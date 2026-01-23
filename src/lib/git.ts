@@ -1,0 +1,83 @@
+import { existsSync } from 'fs'
+import { join } from 'path'
+
+export type GitResult =
+  | { success: true; output?: string }
+  | { success: false; error: string }
+
+export type GitCommitResult =
+  | { success: true; commitHash: string }
+  | { success: false; error: string }
+
+export const isGitRepo = (dir: string): boolean => {
+  return existsSync(join(dir, '.git'))
+}
+
+const runGit = async (dir: string, args: string[]): Promise<GitResult> => {
+  try {
+    const proc = Bun.spawn(['git', ...args], {
+      cwd: dir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      return { success: false, error: stderr.trim() || `Git command failed with exit code ${exitCode}` }
+    }
+
+    return { success: true, output: stdout.trim() }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, error: message }
+  }
+}
+
+export const gitInit = async (dir: string): Promise<GitResult> => {
+  if (isGitRepo(dir)) {
+    return { success: true, output: 'Already a git repository' }
+  }
+
+  return runGit(dir, ['init'])
+}
+
+export const gitAdd = async (dir: string, filePath: string): Promise<GitResult> => {
+  return runGit(dir, ['add', filePath])
+}
+
+export const gitCommit = async (dir: string, message: string): Promise<GitCommitResult> => {
+  const result = await runGit(dir, ['commit', '-m', message])
+
+  if (!result.success) {
+    return result
+  }
+
+  const hashResult = await runGit(dir, ['rev-parse', '--short', 'HEAD'])
+
+  if (!hashResult.success) {
+    return { success: true, commitHash: 'unknown' }
+  }
+
+  return { success: true, commitHash: hashResult.output ?? 'unknown' }
+}
+
+export const ensureGitConfig = async (dir: string): Promise<GitResult> => {
+  const nameResult = await runGit(dir, ['config', 'user.name'])
+
+  if (!nameResult.success || !nameResult.output) {
+    const setName = await runGit(dir, ['config', 'user.name', 'skillbook'])
+    if (!setName.success) return setName
+  }
+
+  const emailResult = await runGit(dir, ['config', 'user.email'])
+
+  if (!emailResult.success || !emailResult.output) {
+    const setEmail = await runGit(dir, ['config', 'user.email', 'skillbook@local'])
+    if (!setEmail.success) return setEmail
+  }
+
+  return { success: true }
+}

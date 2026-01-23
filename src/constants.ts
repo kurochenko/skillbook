@@ -1,4 +1,3 @@
-// Tool configurations for symlink targets
 export const TOOLS = {
   'claude-code': {
     name: 'Claude Code',
@@ -21,7 +20,6 @@ export type ToolId = keyof typeof TOOLS
 
 export const SUPPORTED_TOOLS = Object.keys(TOOLS) as ToolId[]
 
-// Default paths
 export const DEFAULT_LIBRARY_PATH = '~/.config/skillbook'
 export const SKILLS_DIR = 'skills'
 export const SKILL_FILE = 'SKILL.md'

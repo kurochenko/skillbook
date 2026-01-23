@@ -4,11 +4,13 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 
 ## The Problem
 
-You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skills/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
+**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skills/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
+
+**Experimentation clutter.** You want to try a new skill - maybe a coding style guide or a review checklist. But committing experimental skills to your project repo feels wrong. You end up with half-baked `.md` files cluttering your projects, or you avoid trying new skills altogether.
 
 ## The Solution
 
-**skillbook** gives you a central library of skills that sync to any project:
+**skillbook** gives you a central library of skills that sync to any project. Try skills freely, toggle them on/off per project, keep your repos clean:
 
 ```
 ~/.config/skillbook/skills/     # Your skill library (one source of truth)
