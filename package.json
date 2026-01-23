@@ -1,0 +1,26 @@
+{
+  "name": "skillbook",
+  "version": "0.1.0",
+  "description": "Manage AI coding assistant skills across projects",
+  "type": "module",
+  "bin": {
+    "skillbook": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --compile --outfile dist/skillbook",
+    "test": "bun test"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "citty": "^0.2.0",
+    "picocolors": "^1.1.1"
+  }
+}
