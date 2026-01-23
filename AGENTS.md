@@ -2,6 +2,32 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Skills
+
+Load relevant skills for the current task:
+
+| Skill | Use When |
+|-------|----------|
+| `typescript-cli` | Writing code, implementing features, code review |
+| `git-workflow` | Creating branches, commits, merge requests |
+| `beads` | Multi-session work, task tracking |
+
+## Commands
+
+```bash
+bun run src/cli.ts        # Run the CLI (during development)
+bun run build             # Build for distribution
+bun test                  # Run tests
+```
+
+## Code Style
+
+- **No semicolons**, single quotes, trailing commas
+- **Arrow functions** everywhere
+- **Explicit types** for public interfaces
+- **Early returns** to reduce nesting
+- See `typescript-cli` skill for full guidelines
+
 ## Quick Reference
 
 ```bash
