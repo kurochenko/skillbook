@@ -4,7 +4,7 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 
 ## The Problem
 
-**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skills/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
+**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skill/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
 
 **Experimentation clutter.** You want to try a new skill - maybe a coding style guide or a review checklist. But committing experimental skills to your project repo feels wrong. You end up with half-baked `.md` files cluttering your projects, or you avoid trying new skills altogether.
 
@@ -20,7 +20,7 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 
 project-a/.claude/skills/       # Symlinked from library
 project-b/.cursor/rules/        # Same skills, different tool
-project-c/.opencode/skills/     # Always in sync
+project-c/.opencode/skill/      # Always in sync
 ```
 
 ## Installation
@@ -143,7 +143,7 @@ Each skill is a folder containing a `SKILL.md` file. The folder name is the skil
 |------|---------------|--------|
 | **Claude Code** | `.claude/skills/<name>/SKILL.md` | Directory with SKILL.md |
 | **Cursor** | `.cursor/rules/<name>.md` | Flat .md file |
-| **OpenCode** | `.opencode/skills/<name>.md` | Flat .md file |
+| **OpenCode** | `.opencode/skill/<name>/SKILL.md` | Directory with SKILL.md |
 
 ## Development
 
@@ -187,8 +187,9 @@ bun test
 
 ### MVP (Current)
 - [x] Project setup
+- [x] `skillbook add` - Add skill to library
+- [ ] `skillbook add --bulk` - Scan project and bulk add skills
 - [ ] `skillbook list` - List available skills
-- [ ] `skillbook add` - Add skill to library
 - [ ] `skillbook init` - Interactive skill installation
 
 ### Phase 2
