@@ -173,10 +173,13 @@ const HarnessStateBadge = ({ state }: { state: HarnessState }) => {
   if (state === 'enabled') {
     return <Text color="green">[✓]</Text>
   }
+  if (state === 'detached') {
+    return <Text dimColor>[d]</Text>
+  }
   if (state === 'partial') {
     return <Text color="yellow">[~]</Text>
   }
-  return <Text dimColor>[—]</Text>
+  return <Text dimColor>[ ]</Text>
 }
 
 const HarnessRow = ({
@@ -246,6 +249,8 @@ const HelpBar = ({ tab, selectedRow, selectedHarness }: { tab: Tab; selectedRow:
     const { state } = selectedHarness
     if (state === 'enabled') {
       harnessParts.push('[d]etach', '[r]emove')
+    } else if (state === 'detached') {
+      harnessParts.push('[e]nable', '[r]emove')
     } else if (state === 'partial') {
       harnessParts.push('[e]nable', '[d]etach')
     } else {
@@ -463,14 +468,14 @@ const App = ({ projectPath, inProject }: AppProps) => {
       const installedSkillNames = installedSkills.map((s) => s.name)
       const currentlyEnabled = harnesses.filter((h) => h.state === 'enabled').map((h) => h.id)
 
-      // Enable (e) - available for partial and available states
-      if (input === 'e' && (state === 'partial' || state === 'available')) {
+      // Enable (e) - available for partial, detached, and available states
+      if (input === 'e' && (state === 'partial' || state === 'detached' || state === 'available')) {
         enableHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
         loadData()
       }
 
-      // Remove (r) - available for enabled and partial states, needs confirmation
-      if (input === 'r' && (state === 'enabled' || state === 'partial')) {
+      // Remove (r) - available for enabled, detached, and partial states, needs confirmation
+      if (input === 'r' && (state === 'enabled' || state === 'detached' || state === 'partial')) {
         setConfirmAction({
           message: `Remove "${selectedHarness.name}" harness folder?\nThis will delete all files in the harness folder.`,
           onConfirm: () => {
@@ -480,7 +485,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
         })
       }
 
-      // Detach (d) - available for enabled and partial states
+      // Detach (d) - available for enabled and partial states (not detached - already detached)
       if (input === 'd' && (state === 'enabled' || state === 'partial')) {
         detachHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
         loadData()

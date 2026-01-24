@@ -165,19 +165,39 @@ Destructive actions show confirmation prompts only when information would be los
 | State | Symbol | Description |
 |-------|--------|-------------|
 | **Enabled** | `[✓]` | Fully managed, all installed skills are symlinked |
-| **Partial** | `[~]` | Folder exists with content, but not fully managed (mixed state) |
-| **Available** | `[—]` | No folder exists, can be enabled |
+| **Detached** | `[d]` | Folder exists with real files only (no symlinks), clean standalone state |
+| **Partial** | `[~]` | Mixed state (some symlinks, some real files, or inconsistent) |
+| **Available** | `[—]` | No folder exists |
 
 ### Harness Actions
 
 | Key | Action | When Available | Description | Confirm? |
 |-----|--------|----------------|-------------|----------|
-| `e` | **Enable** | Partial, Available | Add to config, sync all installed skills (create symlinks) | No |
-| `r` | **Remove** | Enabled, Partial | Delete the harness folder entirely | Yes |
+| `e` | **Enable** | Partial, Detached, Available | Add to config, sync all installed skills (create symlinks) | No |
+| `r` | **Remove** | Enabled, Detached, Partial | Delete the harness folder entirely | Yes |
 | `d` | **Detach** | Enabled, Partial | Convert symlinks to real files, remove from config | No |
 
 ### Harness State Detection
 
+```
+if (folder doesn't exist):
+  state = 'available'
+else if (in config AND all installed skills are symlinked):
+  state = 'enabled'
+else if (not in config AND all present skills are real files):
+  state = 'detached'
+else:
+  state = 'partial'  // mixed state
+```
+
+### Harness Tab Display
+
+```
+HARNESSES
+> [✓] Claude Code                    ← enabled, fully managed
+  [d] OpenCode                       ← detached, real files only
+  [~] Cursor                         ← partial, mixed state
+  [—] Other                          ← available, no folder
 ```
 if (folder doesn't exist):
   state = 'available'

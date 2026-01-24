@@ -2,13 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, lstatSync }
 import { join, dirname } from 'path'
 import { readConfig, setHarnessEnabled } from './config.js'
 import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '../constants.js'
-import { isSkillSymlinked, createSkillSymlink } from './symlinks.js'
+import { isSkillSymlinked, convertToSymlink } from './symlinks.js'
 
 // Harness state:
 // - 'enabled': Fully managed, all installed skills are symlinked
-// - 'partial': Folder exists with content, but not fully managed (mixed state)
+// - 'detached': Folder exists with real files only (no symlinks), consistent state
+// - 'partial': Mixed state (some symlinks, some real files, or inconsistent)
 // - 'available': No folder exists
-export type HarnessState = 'enabled' | 'partial' | 'available'
+export type HarnessState = 'enabled' | 'detached' | 'partial' | 'available'
 
 export type HarnessInfo = {
   id: ToolId
@@ -78,7 +79,8 @@ export const getEnabledHarnesses = (projectPath: string): ToolId[] => {
 /**
  * Detect the state of a harness.
  * - 'enabled': In config AND all installed skills are symlinked
- * - 'partial': Folder exists but not fully managed
+ * - 'detached': Folder exists, not in config, all present skills are real files (no symlinks)
+ * - 'partial': Mixed state (some symlinks, some real files, or inconsistent)
  * - 'available': No folder exists
  */
 export const getHarnessState = (
@@ -96,26 +98,50 @@ export const getHarnessState = (
   const config = readConfig(projectPath)
   const inConfig = config?.harnesses.includes(harnessId) ?? false
 
-  if (!inConfig) {
+  // Count symlinked vs not symlinked skills in this harness
+  const skillStatuses = installedSkillNames.map((skillName) => ({
+    name: skillName,
+    isSymlinked: isSkillSymlinked(projectPath, harnessId, skillName),
+    exists: skillExistsInHarness(projectPath, harnessId, skillName),
+  }))
+
+  const presentSkills = skillStatuses.filter((s) => s.exists)
+  const allSymlinked = presentSkills.length > 0 && presentSkills.every((s) => s.isSymlinked)
+  const noneSymlinked = presentSkills.length > 0 && presentSkills.every((s) => !s.isSymlinked)
+
+  if (inConfig) {
+    // In config - check if fully managed
+    if (allSymlinked || presentSkills.length === 0) {
+      return 'enabled'
+    }
+    // In config but mixed or no symlinks
+    return 'partial'
+  } else {
+    // Not in config
+    if (noneSymlinked) {
+      // All real files, no symlinks - this is a clean detached state
+      return 'detached'
+    }
+    if (presentSkills.length === 0) {
+      // Folder exists but no skills - could be empty or have other content
+      return 'partial'
+    }
+    // Mixed state (some symlinks, some real) or only symlinks without config
     return 'partial'
   }
+}
 
-  // Check if all installed skills are symlinked
-  const allSymlinked = installedSkillNames.every((skillName) =>
-    isSkillSymlinked(projectPath, harnessId, skillName)
-  )
-
-  if (allSymlinked && installedSkillNames.length > 0) {
-    return 'enabled'
-  }
-
-  // In config but not all symlinked, or no skills installed yet
-  // If no skills, consider it enabled (nothing to sync)
-  if (installedSkillNames.length === 0) {
-    return 'enabled'
-  }
-
-  return 'partial'
+/**
+ * Check if a skill exists in a harness (regardless of symlink status)
+ */
+const skillExistsInHarness = (
+  projectPath: string,
+  harnessId: ToolId,
+  skillName: string,
+): boolean => {
+  const tool = TOOLS[harnessId]
+  const skillPath = join(projectPath, tool.skillPath(skillName))
+  return existsSync(skillPath)
 }
 
 /**
@@ -266,9 +292,9 @@ export const enableHarness = (
   // Add to config
   setHarnessEnabled(projectPath, harnessId, true, currentlyEnabled)
 
-  // Create symlinks for all installed skills
+  // Create symlinks for all installed skills (convertToSymlink handles real files)
   for (const skillName of installedSkillNames) {
-    createSkillSymlink(projectPath, harnessId, skillName)
+    convertToSymlink(projectPath, harnessId, skillName)
   }
 }
 
