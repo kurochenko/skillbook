@@ -312,7 +312,7 @@ describe('add --bulk command', () => {
 
       const result = runCliBulk()
 
-      expect(result.output).toContain('1 found in 1 projects')
+      expect(result.output).toContain('1 in 1 projects')
     })
 
     test('finds skills from .cursor/rules/', () => {
@@ -320,7 +320,7 @@ describe('add --bulk command', () => {
 
       const result = runCliBulk()
 
-      expect(result.output).toContain('1 found in 1 projects')
+      expect(result.output).toContain('1 in 1 projects')
     })
 
     test('finds skills from .opencode/skill/', () => {
@@ -328,7 +328,7 @@ describe('add --bulk command', () => {
 
       const result = runCliBulk()
 
-      expect(result.output).toContain('1 found in 1 projects')
+      expect(result.output).toContain('1 in 1 projects')
     })
 
     test('finds skills from multiple locations', () => {
@@ -338,17 +338,18 @@ describe('add --bulk command', () => {
 
       const result = runCliBulk()
 
-      expect(result.output).toContain('3 found in 1 projects')
+      expect(result.output).toContain('3 in 1 projects')
     })
 
-    test('detects duplicate skills across locations', () => {
+    test('detects conflicting skills with different content', () => {
       createProjectSkill('.claude/skills/dupe/SKILL.md', '# Claude version')
       createProjectSkill('.cursor/rules/dupe.md', '# Cursor version')
 
       const result = runCliBulk()
 
-      expect(result.output).toContain('2 found in 1 projects')
-      expect(result.output).toContain('multiple locations')
+      expect(result.output).toContain('2 in 1 projects')
+      expect(result.output).toContain('multiple versions')
+      expect(result.output).toContain('2 versions')
     })
 
     test('scans specified directory with --dir flag', () => {
@@ -363,7 +364,7 @@ describe('add --bulk command', () => {
       })
 
       const output = result.stdout + result.stderr
-      expect(output).toContain('1 found in 1 projects')
+      expect(output).toContain('1 in 1 projects')
     })
   })
 })

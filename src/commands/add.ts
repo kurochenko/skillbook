@@ -12,21 +12,34 @@ import {
   type ScannedSkill,
 } from '../lib/library.ts'
 
-const formatStatus = (status: ScannedSkill['status']): string => {
-  switch (status) {
-    case 'new':
-      return pc.green('[new]')
+const formatStatus = (skill: ScannedSkill): string => {
+  switch (skill.status) {
+    case 'untracked':
+      return pc.dim('[untracked]')
     case 'synced':
-      return pc.dim('[synced]')
-    case 'changed':
-      return pc.yellow('[changed]')
+      return pc.green('[synced]')
+    case 'ahead': {
+      const diff = skill.diff
+      if (diff) {
+        const parts = []
+        if (diff.additions > 0) parts.push(`+${diff.additions}`)
+        if (diff.deletions > 0) parts.push(`-${diff.deletions}`)
+        return pc.yellow(`[ahead ${parts.join('/')}]`)
+      }
+      return pc.yellow('[ahead]')
+    }
   }
 }
 
-const formatDuplicate = (hasDuplicates: boolean): string => {
-  return hasDuplicates ? pc.red(' ⚠ duplicate') : ''
+const formatConflict = (skill: ScannedSkill): string => {
+  if (!skill.hasConflict) return ''
+  return pc.red(` ⚠ ${skill.conflictCount} versions`)
 }
 
+/**
+ * Find skills where user selected multiple versions with DIFFERENT content.
+ * If all selected versions have identical content, no conflict (any one works).
+ */
 const findDuplicateConflicts = (selected: ScannedSkill[]): Map<string, ScannedSkill[]> => {
   const byName = new Map<string, ScannedSkill[]>()
   for (const skill of selected) {
@@ -38,18 +51,25 @@ const findDuplicateConflicts = (selected: ScannedSkill[]): Map<string, ScannedSk
   const conflicts = new Map<string, ScannedSkill[]>()
   for (const [name, skills] of byName) {
     if (skills.length > 1) {
-      conflicts.set(name, skills)
+      // Only conflict if content differs
+      const uniqueContents = new Set(skills.map((s) => s.content))
+      if (uniqueContents.size > 1) {
+        conflicts.set(name, skills)
+      }
     }
   }
   return conflicts
 }
 
 const runBulkAdd = async (force: boolean, basePath: string) => {
+  p.intro(pc.cyan('Add skills to library'))
+
   const skills = await scanProjectSkills(basePath)
 
   if (skills.length === 0) {
     p.log.warn('No skills found')
     p.log.info(pc.dim('Looked in: .claude/skills/, .cursor/rules/, .opencode/skill/'))
+    p.outro(pc.dim('Nothing to add'))
     process.exit(0)
   }
 
@@ -65,10 +85,21 @@ const runBulkAdd = async (force: boolean, basePath: string) => {
   const sortedProjects = Array.from(byProject.keys()).sort()
   const projectCount = sortedProjects.length
 
-  const hasDuplicates = skills.some((s) => s.hasDuplicates)
+  // Show legend for status labels
+  const untrackedCount = skills.filter((s) => s.status === 'untracked').length
+  const syncedCount = skills.filter((s) => s.status === 'synced').length
+  const aheadCount = skills.filter((s) => s.status === 'ahead').length
 
-  if (hasDuplicates) {
-    p.log.warn(pc.yellow('Some skills exist in multiple locations. Select only one per name.'))
+  const legend = []
+  if (untrackedCount > 0) legend.push(`${pc.dim('[untracked]')} not in library`)
+  if (syncedCount > 0) legend.push(`${pc.green('[synced]')} in library, matches`)
+  if (aheadCount > 0) legend.push(`${pc.yellow('[ahead]')} in library, local has changes`)
+  p.log.message(legend.join('  '))
+
+  const hasConflicts = skills.some((s) => s.hasConflict)
+
+  if (hasConflicts) {
+    p.log.warn(pc.yellow('Some skills have multiple versions. Select only one per name.'))
   }
 
   // Build grouped options for clack groupMultiselect
@@ -78,25 +109,25 @@ const runBulkAdd = async (force: boolean, basePath: string) => {
     const projectSkills = byProject.get(project)!.sort((a, b) => a.name.localeCompare(b.name))
 
     groupedOptions[`${project} ${pc.dim(`(${projectSkills.length})`)}`] = projectSkills.map((skill) => {
-      const statusLabel = formatStatus(skill.status)
-      const dupeLabel = formatDuplicate(skill.hasDuplicates)
+      const statusLabel = formatStatus(skill)
+      const conflictLabel = formatConflict(skill)
 
       return {
         value: skill,
-        label: `${statusLabel} ${skill.name}${dupeLabel}`,
+        label: `${statusLabel} ${skill.name}${conflictLabel}`,
       }
     })
   }
 
-  // Pre-select new skills that don't have duplicates
-  const initialValues = skills.filter((s) => s.status === 'new' && !s.hasDuplicates)
+  // Pre-select untracked skills that don't have conflicts
+  const initialValues = skills.filter((s) => s.status === 'untracked' && !s.hasConflict)
 
   let selected: ScannedSkill[]
 
   // Loop until valid selection (no duplicate conflicts)
   while (true) {
     const result = await p.groupMultiselect({
-      message: `Select skills to add (${skills.length} found in ${projectCount} projects):`,
+      message: `Select skills to add to library (${skills.length} in ${projectCount} projects):`,
       options: groupedOptions,
       initialValues,
     })

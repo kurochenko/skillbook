@@ -80,7 +80,7 @@ describe('scanProjectSkills', () => {
       expect(skills.map((s) => s.name)).toEqual(['skill-a', 'skill-b', 'skill-c'])
     })
 
-    test('returns all skills with same name and marks them as duplicates', async () => {
+    test('marks skills with same name but different content as conflicts', async () => {
       createProjectSkill('.claude/skills/dupe/SKILL.md', '# Claude version')
       createProjectSkill('.cursor/rules/dupe.md', '# Cursor version')
 
@@ -88,16 +88,30 @@ describe('scanProjectSkills', () => {
 
       expect(skills).toHaveLength(2)
       expect(skills.every((s) => s.name === 'dupe')).toBe(true)
-      expect(skills.every((s) => s.hasDuplicates)).toBe(true)
+      expect(skills.every((s) => s.hasConflict)).toBe(true)
+      expect(skills.every((s) => s.conflictCount === 2)).toBe(true)
     })
 
-    test('marks non-duplicate skills with hasDuplicates: false', async () => {
+    test('marks skills with same name and same content as non-conflict', async () => {
+      createProjectSkill('.claude/skills/dupe/SKILL.md', '# Same content')
+      createProjectSkill('.cursor/rules/dupe.md', '# Same content')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(2)
+      expect(skills.every((s) => s.name === 'dupe')).toBe(true)
+      expect(skills.every((s) => s.hasConflict)).toBe(false)
+      expect(skills.every((s) => s.conflictCount === 0)).toBe(true)
+    })
+
+    test('marks unique skills as non-conflict', async () => {
       createProjectSkill('.claude/skills/unique/SKILL.md', '# Unique skill')
 
       const skills = await scanProjectSkills(projectDir)
 
       expect(skills).toHaveLength(1)
-      expect(skills[0]!.hasDuplicates).toBe(false)
+      expect(skills[0]!.hasConflict).toBe(false)
+      expect(skills[0]!.conflictCount).toBe(0)
     })
 
     test('returns skills sorted by name', async () => {
@@ -123,12 +137,12 @@ describe('scanProjectSkills', () => {
 
 
   describe('status detection', () => {
-    test('marks skills not in library as "new"', async () => {
+    test('marks skills not in library as "untracked"', async () => {
       createProjectSkill('.claude/skills/brand-new/SKILL.md', '# New skill')
 
       const skills = await scanProjectSkills(projectDir)
 
-      expect(skills[0]!.status).toBe('new')
+      expect(skills[0]!.status).toBe('untracked')
     })
 
     test('marks skills with identical content as "synced"', async () => {
@@ -141,13 +155,13 @@ describe('scanProjectSkills', () => {
       expect(skills[0]!.status).toBe('synced')
     })
 
-    test('marks skills with different content as "changed"', async () => {
+    test('marks skills with different content as "ahead"', async () => {
       createProjectSkill('.claude/skills/changed/SKILL.md', '# Version 2')
       await addSkillToLibrary('changed', '# Version 1')
 
       const skills = await scanProjectSkills(projectDir)
 
-      expect(skills[0]!.status).toBe('changed')
+      expect(skills[0]!.status).toBe('ahead')
     })
   })
 
@@ -177,6 +191,126 @@ describe('scanProjectSkills', () => {
       const skills = await scanProjectSkills(projectDir)
 
       expect(skills[0]!.project).toBe('project')
+    })
+  })
+
+
+  describe('diff calculation', () => {
+    test('calculates additions correctly', async () => {
+      await addSkillToLibrary('diff-test', '# Original')
+      createProjectSkill('.claude/skills/diff-test/SKILL.md', '# Original\nLine 2\nLine 3')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.diff).not.toBeNull()
+      expect(skills[0]!.diff!.additions).toBe(2)
+      expect(skills[0]!.diff!.deletions).toBe(0)
+    })
+
+    test('calculates deletions correctly', async () => {
+      await addSkillToLibrary('diff-test', '# Original\nLine 2\nLine 3')
+      createProjectSkill('.claude/skills/diff-test/SKILL.md', '# Original')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.diff).not.toBeNull()
+      expect(skills[0]!.diff!.additions).toBe(0)
+      expect(skills[0]!.diff!.deletions).toBe(2)
+    })
+
+    test('calculates mixed changes correctly', async () => {
+      await addSkillToLibrary('diff-test', '# Original\nOld line')
+      createProjectSkill('.claude/skills/diff-test/SKILL.md', '# Original\nNew line\nExtra line')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.diff).not.toBeNull()
+      expect(skills[0]!.diff!.additions).toBe(2) // 'New line' and 'Extra line'
+      expect(skills[0]!.diff!.deletions).toBe(1) // 'Old line'
+    })
+
+    test('returns null diff for new skills', async () => {
+      createProjectSkill('.claude/skills/brand-new/SKILL.md', '# New skill')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.diff).toBeNull()
+    })
+
+    test('returns null diff for synced skills', async () => {
+      const content = '# Same'
+      await addSkillToLibrary('synced', content)
+      createProjectSkill('.claude/skills/synced/SKILL.md', content)
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.diff).toBeNull()
+    })
+  })
+
+
+  describe('conflict scenarios', () => {
+    test('multiple synced skills have no conflict', async () => {
+      const content = '# Same content'
+      await addSkillToLibrary('shared', content)
+      createProjectSkill('.claude/skills/shared/SKILL.md', content)
+      createProjectSkill('.cursor/rules/shared.md', content)
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(2)
+      expect(skills.every((s) => s.status === 'synced')).toBe(true)
+      expect(skills.every((s) => !s.hasConflict)).toBe(true)
+    })
+
+    test('multiple changed skills with same changes have no conflict', async () => {
+      await addSkillToLibrary('shared', '# V1')
+      createProjectSkill('.claude/skills/shared/SKILL.md', '# V2')
+      createProjectSkill('.cursor/rules/shared.md', '# V2')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(2)
+      expect(skills.every((s) => s.status === 'ahead')).toBe(true)
+      expect(skills.every((s) => !s.hasConflict)).toBe(true)
+    })
+
+    test('multiple changed skills with different changes have conflict', async () => {
+      await addSkillToLibrary('shared', '# V1')
+      createProjectSkill('.claude/skills/shared/SKILL.md', '# V2-claude')
+      createProjectSkill('.cursor/rules/shared.md', '# V2-cursor')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(2)
+      expect(skills.every((s) => s.status === 'ahead')).toBe(true)
+      expect(skills.every((s) => s.hasConflict)).toBe(true)
+      expect(skills.every((s) => s.conflictCount === 2)).toBe(true)
+    })
+
+    test('mix of synced and changed shows conflict only for changed', async () => {
+      const libraryContent = '# Library version'
+      await addSkillToLibrary('shared', libraryContent)
+      createProjectSkill('.claude/skills/shared/SKILL.md', libraryContent) // synced
+      createProjectSkill('.cursor/rules/shared.md', '# Different version') // changed
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(2)
+      // Both should show conflict because there are 2 different content versions
+      expect(skills.every((s) => s.hasConflict)).toBe(true)
+    })
+
+    test('three versions shows conflictCount of 3', async () => {
+      createProjectSkill('.claude/skills/multi/SKILL.md', '# Version A')
+      createProjectSkill('.cursor/rules/multi.md', '# Version B')
+      createProjectSkill('.opencode/skill/multi/SKILL.md', '# Version C')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(3)
+      expect(skills.every((s) => s.hasConflict)).toBe(true)
+      expect(skills.every((s) => s.conflictCount === 3)).toBe(true)
     })
   })
 })

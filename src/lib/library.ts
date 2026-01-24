@@ -154,15 +154,49 @@ export const addSkillToLibrary = async (
   }
 }
 
-export type SkillStatus = 'new' | 'synced' | 'changed'
+export type SkillStatus = 'untracked' | 'synced' | 'ahead'
+
+export type DiffStats = {
+  additions: number
+  deletions: number
+}
 
 export type ScannedSkill = {
   name: string
   path: string
   content: string
   status: SkillStatus
-  hasDuplicates: boolean
+  diff: DiffStats | null  // null for 'untracked' and 'synced', populated for 'ahead'
+  hasConflict: boolean    // true only if multiple locations have DIFFERENT content
+  conflictCount: number   // number of different versions (0, 2, 3, etc.)
   project: string
+}
+
+/**
+ * Calculate line-based diff between two strings.
+ * Returns additions (lines in `current` not in `base`) and deletions (lines in `base` not in `current`).
+ */
+export const calculateDiff = (base: string, current: string): DiffStats => {
+  const baseLines = base.split('\n')
+  const currentLines = current.split('\n')
+  
+  // Simple line-based diff: count lines added and removed
+  // This is a simplified approach - not a full diff algorithm
+  const baseSet = new Set(baseLines)
+  const currentSet = new Set(currentLines)
+  
+  let additions = 0
+  let deletions = 0
+  
+  for (const line of currentLines) {
+    if (!baseSet.has(line)) additions++
+  }
+  
+  for (const line of baseLines) {
+    if (!currentSet.has(line)) deletions++
+  }
+  
+  return { additions, deletions }
 }
 
 // Directories to skip during traversal - only truly bulky ones with deep nesting
@@ -200,8 +234,17 @@ const extractProjectFromPath = (filePath: string): string => {
   return 'unknown'
 }
 
+type PartialSkill = {
+  name: string
+  path: string
+  content: string
+  status: SkillStatus
+  diff: DiffStats | null
+  project: string
+}
+
 export type ScanOptions = {
-  onSkillFound?: (skill: Omit<ScannedSkill, 'hasDuplicates'>) => void
+  onSkillFound?: (skill: PartialSkill) => void
 }
 
 /**
@@ -224,8 +267,8 @@ export const scanProjectSkills = async (
     .withPromise()
 
   // Process each skill file
-  const skills: Omit<ScannedSkill, 'hasDuplicates'>[] = []
-  const nameCount = new Map<string, number>()
+  const skills: PartialSkill[] = []
+  const skillsByName = new Map<string, PartialSkill[]>()
 
   for (const file of skillFiles) {
     const name = extractSkillName(file)
@@ -239,23 +282,57 @@ export const scanProjectSkills = async (
     const project = extractProjectFromPath(file)
 
     let status: SkillStatus
+    let diff: DiffStats | null = null
+
     if (libraryContent === null) {
-      status = 'new'
+      status = 'untracked'
     } else if (libraryContent === content) {
       status = 'synced'
     } else {
-      status = 'changed'
+      status = 'ahead'
+      diff = calculateDiff(libraryContent, content)
     }
 
-    const skill = { name, path: file, content, status, project }
+    const skill: PartialSkill = { name, path: file, content, status, diff, project }
     skills.push(skill)
-    nameCount.set(name, (nameCount.get(name) ?? 0) + 1)
+
+    // Group by name for conflict detection
+    const existing = skillsByName.get(name) ?? []
+    existing.push(skill)
+    skillsByName.set(name, existing)
 
     onSkillFound?.(skill)
   }
 
-  // Mark duplicates and sort
+  // Determine conflicts: only if multiple locations have DIFFERENT content
+  // Note: synced items all have same content (they match library), so no conflict possible
+  const getConflictInfo = (name: string): { hasConflict: boolean; conflictCount: number } => {
+    const instances = skillsByName.get(name) ?? []
+    if (instances.length <= 1) {
+      return { hasConflict: false, conflictCount: 0 }
+    }
+
+    // If all are synced, no conflict (all identical to library, thus to each other)
+    if (instances.every((s) => s.status === 'synced')) {
+      return { hasConflict: false, conflictCount: 0 }
+    }
+
+    // Count unique content versions
+    const uniqueContents = new Set(instances.map((s) => s.content))
+    const conflictCount = uniqueContents.size
+
+    // Conflict exists if there are multiple different versions
+    return {
+      hasConflict: conflictCount > 1,
+      conflictCount: conflictCount > 1 ? conflictCount : 0,
+    }
+  }
+
+  // Add conflict info and sort
   return skills
-    .map((skill) => ({ ...skill, hasDuplicates: (nameCount.get(skill.name) ?? 0) > 1 }))
+    .map((skill) => {
+      const { hasConflict, conflictCount } = getConflictInfo(skill.name)
+      return { ...skill, hasConflict, conflictCount }
+    })
     .sort((a, b) => a.name.localeCompare(b.name))
 }
