@@ -154,7 +154,47 @@ typescript-cli
 |--------|-----|-------------|
 | Use as source | `s` | Push this harness's content to library, sync all other harnesses |
 
-Destructive harness-level actions show confirmation prompts.
+Destructive actions show confirmation prompts only when information would be lost.
+
+---
+
+## Harness Tab
+
+### Harness States
+
+| State | Symbol | Description |
+|-------|--------|-------------|
+| **Enabled** | `[✓]` | Fully managed, all installed skills are symlinked |
+| **Partial** | `[~]` | Folder exists with content, but not fully managed (mixed state) |
+| **Available** | `[—]` | No folder exists, can be enabled |
+
+### Harness Actions
+
+| Key | Action | When Available | Description | Confirm? |
+|-----|--------|----------------|-------------|----------|
+| `e` | **Enable** | Partial, Available | Add to config, sync all installed skills (create symlinks) | No |
+| `r` | **Remove** | Enabled, Partial | Delete the harness folder entirely | Yes |
+| `d` | **Detach** | Enabled, Partial | Convert symlinks to real files, remove from config | No |
+
+### Harness State Detection
+
+```
+if (folder doesn't exist):
+  state = 'available'
+else if (in config AND all installed skills are symlinked):
+  state = 'enabled'
+else:
+  state = 'partial'  // folder exists but not fully managed
+```
+
+### Harness Tab Display
+
+```
+HARNESSES
+> [✓] Claude Code                    ← enabled, fully managed
+  [~] OpenCode                       ← partial, has content but not managed
+  [—] Cursor                         ← available, no folder
+```
 
 ---
 

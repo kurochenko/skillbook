@@ -16,12 +16,13 @@ import {
 } from '../lib/project.js'
 import {
   getHarnessesInfo,
-  syncAllSkillsToHarness,
-  removeAllSkillsFromHarness,
+  enableHarness,
+  removeHarness,
+  detachHarness,
   type HarnessInfo,
+  type HarnessState,
 } from '../lib/harness.js'
-import { setHarnessEnabled } from '../lib/config.js'
-import { TOOLS, type ToolId } from '../constants.js'
+import { TOOLS } from '../constants.js'
 
 type Tab = 'skills' | 'harnesses'
 
@@ -167,6 +168,17 @@ const RowDisplay = ({ row, selected }: { row: SkillRow; selected: boolean }) => 
   }
 }
 
+// Harness state badge
+const HarnessStateBadge = ({ state }: { state: HarnessState }) => {
+  if (state === 'enabled') {
+    return <Text color="green">[✓]</Text>
+  }
+  if (state === 'partial') {
+    return <Text color="yellow">[~]</Text>
+  }
+  return <Text dimColor>[—]</Text>
+}
+
 const HarnessRow = ({
   harness,
   selected,
@@ -176,15 +188,14 @@ const HarnessRow = ({
 }) => {
   return (
     <Box>
-      <Text color={selected ? 'blue' : undefined} bold={selected}>
-        {selected ? '>' : ' '} [{harness.enabled ? 'x' : ' '}] {harness.name}
-        {harness.exists && !harness.enabled && <Text dimColor> (folder exists)</Text>}
-      </Text>
+      <Text color={selected ? 'blue' : undefined} bold={selected}>{selected ? '>' : ' '} </Text>
+      <HarnessStateBadge state={harness.state} />
+      <Text color={selected ? 'blue' : undefined} bold={selected}> {harness.name}</Text>
     </Box>
   )
 }
 
-const HelpBar = ({ tab, selectedRow }: { tab: Tab; selectedRow: SkillRow | null }) => {
+const HelpBar = ({ tab, selectedRow, selectedHarness }: { tab: Tab; selectedRow: SkillRow | null; selectedHarness: HarnessInfo | null }) => {
   if (tab === 'skills') {
     const parts: string[] = []
 
@@ -228,9 +239,25 @@ const HelpBar = ({ tab, selectedRow }: { tab: Tab; selectedRow: SkillRow | null 
       </Box>
     )
   }
+
+  // Harness tab help bar - context-sensitive based on harness state
+  const harnessParts: string[] = []
+  if (selectedHarness) {
+    const { state } = selectedHarness
+    if (state === 'enabled') {
+      harnessParts.push('[d]etach', '[r]emove')
+    } else if (state === 'partial') {
+      harnessParts.push('[e]nable', '[d]etach')
+    } else {
+      // available
+      harnessParts.push('[e]nable')
+    }
+  }
+  harnessParts.push('[tab] skills', '[q]uit')
+
   return (
     <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
-      <Text dimColor wrap="truncate">[space] toggle  [tab] skills  [q]uit</Text>
+      <Text dimColor wrap="truncate">{harnessParts.join('  ')}</Text>
     </Box>
   )
 }
@@ -266,7 +293,8 @@ const App = ({ projectPath, inProject }: AppProps) => {
     setInstalledSkills(installed)
     setUntrackedSkills(untracked)
     setAvailableSkills(available)
-    setHarnesses(getHarnessesInfo(projectPath))
+    const installedSkillNames = installed.map((s) => s.name)
+    setHarnesses(getHarnessesInfo(projectPath, installedSkillNames))
 
     const newRows = buildSkillRows(installed, untracked, available)
 
@@ -295,6 +323,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const skillRows = buildSkillRows(installedSkills, untrackedSkills, availableSkills)
   const currentList = tab === 'skills' ? skillRows : harnesses
   const selectedRow = tab === 'skills' ? (skillRows[selectedIndex] ?? null) : null
+  const selectedHarness = tab === 'harnesses' ? (harnesses[selectedIndex] ?? null) : null
 
   // Count skills for section headers
   const installedCount = installedSkills.length
@@ -429,30 +458,32 @@ const App = ({ projectPath, inProject }: AppProps) => {
     }
 
     // Actions for harnesses tab
-    if (tab === 'harnesses') {
-      if (input === ' ' || key.return) {
-        const harness = harnesses[selectedIndex]
-        if (harness) {
-          const newEnabled = !harness.enabled
-          const currentlyEnabled = harnesses.filter((h) => h.enabled).map((h) => h.id)
-          setHarnessEnabled(projectPath, harness.id, newEnabled, currentlyEnabled)
+    if (tab === 'harnesses' && selectedHarness) {
+      const { state } = selectedHarness
+      const installedSkillNames = installedSkills.map((s) => s.name)
+      const currentlyEnabled = harnesses.filter((h) => h.state === 'enabled').map((h) => h.id)
 
-          // Sync or remove skills based on toggle
-          if (newEnabled) {
-            // Sync all installed skills to this harness
-            const skills = installedSkills.map((s) => ({ name: s.name, content: s.content }))
-            syncAllSkillsToHarness(projectPath, harness.id as ToolId, skills)
-          } else {
-            // Remove all skills from this harness
-            removeAllSkillsFromHarness(
-              projectPath,
-              harness.id as ToolId,
-              installedSkills.map((s) => s.name),
-            )
-          }
+      // Enable (e) - available for partial and available states
+      if (input === 'e' && (state === 'partial' || state === 'available')) {
+        enableHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
+        loadData()
+      }
 
-          loadData()
-        }
+      // Remove (r) - available for enabled and partial states, needs confirmation
+      if (input === 'r' && (state === 'enabled' || state === 'partial')) {
+        setConfirmAction({
+          message: `Remove "${selectedHarness.name}" harness folder?\nThis will delete all files in the harness folder.`,
+          onConfirm: () => {
+            removeHarness(projectPath, selectedHarness.id, currentlyEnabled)
+            loadData()
+          },
+        })
+      }
+
+      // Detach (d) - available for enabled and partial states
+      if (input === 'd' && (state === 'enabled' || state === 'partial')) {
+        detachHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
+        loadData()
       }
     }
   })
@@ -580,7 +611,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
       {/* Help bar */}
       <Box marginTop={1}>
-        <HelpBar tab={tab} selectedRow={selectedRow} />
+        <HelpBar tab={tab} selectedRow={selectedRow} selectedHarness={selectedHarness} />
       </Box>
 
       {/* Confirmation dialog */}

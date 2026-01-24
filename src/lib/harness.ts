@@ -1,13 +1,19 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, lstatSync } from 'fs'
 import { join, dirname } from 'path'
-import { readConfig } from './config.js'
+import { readConfig, setHarnessEnabled } from './config.js'
 import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '../constants.js'
+import { isSkillSymlinked, createSkillSymlink } from './symlinks.js'
+
+// Harness state:
+// - 'enabled': Fully managed, all installed skills are symlinked
+// - 'partial': Folder exists with content, but not fully managed (mixed state)
+// - 'available': No folder exists
+export type HarnessState = 'enabled' | 'partial' | 'available'
 
 export type HarnessInfo = {
   id: ToolId
   name: string
-  exists: boolean
-  enabled: boolean
+  state: HarnessState
 }
 
 /**
@@ -70,16 +76,57 @@ export const getEnabledHarnesses = (projectPath: string): ToolId[] => {
 }
 
 /**
- * Get full harness info for all supported harnesses
+ * Detect the state of a harness.
+ * - 'enabled': In config AND all installed skills are symlinked
+ * - 'partial': Folder exists but not fully managed
+ * - 'available': No folder exists
  */
-export const getHarnessesInfo = (projectPath: string): HarnessInfo[] => {
-  const enabled = new Set(getEnabledHarnesses(projectPath))
+export const getHarnessState = (
+  projectPath: string,
+  harnessId: ToolId,
+  installedSkillNames: string[],
+): HarnessState => {
+  const exists = harnessExists(projectPath, harnessId)
 
+  if (!exists) {
+    return 'available'
+  }
+
+  // Check if in config
+  const config = readConfig(projectPath)
+  const inConfig = config?.harnesses.includes(harnessId) ?? false
+
+  if (!inConfig) {
+    return 'partial'
+  }
+
+  // Check if all installed skills are symlinked
+  const allSymlinked = installedSkillNames.every((skillName) =>
+    isSkillSymlinked(projectPath, harnessId, skillName)
+  )
+
+  if (allSymlinked && installedSkillNames.length > 0) {
+    return 'enabled'
+  }
+
+  // In config but not all symlinked, or no skills installed yet
+  // If no skills, consider it enabled (nothing to sync)
+  if (installedSkillNames.length === 0) {
+    return 'enabled'
+  }
+
+  return 'partial'
+}
+
+/**
+ * Get full harness info for all supported harnesses.
+ * @param installedSkillNames - Names of installed skills (to check symlink status)
+ */
+export const getHarnessesInfo = (projectPath: string, installedSkillNames: string[] = []): HarnessInfo[] => {
   return SUPPORTED_TOOLS.map((id) => ({
     id,
     name: TOOLS[id].name,
-    exists: harnessExists(projectPath, id),
-    enabled: enabled.has(id),
+    state: getHarnessState(projectPath, id, installedSkillNames),
   }))
 }
 
@@ -202,5 +249,116 @@ export const removeAllSkillsFromHarness = (
 ): void => {
   for (const skillName of skillNames) {
     removeSkillFromHarness(projectPath, harnessId, skillName)
+  }
+}
+
+/**
+ * Enable a harness: add to config, create symlinks for all installed skills.
+ * @param installedSkillNames - Names of installed skills to sync
+ * @param currentlyEnabled - Currently enabled harness IDs (to preserve in config)
+ */
+export const enableHarness = (
+  projectPath: string,
+  harnessId: ToolId,
+  installedSkillNames: string[],
+  currentlyEnabled: string[],
+): void => {
+  // Add to config
+  setHarnessEnabled(projectPath, harnessId, true, currentlyEnabled)
+
+  // Create symlinks for all installed skills
+  for (const skillName of installedSkillNames) {
+    createSkillSymlink(projectPath, harnessId, skillName)
+  }
+}
+
+/**
+ * Remove a harness: delete the harness folder entirely.
+ * This is destructive - the folder and all its contents are deleted.
+ */
+export const removeHarness = (
+  projectPath: string,
+  harnessId: ToolId,
+  currentlyEnabled: string[],
+): void => {
+  const baseDir = getHarnessBaseDir(projectPath, harnessId)
+
+  // Remove from config
+  setHarnessEnabled(projectPath, harnessId, false, currentlyEnabled)
+
+  // Delete the folder
+  if (existsSync(baseDir)) {
+    rmSync(baseDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Detach a harness: convert symlinks to real files, remove from config.
+ * Files are preserved as standalone copies.
+ * @param installedSkillNames - Names of installed skills to detach
+ * @param currentlyEnabled - Currently enabled harness IDs (to preserve in config)
+ */
+export const detachHarness = (
+  projectPath: string,
+  harnessId: ToolId,
+  installedSkillNames: string[],
+  currentlyEnabled: string[],
+): void => {
+  // Convert symlinks to real files
+  for (const skillName of installedSkillNames) {
+    convertSymlinkToRealFile(projectPath, harnessId, skillName)
+  }
+
+  // Remove from config
+  setHarnessEnabled(projectPath, harnessId, false, currentlyEnabled)
+}
+
+/**
+ * Convert a symlink to a real file (for detach operation).
+ * Reads the content through the symlink and writes it as a real file.
+ */
+const convertSymlinkToRealFile = (
+  projectPath: string,
+  harnessId: ToolId,
+  skillName: string,
+): void => {
+  const tool = TOOLS[harnessId]
+  const skillPath = join(projectPath, tool.skillPath(skillName))
+
+  // Check if it's a symlink
+  if (!existsSync(skillPath)) {
+    return
+  }
+
+  try {
+    const stat = lstatSync(skillPath)
+    if (!stat.isSymbolicLink()) {
+      // Already a real file, nothing to do
+      return
+    }
+
+    // Read content through symlink
+    const content = readFileSync(skillPath, 'utf-8')
+
+    // Check if this is a directory-based harness
+    const isDirectorySymlink = tool.needsDirectory
+
+    if (isDirectorySymlink) {
+      // For directory harnesses (claude-code, opencode), the symlink is the skill folder
+      const skillDir = dirname(skillPath)
+
+      // Remove the symlink (it's pointing to the folder)
+      rmSync(skillDir, { force: true })
+
+      // Create the directory and write the file
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(skillPath, content, 'utf-8')
+    } else {
+      // For flat file harnesses (cursor), the symlink is the file itself
+      rmSync(skillPath, { force: true })
+      writeFileSync(skillPath, content, 'utf-8')
+    }
+  } catch {
+    // Ignore errors (broken symlinks, etc.)
   }
 }
