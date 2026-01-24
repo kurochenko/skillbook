@@ -65,14 +65,9 @@ describe('extractSkillName', () => {
     expect(extractSkillName('/Users/foo/.cursor/rules/beads.md')).toBe('beads')
   })
 
-  test('extracts from .opencode/skills/<name>.md (flat)', () => {
-    expect(extractSkillName('.opencode/skills/beads.md')).toBe('beads')
-    expect(extractSkillName('.opencode/skill/typescript.md')).toBe('typescript')
-  })
-
-  test('extracts from .opencode/skill/<name>/SKILL.md (directory)', () => {
+  test('extracts from .opencode/skill/<name>/SKILL.md', () => {
     expect(extractSkillName('.opencode/skill/beads/SKILL.md')).toBe('beads')
-    expect(extractSkillName('.opencode/skills/typescript/SKILL.md')).toBe('typescript')
+    expect(extractSkillName('/Users/foo/.opencode/skill/typescript/SKILL.md')).toBe('typescript')
   })
 
   test('extracts from generic <folder>/SKILL.md', () => {

@@ -38,11 +38,8 @@ export const extractSkillName = (filePath: string): string | null => {
   const cursorMatch = normalizedPath.match(/\.cursor\/rules\/([^/]+)\.md$/i)
   if (cursorMatch) return cursorMatch[1]?.toLowerCase() ?? null
 
-  const opencodeFlat = normalizedPath.match(/\.opencode\/skills?\/([^/]+)\.md$/i)
-  if (opencodeFlat) return opencodeFlat[1]?.toLowerCase() ?? null
-
-  const opencodeDir = normalizedPath.match(/\.opencode\/skills?\/([^/]+)\/SKILL\.md$/i)
-  if (opencodeDir) return opencodeDir[1]?.toLowerCase() ?? null
+  const opencodeMatch = normalizedPath.match(/\.opencode\/skill\/([^/]+)\/SKILL\.md$/i)
+  if (opencodeMatch) return opencodeMatch[1]?.toLowerCase() ?? null
 
   const fileName = basename(normalizedPath)
   if (fileName.toLowerCase() === 'skill.md') {

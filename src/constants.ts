@@ -11,8 +11,8 @@ export const TOOLS = {
   },
   opencode: {
     name: 'OpenCode',
-    skillPath: (name: string) => `.opencode/skills/${name}.md`,
-    needsDirectory: false,
+    skillPath: (name: string) => `.opencode/skill/${name}/SKILL.md`,
+    needsDirectory: true,
   },
 } as const
 

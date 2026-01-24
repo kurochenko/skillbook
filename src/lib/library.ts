@@ -1,8 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
+import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from './paths.ts'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from './git.ts'
 import { SKILL_FILE, SKILLS_DIR } from '../constants.ts'
+import { extractSkillName, validateSkillName } from './skills.ts'
 
 export type LibraryInitResult =
   | { success: true; path: string; created: boolean }
@@ -150,4 +152,110 @@ export const addSkillToLibrary = async (
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: message }
   }
+}
+
+export type SkillStatus = 'new' | 'synced' | 'changed'
+
+export type ScannedSkill = {
+  name: string
+  path: string
+  content: string
+  status: SkillStatus
+  hasDuplicates: boolean
+  project: string
+}
+
+// Directories to skip during traversal - only truly bulky ones with deep nesting
+// fdir's exclude() prunes BEFORE entering, so this is very fast
+const IGNORED_DIRS_SET = new Set([
+  'node_modules', // npm packages - can have thousands of nested dirs
+  'vendor',       // PHP/Ruby dependencies
+  '__pycache__',  // Python cache
+  '.venv',        // Python virtual env
+  'venv',         // Python virtual env
+  '.cache',       // Various caches
+  '.turbo',       // Turborepo cache
+  'target',       // Rust build output
+  'Pods',         // iOS CocoaPods
+])
+
+// Check if a path is a skill file we're looking for
+const isSkillFile = (path: string): boolean => {
+  return (path.includes('/.claude/skills/') && path.endsWith('/SKILL.md')) ||
+         (path.includes('/.cursor/rules/') && path.endsWith('.md')) ||
+         (path.includes('/.opencode/skill/') && path.endsWith('/SKILL.md'))
+}
+
+// Extract project name from skill file path
+const extractProjectFromPath = (filePath: string): string => {
+  // Find the parent directory before .claude/.cursor/.opencode
+  const patterns = ['/.claude/skills/', '/.cursor/rules/', '/.opencode/skill/']
+  for (const pattern of patterns) {
+    const idx = filePath.indexOf(pattern)
+    if (idx !== -1) {
+      const projectPath = filePath.slice(0, idx)
+      return projectPath.split('/').pop() ?? projectPath
+    }
+  }
+  return 'unknown'
+}
+
+export type ScanOptions = {
+  onSkillFound?: (skill: Omit<ScannedSkill, 'hasDuplicates'>) => void
+}
+
+/**
+ * Single-phase skill scanning using fdir.
+ * Lightning fast - scans entire directory tree in one pass.
+ */
+export const scanProjectSkills = async (
+  basePath: string = '.',
+  options: ScanOptions = {},
+): Promise<ScannedSkill[]> => {
+  const { onSkillFound } = options
+  const absolutePath = resolve(basePath)
+
+  // Single fdir pass to find all skill files
+  const skillFiles = await new fdir()
+    .withFullPaths()
+    .exclude((dirName) => IGNORED_DIRS_SET.has(dirName))
+    .filter((path) => isSkillFile(path))
+    .crawl(absolutePath)
+    .withPromise()
+
+  // Process each skill file
+  const skills: Omit<ScannedSkill, 'hasDuplicates'>[] = []
+  const nameCount = new Map<string, number>()
+
+  for (const file of skillFiles) {
+    const name = extractSkillName(file)
+    if (!name) continue
+
+    const validation = validateSkillName(name)
+    if (!validation.valid) continue
+
+    const content = await Bun.file(file).text()
+    const libraryContent = getSkillContent(name)
+    const project = extractProjectFromPath(file)
+
+    let status: SkillStatus
+    if (libraryContent === null) {
+      status = 'new'
+    } else if (libraryContent === content) {
+      status = 'synced'
+    } else {
+      status = 'changed'
+    }
+
+    const skill = { name, path: file, content, status, project }
+    skills.push(skill)
+    nameCount.set(name, (nameCount.get(name) ?? 0) + 1)
+
+    onSkillFound?.(skill)
+  }
+
+  // Mark duplicates and sort
+  return skills
+    .map((skill) => ({ ...skill, hasDuplicates: (nameCount.get(skill.name) ?? 0) > 1 }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }

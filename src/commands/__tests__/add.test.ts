@@ -192,7 +192,6 @@ describe('add command', () => {
       { path: '.claude/skills/my_skill/SKILL.md', expected: 'my_skill' },
       { path: '.claude/skills/_private/SKILL.md', expected: '_private' },
       { path: '.cursor/rules/my-skill.md', expected: 'my-skill' },
-      { path: '.opencode/skills/my-skill.md', expected: 'my-skill' },
       { path: '.opencode/skill/my-skill/SKILL.md', expected: 'my-skill' },
       { path: 'custom-skill/SKILL.md', expected: 'custom-skill' },
     ]
@@ -246,6 +245,125 @@ describe('add command', () => {
 
       expect(result.exitCode).toBe(0)
       expect(getLibrarySkill('skill-v2')).toBe('# Skill')
+    })
+
+    test('requires path when not using --bulk', () => {
+      const result = runCli(['add'], env())
+
+      expect(result.exitCode).toBe(1)
+      expect(result.output).toContain('Path is required')
+      expect(result.output).toContain('--bulk')
+    })
+  })
+})
+
+
+describe('add --bulk command', () => {
+  let tempDir: string
+  let libraryDir: string
+  let projectDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-bulk-test-'))
+    libraryDir = join(tempDir, 'library')
+    projectDir = join(tempDir, 'project')
+    mkdirSync(projectDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({ SKILLBOOK_LIBRARY: libraryDir })
+
+  const createProjectSkill = (path: string, content: string) => {
+    const fullPath = join(projectDir, path)
+    mkdirSync(join(fullPath, '..'), { recursive: true })
+    writeFileSync(fullPath, content)
+    return fullPath
+  }
+
+  const runCliBulk = (args: string[] = []) => {
+    const result = spawnSync('bun', ['run', CLI_PATH, 'add', '--bulk', ...args], {
+      encoding: 'utf-8',
+      env: { ...process.env, ...env() },
+      cwd: projectDir,
+      input: '\n',
+    })
+
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.status ?? 1,
+      output: result.stdout + result.stderr,
+    }
+  }
+
+
+  describe('scanning', () => {
+    test('reports no skills found in empty project', () => {
+      const result = runCliBulk()
+
+      expect(result.output).toContain('No skills found')
+    })
+
+    test('finds skills from .claude/skills/', () => {
+      createProjectSkill('.claude/skills/typescript/SKILL.md', '# TS')
+
+      const result = runCliBulk()
+
+      expect(result.output).toContain('1 found in 1 projects')
+    })
+
+    test('finds skills from .cursor/rules/', () => {
+      createProjectSkill('.cursor/rules/react.md', '# React')
+
+      const result = runCliBulk()
+
+      expect(result.output).toContain('1 found in 1 projects')
+    })
+
+    test('finds skills from .opencode/skill/', () => {
+      createProjectSkill('.opencode/skill/python/SKILL.md', '# Python')
+
+      const result = runCliBulk()
+
+      expect(result.output).toContain('1 found in 1 projects')
+    })
+
+    test('finds skills from multiple locations', () => {
+      createProjectSkill('.claude/skills/skill-a/SKILL.md', '# A')
+      createProjectSkill('.cursor/rules/skill-b.md', '# B')
+      createProjectSkill('.opencode/skill/skill-c/SKILL.md', '# C')
+
+      const result = runCliBulk()
+
+      expect(result.output).toContain('3 found in 1 projects')
+    })
+
+    test('detects duplicate skills across locations', () => {
+      createProjectSkill('.claude/skills/dupe/SKILL.md', '# Claude version')
+      createProjectSkill('.cursor/rules/dupe.md', '# Cursor version')
+
+      const result = runCliBulk()
+
+      expect(result.output).toContain('2 found in 1 projects')
+      expect(result.output).toContain('multiple locations')
+    })
+
+    test('scans specified directory with --dir flag', () => {
+      createProjectSkill('.claude/skills/remote-skill/SKILL.md', '# Remote')
+
+      // Run from temp dir (not project dir) with --dir pointing to project
+      const result = spawnSync('bun', ['run', CLI_PATH, 'add', '--bulk', '--dir', projectDir], {
+        encoding: 'utf-8',
+        env: { ...process.env, SKILLBOOK_LIBRARY: libraryDir },
+        cwd: tempDir,
+        input: '\n',
+      })
+
+      const output = result.stdout + result.stderr
+      expect(output).toContain('1 found in 1 projects')
     })
   })
 })
