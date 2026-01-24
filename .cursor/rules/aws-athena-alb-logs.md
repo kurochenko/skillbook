@@ -1,0 +1,1 @@
+../../.skillbook/skills/aws-athena-alb-logs/SKILL.md

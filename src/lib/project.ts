@@ -1,16 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname, resolve, basename } from 'path'
 import {
-  getProjectSkillsDir,
-  getProjectSkillPath,
-  addSkillToConfig,
-  removeSkillFromConfig,
-  ensureSkillbookDir,
-} from './config.js'
-import {
-  syncSkillToHarnesses,
-  removeSkillFromAllHarnesses,
   detectHarnesses,
+  getEnabledHarnesses,
 } from './harness.js'
 import {
   getSkillContent,
@@ -20,20 +12,62 @@ import {
   type DiffStats,
 } from './library.js'
 import { SKILL_FILE, TOOLS, type ToolId } from '../constants.js'
+import {
+  isSkillbookInitialized,
+  initSparseCheckout,
+  addToSparseCheckout,
+  removeFromSparseCheckout,
+  getSkillbookSkillsPath,
+} from './sparse-checkout.js'
+import {
+  isSkillSymlinked,
+  createSymlinksForSkill,
+  removeSymlinksForSkill,
+  convertToSymlink,
+} from './symlinks.js'
 
-export type SkillSyncStatus = 'synced' | 'ahead' | 'behind' | 'diverged'
+// Sync status for skills (displayed in TUI)
+//
+// For symlinked skills (managed by skillbook):
+// - 'ok': symlink to .skillbook, content matches library
+// - 'ahead': symlink to .skillbook, local changes to push
+// - 'behind': symlink to .skillbook, library has updates to pull
+//
+// For real files (not yet managed by skillbook):
+// - 'detached': real file matches library content (safe to sync)
+// - 'conflict': real file differs from library (needs review)
+export type SkillSyncStatus = 'ok' | 'ahead' | 'behind' | 'detached' | 'conflict'
+
+// Harness-level status (only ok/detached/conflict - ahead/behind are skill-level)
+export type HarnessSkillStatus = 'ok' | 'detached' | 'conflict'
+
+// Per-harness information for a skill
+export type HarnessSkillInfo = {
+  harnessId: ToolId
+  status: HarnessSkillStatus
+  content: string
+  diff: DiffStats | null  // Only set for 'conflict' status
+}
 
 export type InstalledSkill = {
   name: string
-  status: SkillSyncStatus
-  diff: DiffStats | null
+  status: SkillSyncStatus           // Overall skill status (unanimous or derived)
+  harnesses: HarnessSkillInfo[]     // Per-harness details
+  isUnanimous: boolean              // True if all harnesses have same status
+  diff: DiffStats | null            // Overall diff (for skill-level display)
+  content: string                   // Content from first harness (for backward compat)
+}
+
+// Info about which harnesses contain an untracked skill
+export type UntrackedHarnessInfo = {
+  harnessId: ToolId
   content: string
 }
 
 export type UntrackedSkill = {
   name: string
-  path: string
-  content: string
+  harnesses: UntrackedHarnessInfo[]  // Which harnesses have this skill
+  content: string                     // Content from first harness (for backward compat)
 }
 
 export type AvailableSkill = {
@@ -74,6 +108,13 @@ export const detectProjectContext = (startPath: string = process.cwd()): string 
 }
 
 /**
+ * Get the path to a skill file in .skillbook/skills/
+ */
+const getProjectSkillPath = (projectPath: string, skillName: string): string => {
+  return join(getSkillbookSkillsPath(projectPath), skillName, SKILL_FILE)
+}
+
+/**
  * Read skill content from project's .skillbook/skills/ directory
  */
 export const getProjectSkillContent = (projectPath: string, skillName: string): string | null => {
@@ -88,30 +129,6 @@ export const getProjectSkillContent = (projectPath: string, skillName: string): 
   } catch {
     return null
   }
-}
-
-/**
- * Determine sync status between project skill and library skill
- */
-const getSkillSyncStatus = (
-  projectContent: string,
-  libraryContent: string | null,
-): { status: SkillSyncStatus; diff: DiffStats | null } => {
-  if (libraryContent === null) {
-    // Skill not in library - this shouldn't happen for installed skills
-    // but treat as "ahead" (local has changes library doesn't have)
-    return { status: 'ahead', diff: null }
-  }
-
-  if (projectContent === libraryContent) {
-    return { status: 'synced', diff: null }
-  }
-
-  // Content differs - for now, we can't tell direction without timestamps
-  // So we'll call it "ahead" (assuming local changes are intentional)
-  // In future, could use git history or modification times
-  const diff = calculateDiff(libraryContent, projectContent)
-  return { status: 'ahead', diff }
 }
 
 /**
@@ -148,8 +165,21 @@ const scanHarnessForSkills = (
 
     if (tool.needsDirectory) {
       // Directory-based harness (claude-code, opencode)
+      // Note: entry might be a directory OR a symlink to a directory
       for (const entry of entries) {
-        if (!entry.isDirectory()) continue
+        const entryPath = join(skillsDir, entry.name)
+        
+        // Check if it's a directory or symlink to directory
+        let isDir = entry.isDirectory()
+        if (!isDir && entry.isSymbolicLink()) {
+          try {
+            isDir = statSync(entryPath).isDirectory()
+          } catch {
+            // Broken symlink - skip this entry
+            continue
+          }
+        }
+        if (!isDir) continue
 
         const skillPath = join(skillsDir, entry.name, SKILL_FILE)
         if (!existsSync(skillPath)) continue
@@ -176,53 +206,125 @@ const scanHarnessForSkills = (
 }
 
 /**
- * Get all installed skills.
- * Checks both .skillbook/skills/ AND harness folders (like .claude/skills/)
- * A skill is "installed" if it exists locally AND is in the library.
+ * Get harness-level status for a skill in a specific harness.
  */
-export const getInstalledSkills = (projectPath: string): InstalledSkill[] => {
-  const skills = new Map<string, InstalledSkill>()
+const getHarnessSkillStatus = (
+  projectPath: string,
+  harnessId: ToolId,
+  skillName: string,
+  content: string,
+  libraryContent: string,
+): HarnessSkillInfo => {
+  const symlinked = isSkillSymlinked(projectPath, harnessId, skillName)
 
-  // First, check .skillbook/skills/ (managed by skillbook)
-  const skillsDir = getProjectSkillsDir(projectPath)
-  if (existsSync(skillsDir)) {
-    try {
-      const entries = readdirSync(skillsDir, { withFileTypes: true })
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue
+  let status: HarnessSkillStatus
+  let diff: DiffStats | null = null
 
-        const skillPath = join(skillsDir, entry.name, SKILL_FILE)
-        if (!existsSync(skillPath)) continue
+  if (symlinked) {
+    status = 'ok'
+  } else if (content === libraryContent) {
+    status = 'detached'
+  } else {
+    status = 'conflict'
+    diff = calculateDiff(libraryContent, content)
+  }
 
-        const content = readFileSync(skillPath, 'utf-8')
-        const libraryContent = getSkillContent(entry.name)
-        const { status, diff } = getSkillSyncStatus(content, libraryContent)
+  return { harnessId, status, content, diff }
+}
 
-        skills.set(entry.name, { name: entry.name, status, diff, content })
-      }
-    } catch {
-      // ignore errors
+/**
+ * Derive overall skill status from per-harness statuses.
+ * - If all symlinked and content matches library: 'ok'
+ * - If all symlinked but content differs: 'ahead' (local changes)
+ * - If all harnesses have same real-file status: that status (detached/conflict)
+ * - If mixed: use the "worst" status (conflict > detached > ok)
+ */
+const deriveSkillStatus = (
+  harnesses: HarnessSkillInfo[],
+  libraryContent: string,
+): { status: SkillSyncStatus; isUnanimous: boolean; diff: DiffStats | null } => {
+  if (harnesses.length === 0) {
+    return { status: 'ok', isUnanimous: true, diff: null }
+  }
+
+  const statuses = new Set(harnesses.map((h) => h.status))
+  const isUnanimous = statuses.size === 1
+
+  const firstHarness = harnesses[0]!
+
+  // Check if all symlinked (ok status at harness level)
+  const allSymlinked = harnesses.every((h) => h.status === 'ok')
+  if (allSymlinked) {
+    // All symlinked - check if content matches library
+    if (firstHarness.content === libraryContent) {
+      return { status: 'ok', isUnanimous: true, diff: null }
+    } else {
+      // Symlinked but content differs from library = ahead
+      const diff = calculateDiff(libraryContent, firstHarness.content)
+      return { status: 'ahead', isUnanimous: true, diff }
     }
   }
 
-  // Then, check all harness folders for skills that are in the library
-  const harnesses = detectHarnesses(projectPath)
-  for (const harnessId of harnesses) {
+  // Not all symlinked - determine status based on harness statuses
+  if (isUnanimous) {
+    const status = firstHarness.status as SkillSyncStatus
+    const diff = firstHarness.diff
+    return { status, isUnanimous: true, diff }
+  }
+
+  // Mixed statuses - use worst (conflict > detached > ok)
+  if (statuses.has('conflict')) {
+    const conflictHarness = harnesses.find((h) => h.status === 'conflict')
+    return { status: 'conflict', isUnanimous: false, diff: conflictHarness?.diff ?? null }
+  }
+  if (statuses.has('detached')) {
+    return { status: 'detached', isUnanimous: false, diff: null }
+  }
+  return { status: 'ok', isUnanimous: false, diff: null }
+}
+
+/**
+ * Get all installed skills with per-harness status information.
+ * Scans harness folders and determines sync status for each harness.
+ * 
+ * Note: Skills NOT in library go to getUntrackedSkills() instead.
+ */
+export const getInstalledSkills = (projectPath: string): InstalledSkill[] => {
+  const skillMap = new Map<string, HarnessSkillInfo[]>()
+  const skillContent = new Map<string, string>()  // First content seen
+  const detectedHarnesses = detectHarnesses(projectPath)
+
+  // Collect per-harness info for each skill
+  for (const harnessId of detectedHarnesses) {
     const harnessSkills = scanHarnessForSkills(projectPath, harnessId)
 
     for (const { name, content } of harnessSkills) {
-      if (skills.has(name)) continue // already found
-
       const libraryContent = getSkillContent(name)
-      // Only count as "installed" if it's in the library
+      
+      // Only "installed" if it's in the library
       if (libraryContent === null) continue
 
-      const { status, diff } = getSkillSyncStatus(content, libraryContent)
-      skills.set(name, { name, status, diff, content })
+      const harnessInfo = getHarnessSkillStatus(projectPath, harnessId, name, content, libraryContent)
+
+      if (!skillMap.has(name)) {
+        skillMap.set(name, [])
+        skillContent.set(name, content)
+      }
+      skillMap.get(name)!.push(harnessInfo)
     }
   }
 
-  return Array.from(skills.values()).sort((a, b) => a.name.localeCompare(b.name))
+  // Build InstalledSkill array
+  const skills: InstalledSkill[] = []
+  for (const [name, harnesses] of skillMap) {
+    const libraryContent = getSkillContent(name)!
+    const { status, isUnanimous, diff } = deriveSkillStatus(harnesses, libraryContent)
+    const content = skillContent.get(name)!
+
+    skills.push({ name, status, harnesses, isUnanimous, diff, content })
+  }
+
+  return skills.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**
@@ -230,31 +332,37 @@ export const getInstalledSkills = (projectPath: string): InstalledSkill[] => {
  * These are "untracked" - local skills that haven't been pushed to the library yet.
  */
 export const getUntrackedSkills = (projectPath: string): UntrackedSkill[] => {
-  const untracked: UntrackedSkill[] = []
+  const skillMap = new Map<string, UntrackedHarnessInfo[]>()
+  const skillContent = new Map<string, string>()
 
   // Check all harness folders for skills NOT in the library
-  const harnesses = detectHarnesses(projectPath)
+  const detectedHarnesses = detectHarnesses(projectPath)
 
-  for (const harnessId of harnesses) {
+  for (const harnessId of detectedHarnesses) {
     const harnessSkills = scanHarnessForSkills(projectPath, harnessId)
 
-    for (const { name, content, path } of harnessSkills) {
+    for (const { name, content } of harnessSkills) {
       const libraryContent = getSkillContent(name)
 
       // Only "untracked" if NOT in library
       if (libraryContent !== null) continue
 
-      untracked.push({ name, path, content })
+      if (!skillMap.has(name)) {
+        skillMap.set(name, [])
+        skillContent.set(name, content)
+      }
+      skillMap.get(name)!.push({ harnessId, content })
     }
   }
 
-  // Dedupe by name
-  const seen = new Set<string>()
-  return untracked.filter((s) => {
-    if (seen.has(s.name)) return false
-    seen.add(s.name)
-    return true
-  })
+  // Build UntrackedSkill array
+  const skills: UntrackedSkill[] = []
+  for (const [name, harnesses] of skillMap) {
+    const content = skillContent.get(name)!
+    skills.push({ name, harnesses, content })
+  }
+
+  return skills.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**
@@ -270,56 +378,68 @@ export const getAvailableSkills = (projectPath: string): AvailableSkill[] => {
 }
 
 /**
- * Install a skill from library to project
- * 1. Copy to .skillbook/skills/
- * 2. Sync to enabled harnesses
- * 3. Update config
+ * Install a skill from library to project.
+ * Uses sparse checkout + symlinks:
+ * 1. Init .skillbook if needed (lazy init)
+ * 2. Add skill to sparse checkout
+ * 3. Create symlinks in enabled harnesses
  */
-export const installSkill = (projectPath: string, skillName: string): boolean => {
+export const installSkill = async (projectPath: string, skillName: string): Promise<boolean> => {
   const libraryContent = getSkillContent(skillName)
 
   if (libraryContent === null) {
     return false // Skill not in library
   }
 
-  // Ensure .skillbook directory exists
-  ensureSkillbookDir(projectPath)
-
-  // Copy to .skillbook/skills/
-  const skillDir = dirname(getProjectSkillPath(projectPath, skillName))
-  if (!existsSync(skillDir)) {
-    mkdirSync(skillDir, { recursive: true })
+  // Lazy init: if .skillbook not initialized, init it now
+  if (!isSkillbookInitialized(projectPath)) {
+    const initResult = await initSparseCheckout(projectPath)
+    if (!initResult.success) {
+      console.error('Failed to init skillbook:', initResult.error)
+      return false
+    }
   }
-  writeFileSync(getProjectSkillPath(projectPath, skillName), libraryContent, 'utf-8')
 
-  // Sync to enabled harnesses
-  syncSkillToHarnesses(projectPath, skillName, libraryContent)
+  // Add skill to sparse checkout
+  const addResult = await addToSparseCheckout(projectPath, skillName)
+  if (!addResult.success) {
+    console.error('Failed to add to sparse checkout:', addResult.error)
+    return false
+  }
 
-  // Update config
-  addSkillToConfig(projectPath, skillName)
+  // Create symlinks in enabled harnesses
+  const harnesses = getEnabledHarnesses(projectPath)
+  const symlinkResult = createSymlinksForSkill(projectPath, harnesses, skillName)
+  if (!symlinkResult.success) {
+    console.error('Failed to create symlinks:', symlinkResult.error)
+    return false
+  }
 
   return true
 }
 
 /**
- * Uninstall a skill from project
- * 1. Remove from .skillbook/skills/
- * 2. Remove from all harnesses
- * 3. Update config
+ * Uninstall a skill from project.
+ * 1. Remove symlinks from all harnesses
+ * 2. Remove from sparse checkout
  */
-export const uninstallSkill = (projectPath: string, skillName: string): boolean => {
-  const skillDir = dirname(getProjectSkillPath(projectPath, skillName))
-
-  // Remove from .skillbook/skills/
-  if (existsSync(skillDir)) {
-    rmSync(skillDir, { recursive: true, force: true })
+export const uninstallSkill = async (projectPath: string, skillName: string): Promise<boolean> => {
+  // Remove symlinks from all harnesses (not just enabled ones)
+  const allHarnesses = detectHarnesses(projectPath)
+  const symlinkResult = removeSymlinksForSkill(projectPath, allHarnesses, skillName)
+  if (!symlinkResult.success) {
+    console.error('Failed to remove symlinks:', symlinkResult.error)
+    // Continue anyway - might be real files
   }
 
-  // Remove from all harnesses
-  removeSkillFromAllHarnesses(projectPath, skillName)
-
-  // Update config
-  removeSkillFromConfig(projectPath, skillName)
+  // Remove from sparse checkout (if skillbook is initialized)
+  if (isSkillbookInitialized(projectPath)) {
+    const removeResult = await removeFromSparseCheckout(projectPath, skillName)
+    if (!removeResult.success) {
+      console.error('Failed to remove from sparse checkout:', removeResult.error)
+      return false
+    }
+  }
 
   return true
 }
@@ -352,25 +472,44 @@ export const pushSkillToLibrary = async (
 }
 
 /**
- * Sync a skill from library to project (pull)
+ * Sync a skill from library to project.
+ * For unsynced skills: converts real files to symlinks.
+ * 1. Init .skillbook if needed (lazy init)
+ * 2. Add skill to sparse checkout
+ * 3. Convert real files in harnesses to symlinks
  */
-export const syncSkillFromLibrary = (projectPath: string, skillName: string): boolean => {
+export const syncSkillFromLibrary = async (projectPath: string, skillName: string): Promise<boolean> => {
   const libraryContent = getSkillContent(skillName)
 
   if (libraryContent === null) {
     return false
   }
 
-  // Ensure skill is in .skillbook/skills/
-  ensureSkillbookDir(projectPath)
-  const skillDir = dirname(getProjectSkillPath(projectPath, skillName))
-  if (!existsSync(skillDir)) {
-    mkdirSync(skillDir, { recursive: true })
+  // Lazy init: if .skillbook not initialized, init it now
+  if (!isSkillbookInitialized(projectPath)) {
+    const initResult = await initSparseCheckout(projectPath)
+    if (!initResult.success) {
+      console.error('Failed to init skillbook:', initResult.error)
+      return false
+    }
   }
-  writeFileSync(getProjectSkillPath(projectPath, skillName), libraryContent, 'utf-8')
 
-  // Sync to harnesses
-  syncSkillToHarnesses(projectPath, skillName, libraryContent)
+  // Add skill to sparse checkout
+  const addResult = await addToSparseCheckout(projectPath, skillName)
+  if (!addResult.success) {
+    console.error('Failed to add to sparse checkout:', addResult.error)
+    return false
+  }
+
+  // Convert real files to symlinks in all detected harnesses
+  const harnesses = detectHarnesses(projectPath)
+  for (const harnessId of harnesses) {
+    const result = convertToSymlink(projectPath, harnessId, skillName)
+    if (!result.success) {
+      console.error(`Failed to convert to symlink in ${harnessId}:`, result.error)
+      // Continue with other harnesses
+    }
+  }
 
   return true
 }

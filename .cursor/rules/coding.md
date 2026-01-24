@@ -1,0 +1,1 @@
+../../.skillbook/skills/coding/SKILL.md
