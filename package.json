@@ -13,7 +13,8 @@
   },
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "^19.2.9"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -22,6 +23,9 @@
     "@clack/prompts": "^0.11.0",
     "citty": "^0.2.0",
     "fdir": "^6.5.0",
-    "picocolors": "^1.1.1"
+    "ink": "^6.6.0",
+    "picocolors": "^1.1.1",
+    "react": "^19.2.3",
+    "yaml": "^2.8.2"
   }
 }

@@ -7,6 +7,9 @@
     "moduleDetection": "force",
     "allowJs": true,
 
+    // JSX support for Ink/React
+    "jsx": "react-jsx",
+
     // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
