@@ -18,6 +18,14 @@ export const waitFor = async (
   }
 }
 
+export const waitForFrame = async (
+  lastFrame: () => string | undefined,
+  text: string,
+  timeout = 2000,
+): Promise<void> => {
+  await waitFor(() => stripAnsi(lastFrame() ?? '').includes(text), timeout)
+}
+
 export const stripAnsi = (str: string): string => {
   return str.replace(/\u001b\[[0-9;]*m/g, '')
 }

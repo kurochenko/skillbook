@@ -10,6 +10,7 @@ import {
   isSkillbookInitialized,
 } from '@/lib/sparse-checkout'
 import { runGit } from '@/test-utils/git'
+import { withLibraryEnv } from '@/test-utils/env'
 
 const createSkill = (libraryPath: string, skillName: string, content: string) => {
   const skillDir = join(libraryPath, 'skills', skillName)
@@ -31,7 +32,7 @@ describe('sparse-checkout', () => {
   let tempDir: string
   let libraryPath: string
   let projectPath: string
-  let originalEnv: string | undefined
+  let restoreEnv: (() => void) | null = null
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'sparse-checkout-test-'))
@@ -39,17 +40,12 @@ describe('sparse-checkout', () => {
     projectPath = join(tempDir, 'project')
     mkdirSync(projectPath, { recursive: true })
 
-    originalEnv = process.env.SKILLBOOK_LIBRARY
-    process.env.SKILLBOOK_LIBRARY = libraryPath
+    restoreEnv = withLibraryEnv(libraryPath)
   })
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true })
-    if (originalEnv !== undefined) {
-      process.env.SKILLBOOK_LIBRARY = originalEnv
-    } else {
-      delete process.env.SKILLBOOK_LIBRARY
-    }
+    restoreEnv?.()
   })
 
   describe('initSparseCheckout', () => {

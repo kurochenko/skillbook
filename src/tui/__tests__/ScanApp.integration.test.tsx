@@ -10,17 +10,18 @@ import {
 } from '../../../test-fixtures/scan-setup'
 import {
   waitFor,
+  waitForFrame,
   stripAnsi,
   pathExists,
   readFile,
   navigateToRow,
 } from '../../../test-fixtures/helpers'
+import { withLibraryEnv } from '@/test-utils/env'
 
-let originalLibraryEnv: string | undefined
+let restoreEnv: (() => void) | null = null
 
 beforeAll(() => {
-  originalLibraryEnv = process.env.SKILLBOOK_LIBRARY
-  process.env.SKILLBOOK_LIBRARY = SCAN_LIBRARY_PATH
+  restoreEnv = withLibraryEnv(SCAN_LIBRARY_PATH)
 })
 
 beforeEach(() => {
@@ -30,11 +31,7 @@ beforeEach(() => {
 afterAll(() => {
   cleanupScanFixtures()
 
-  if (originalLibraryEnv !== undefined) {
-    process.env.SKILLBOOK_LIBRARY = originalLibraryEnv
-  } else {
-    delete process.env.SKILLBOOK_LIBRARY
-  }
+  restoreEnv?.()
 })
 
 describe('ScanApp TUI Integration', () => {
@@ -42,10 +39,7 @@ describe('ScanApp TUI Integration', () => {
     test('shows projects grouped with skill counts', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const frame = stripAnsi(lastFrame() ?? '')
 
@@ -61,10 +55,7 @@ describe('ScanApp TUI Integration', () => {
     test('shows correct status badges for skills', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const frame = stripAnsi(lastFrame() ?? '')
 
@@ -83,10 +74,7 @@ describe('ScanApp TUI Integration', () => {
     test('shows managed project badge for projects with .skillbook', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const frame = stripAnsi(lastFrame() ?? '')
 
@@ -102,10 +90,7 @@ describe('ScanApp TUI Integration', () => {
     test('shows variant warning for conflict skills', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const frame = stripAnsi(lastFrame() ?? '')
 
@@ -119,10 +104,7 @@ describe('ScanApp TUI Integration', () => {
     test('shows legend explaining status badges', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const frame = stripAnsi(lastFrame() ?? '')
 
@@ -143,10 +125,7 @@ describe('ScanApp TUI Integration', () => {
 
       const { lastFrame, stdin, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       const found = await navigateToRow('local-only', stdin, lastFrame)
       expect(found).toBe(true)
@@ -165,10 +144,7 @@ describe('ScanApp TUI Integration', () => {
     test('add updates skill status to matches', async () => {
       const { lastFrame, stdin, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
-      await waitFor(() => {
-        const frame = stripAnsi(lastFrame() ?? '')
-        return frame.includes('PROJECTS')
-      }, 5000)
+      await waitForFrame(lastFrame, 'PROJECTS', 5000)
 
       let frame = stripAnsi(lastFrame() ?? '')
       const localOnlyLine = frame.split('\n').find((l) => l.includes('local-only'))

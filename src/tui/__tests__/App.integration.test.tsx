@@ -11,18 +11,19 @@ import {
 } from '../../../test-fixtures/setup'
 import {
   waitFor,
+  waitForFrame,
   stripAnsi,
   isSymlink,
   pathExists,
   readFile,
   navigateToRow,
 } from '../../../test-fixtures/helpers'
+import { withLibraryEnv } from '@/test-utils/env'
 
-let originalLibraryEnv: string | undefined
+let restoreEnv: (() => void) | null = null
 
 beforeAll(() => {
-  originalLibraryEnv = process.env.SKILLBOOK_LIBRARY
-  process.env.SKILLBOOK_LIBRARY = LIBRARY_PATH
+  restoreEnv = withLibraryEnv(LIBRARY_PATH)
 })
 
 beforeEach(() => {
@@ -32,11 +33,7 @@ beforeEach(() => {
 afterAll(() => {
   cleanupFixtures()
 
-  if (originalLibraryEnv !== undefined) {
-    process.env.SKILLBOOK_LIBRARY = originalLibraryEnv
-  } else {
-    delete process.env.SKILLBOOK_LIBRARY
-  }
+  restoreEnv?.()
 })
 
 describe('App TUI Integration', () => {
@@ -45,7 +42,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     const output = stripAnsi(lastFrame() ?? '')
 
@@ -81,7 +78,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     const frame = stripAnsi(lastFrame() ?? '')
     expect(frame).toContain('> [detached] skill-detached')
@@ -110,7 +107,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => (lastFrame() ?? '').includes('LOCAL'))
+    await waitForFrame(lastFrame, 'LOCAL')
 
     const found = await navigateToRow('skill-local', stdin, lastFrame)
     expect(found).toBe(true)
@@ -146,7 +143,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => (lastFrame() ?? '').includes('AVAILABLE'))
+    await waitForFrame(lastFrame, 'AVAILABLE')
 
     const found = await navigateToRow('skill-available', stdin, lastFrame)
     expect(found).toBe(true)
@@ -174,7 +171,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     const found = await navigateToRow('skill-in-lib', stdin, lastFrame)
     expect(found).toBe(true)
@@ -206,7 +203,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     const found = await navigateToRow('skill-unanimous-conflict', stdin, lastFrame)
     expect(found).toBe(true)
@@ -247,7 +244,7 @@ describe('App TUI Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     const found = await navigateToRow('skill-unanimous-conflict', stdin, lastFrame)
     expect(found).toBe(true)
@@ -274,7 +271,7 @@ describe('App TUI Harness Tab Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     expect(stripAnsi(lastFrame() ?? '')).toContain('INSTALLED')
 
@@ -310,7 +307,7 @@ describe('App TUI Harness Tab Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     stdin.write('\t')
 
@@ -348,7 +345,7 @@ describe('App TUI Harness Tab Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     stdin.write('\t')
 
@@ -386,7 +383,7 @@ describe('App TUI Harness Tab Integration', () => {
       <App projectPath={PROJECT_PATH} inProject={true} />,
     )
 
-    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+    await waitForFrame(lastFrame, 'INSTALLED')
 
     stdin.write('\t')
 

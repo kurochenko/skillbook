@@ -2,13 +2,14 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { scanProjectSkills, addSkillToLibrary } from '@/lib/library'
+import { scanProjectSkills, addSkillToLibrary, type ScanSkillStatus } from '@/lib/library'
+import { withLibraryEnv } from '@/test-utils/env'
 
 describe('scanProjectSkills', () => {
   let tempDir: string
   let libraryDir: string
   let projectDir: string
-  let originalEnv: string | undefined
+  let restoreEnv: (() => void) | null = null
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-scan-test-'))
@@ -16,17 +17,12 @@ describe('scanProjectSkills', () => {
     projectDir = join(tempDir, 'project')
     mkdirSync(projectDir, { recursive: true })
 
-    originalEnv = process.env.SKILLBOOK_LIBRARY
-    process.env.SKILLBOOK_LIBRARY = libraryDir
+    restoreEnv = withLibraryEnv(libraryDir)
   })
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true })
-    if (originalEnv !== undefined) {
-      process.env.SKILLBOOK_LIBRARY = originalEnv
-    } else {
-      delete process.env.SKILLBOOK_LIBRARY
-    }
+    restoreEnv?.()
   })
 
   const createProjectSkill = (path: string, content: string) => {
@@ -42,32 +38,34 @@ describe('scanProjectSkills', () => {
       expect(skills).toEqual([])
     })
 
-    test('finds .claude/skills/*/SKILL.md', async () => {
-      createProjectSkill('.claude/skills/typescript/SKILL.md', '# TS')
+    const singleSkillCases = [
+      {
+        label: 'finds .claude/skills/*/SKILL.md',
+        path: '.claude/skills/typescript/SKILL.md',
+        name: 'typescript',
+      },
+      {
+        label: 'finds .cursor/rules/*.md',
+        path: '.cursor/rules/react.md',
+        name: 'react',
+      },
+      {
+        label: 'finds .opencode/skill/*/SKILL.md',
+        path: '.opencode/skill/python/SKILL.md',
+        name: 'python',
+      },
+    ]
 
-      const skills = await scanProjectSkills(projectDir)
+    for (const { label, path, name } of singleSkillCases) {
+      test(label, async () => {
+        createProjectSkill(path, '# Content')
 
-      expect(skills).toHaveLength(1)
-      expect(skills[0]!.name).toBe('typescript')
-    })
+        const skills = await scanProjectSkills(projectDir)
 
-    test('finds .cursor/rules/*.md', async () => {
-      createProjectSkill('.cursor/rules/react.md', '# React')
-
-      const skills = await scanProjectSkills(projectDir)
-
-      expect(skills).toHaveLength(1)
-      expect(skills[0]!.name).toBe('react')
-    })
-
-    test('finds .opencode/skill/*/SKILL.md', async () => {
-      createProjectSkill('.opencode/skill/python/SKILL.md', '# Python')
-
-      const skills = await scanProjectSkills(projectDir)
-
-      expect(skills).toHaveLength(1)
-      expect(skills[0]!.name).toBe('python')
-    })
+        expect(skills).toHaveLength(1)
+        expect(skills[0]!.name).toBe(name)
+      })
+    }
 
     test('finds skills from multiple locations', async () => {
       createProjectSkill('.claude/skills/skill-a/SKILL.md', '# A')
@@ -137,32 +135,48 @@ describe('scanProjectSkills', () => {
 
 
   describe('status detection', () => {
-    test('marks skills not in library as "detached"', async () => {
-      createProjectSkill('.claude/skills/brand-new/SKILL.md', '# New skill')
+    const statusCases: Array<{
+      label: string
+      name: string
+      projectContent: string
+      libraryContent: string | null
+      expected: ScanSkillStatus
+    }> = [
+      {
+        label: 'marks skills not in library as "detached"',
+        name: 'brand-new',
+        projectContent: '# New skill',
+        libraryContent: null,
+        expected: 'detached',
+      },
+      {
+        label: 'marks skills with identical content as "synced"',
+        name: 'synced',
+        projectContent: '# Same content',
+        libraryContent: '# Same content',
+        expected: 'synced',
+      },
+      {
+        label: 'marks skills with different content as "ahead"',
+        name: 'changed',
+        projectContent: '# Version 2',
+        libraryContent: '# Version 1',
+        expected: 'ahead',
+      },
+    ]
 
-      const skills = await scanProjectSkills(projectDir)
+    for (const { label, name, projectContent, libraryContent, expected } of statusCases) {
+      test(label, async () => {
+        createProjectSkill(`.claude/skills/${name}/SKILL.md`, projectContent)
+        if (libraryContent !== null) {
+          await addSkillToLibrary(name, libraryContent)
+        }
 
-      expect(skills[0]!.status).toBe('detached')
-    })
+        const skills = await scanProjectSkills(projectDir)
 
-    test('marks skills with identical content as "synced"', async () => {
-      const content = '# Same content'
-      createProjectSkill('.claude/skills/synced/SKILL.md', content)
-      await addSkillToLibrary('synced', content)
-
-      const skills = await scanProjectSkills(projectDir)
-
-      expect(skills[0]!.status).toBe('synced')
-    })
-
-    test('marks skills with different content as "ahead"', async () => {
-      createProjectSkill('.claude/skills/changed/SKILL.md', '# Version 2')
-      await addSkillToLibrary('changed', '# Version 1')
-
-      const skills = await scanProjectSkills(projectDir)
-
-      expect(skills[0]!.status).toBe('ahead')
-    })
+        expect(skills[0]!.status).toBe(expected)
+      })
+    }
   })
 
 

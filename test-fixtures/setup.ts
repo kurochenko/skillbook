@@ -1,6 +1,7 @@
-import { mkdirSync, rmSync, writeFileSync, symlinkSync, existsSync } from 'fs'
+import { mkdirSync, rmSync, symlinkSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { runGit, initGitRepo } from '../src/test-utils/git'
+import { createFile } from './utils'
 
 export const FIXTURES_ROOT = dirname(import.meta.path)
 export const LIBRARY_PATH = join(FIXTURES_ROOT, 'library')
@@ -16,11 +17,6 @@ const SKILL_CONTENT = {
   'skill-conflict-lib': '# Conflict Skill - LIBRARY VERSION\n\nOriginal library content.',
   'skill-unanimous-conflict-lib': '# Unanimous Conflict - LIBRARY VERSION\n\nThis is the library version.',
   'skill-unanimous-conflict-local': '# Unanimous Conflict - LOCAL VERSION\n\nThis is the local version that differs.',
-}
-
-const createFile = (path: string, content: string) => {
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, content)
 }
 
 export const cleanupFixtures = () => {

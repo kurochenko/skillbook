@@ -1,6 +1,7 @@
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, rmSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { initGitRepo } from '../src/test-utils/git'
+import { createFile } from './utils'
 
 export const SCAN_FIXTURES_ROOT = join(dirname(import.meta.path), 'scan')
 export const SCAN_LIBRARY_PATH = join(SCAN_FIXTURES_ROOT, 'library')
@@ -18,11 +19,6 @@ const SKILL_CONTENT = {
   'existing-differs-project': '# Existing Differs Skill\n\nPROJECT VERSION - this differs from library.',
   'conflict-skill-b': '# Conflict Skill\n\nVersion from project-b.',
   'conflict-skill-c': '# Conflict Skill\n\nVersion from project-c - DIFFERENT.',
-}
-
-const createFile = (path: string, content: string) => {
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, content)
 }
 
 export const cleanupScanFixtures = () => {
@@ -49,7 +45,7 @@ const setupProjectA = () => {
   const skillbookPath = join(PROJECT_A_PATH, '.skillbook')
   mkdirSync(skillbookPath, { recursive: true })
   initGitRepo(skillbookPath)
-  writeFileSync(
+  createFile(
     join(skillbookPath, 'config.json'),
     JSON.stringify({ harnesses: ['claude-code'] }, null, 2),
   )
