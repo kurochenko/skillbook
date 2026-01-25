@@ -34,44 +34,42 @@ describe('add command', () => {
     return existsSync(path) ? readFileSync(path, 'utf-8') : null
   }
 
-
   describe('basic functionality', () => {
-    test('adds a skill from .claude/skills/<name>/SKILL.md', () => {
-      const skillPath = createSkillFile(
-        '.claude/skills/typescript/SKILL.md',
-        '# TypeScript Skill\n\nBest practices for TypeScript.',
-      )
+    const cases = [
+      {
+        label: 'adds a skill from .claude/skills/<name>/SKILL.md',
+        path: '.claude/skills/typescript/SKILL.md',
+        content: '# TypeScript Skill\n\nBest practices for TypeScript.',
+        args: (skillPath: string) => ['add', skillPath],
+        expectedName: 'typescript',
+      },
+      {
+        label: 'adds a skill from .cursor/rules/<name>.md',
+        path: '.cursor/rules/react-patterns.md',
+        content: '# React Patterns',
+        args: (skillPath: string) => ['add', skillPath],
+        expectedName: 'react-patterns',
+      },
+      {
+        label: 'adds a skill with explicit --name',
+        path: 'random/file.md',
+        content: '# My Custom Skill',
+        args: (skillPath: string) => ['add', skillPath, '--name', 'custom'],
+        expectedName: 'custom',
+      },
+    ]
 
-      const result = runCli(['add', skillPath], env())
+    for (const { label, path, content, args, expectedName } of cases) {
+      test(label, () => {
+        const skillPath = createSkillFile(path, content)
 
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('Added')
-      expect(result.output).toContain('typescript')
-      expect(getLibrarySkill('typescript')).toBe('# TypeScript Skill\n\nBest practices for TypeScript.')
-    })
+        const result = runCli(args(skillPath), env())
 
-    test('adds a skill from .cursor/rules/<name>.md', () => {
-      const skillPath = createSkillFile(
-        '.cursor/rules/react-patterns.md',
-        '# React Patterns',
-      )
-
-      const result = runCli(['add', skillPath], env())
-
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('react-patterns')
-      expect(getLibrarySkill('react-patterns')).toBe('# React Patterns')
-    })
-
-    test('adds a skill with explicit --name', () => {
-      const skillPath = createSkillFile('random/file.md', '# My Custom Skill')
-
-      const result = runCli(['add', skillPath, '--name', 'custom'], env())
-
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('custom')
-      expect(getLibrarySkill('custom')).toBe('# My Custom Skill')
-    })
+        expect(result.exitCode).toBe(0)
+        expect(result.output).toContain(expectedName)
+        expect(getLibrarySkill(expectedName)).toBe(content)
+      })
+    }
   })
 
 

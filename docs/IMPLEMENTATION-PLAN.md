@@ -112,7 +112,7 @@ skillbook scan [path]   // scans and adds to library
 ## Data Flow
 
 ```
-Library (~/.config/skillbook/skills/)
+Library (~/.skillbook/skills/)
     |
     | installSkill() copies library -> project
     v

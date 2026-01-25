@@ -42,7 +42,7 @@ A CLI tool to manage AI coding assistant skills across projects.
 ### Overview
 
 ```
-~/.config/skillbook/              # Library (git repo, ALL skills)
+~/.skillbook/                     # Library (git repo, ALL skills)
 ├── .git/
 ├── skills/
 │   ├── beads/SKILL.md
@@ -71,7 +71,7 @@ project/
 
 | Component | Location | What It Is | Git Status |
 |-----------|----------|------------|------------|
-| **Library** | `~/.config/skillbook/` | Git repo with ALL skills | Own git repo |
+| **Library** | `~/.skillbook/` | Git repo with ALL skills | Own git repo |
 | **Project Cache** | `.skillbook/` | Sparse checkout of library | Part of project git |
 | **Harness Folders** | `.claude/`, `.cursor/`, `.opencode/` | Symlinks to `.skillbook/` | Part of project git |
 
@@ -433,7 +433,7 @@ Overwrite 'beads' in library? This will replace the existing version.
 
 Note: No `skills` array - filesystem is source of truth (sparse checkout contents).
 
-### Library Config (`~/.config/skillbook/config.json`)
+### Library Config (`~/.skillbook/config.json`)
 
 ```json
 {

@@ -17,7 +17,7 @@ test-fixtures/
 After running `setup.ts`:
 
 ```
-library/                                    # Mock ~/.config/skillbook
+library/                                    # Mock ~/.skillbook
 ├── .git/
 └── skills/
     ├── skill-in-lib/SKILL.md              # Installed in project

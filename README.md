@@ -13,7 +13,7 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 **skillbook** gives you a central library of skills that sync to any project. Try skills freely, toggle them on/off per project, keep your repos clean:
 
 ```
-~/.config/skillbook/skills/     # Your skill library (one source of truth)
+~/.skillbook/skills/            # Your skill library (one source of truth)
 ├── typescript/
 ├── review-gitlab/
 └── beads/
@@ -77,7 +77,7 @@ Add a skill from your current project to the central library.
 ```bash
 # Add a skill - extracts name from parent folder
 skillbook add .claude/skills/beads/SKILL.md
-# -> Copies to ~/.config/skillbook/skills/beads/SKILL.md
+# -> Copies to ~/.skillbook/skills/beads/SKILL.md
 
 # Force overwrite if skill exists
 skillbook add .claude/skills/beads/SKILL.md --force
@@ -99,10 +99,10 @@ skillbook list
 
 ## Skill Library Structure
 
-Skills live in `~/.config/skillbook/skills/`:
+Skills live in `~/.skillbook/skills/`:
 
 ```
-~/.config/skillbook/
+~/.skillbook/
 └── skills/
     ├── typescript/
     │   └── SKILL.md
