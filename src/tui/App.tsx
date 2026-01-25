@@ -5,9 +5,8 @@ import {
   uninstallSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
-  type InstalledSkill,
-  type HarnessSkillInfo,
-} from '@/lib/project'
+} from '@/lib/project-actions'
+import type { InstalledSkill, HarnessSkillInfo } from '@/lib/project-scan'
 import {
   enableHarness,
   removeHarness,

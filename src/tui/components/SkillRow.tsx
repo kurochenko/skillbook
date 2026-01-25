@@ -8,7 +8,7 @@ import type {
   UntrackedHarnessInfo,
   SkillSyncStatus,
   HarnessSkillStatus,
-} from '@/lib/project'
+} from '@/lib/project-scan'
 import type { DiffStats } from '@/lib/library'
 
 // A row in the skill list - can be a skill or a harness entry under a skill

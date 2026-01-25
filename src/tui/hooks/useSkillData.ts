@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  getInstalledSkills,
-  getUntrackedSkills,
+  getProjectSkills,
   getAvailableSkills,
   type InstalledSkill,
   type UntrackedSkill,
   type AvailableSkill,
-} from '@/lib/project'
+} from '@/lib/project-scan'
 import { getHarnessesInfo, type HarnessInfo } from '@/lib/harness'
 import { buildSkillRows, type SkillRow } from '@/tui/components/SkillRow'
 
@@ -30,8 +29,7 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
 
   // Load data, optionally selecting a specific skill by name
   const loadData = useCallback((selectSkillName?: string) => {
-    const installed = getInstalledSkills(projectPath)
-    const untracked = getUntrackedSkills(projectPath)
+    const { installed, untracked } = getProjectSkills(projectPath)
     const available = getAvailableSkills(projectPath, installed)
 
     setInstalledSkills(installed)

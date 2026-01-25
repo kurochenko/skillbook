@@ -9,7 +9,7 @@ const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.i
 if (!hasSubcommand && !isHelpOrVersion) {
   // Launch TUI directly
   const { runTUI } = await import('@/tui/App')
-  const { detectProjectContext } = await import('@/lib/project')
+  const { detectProjectContext } = await import('@/lib/project-scan')
 
   if (!process.stdin.isTTY) {
     console.error('Error: skillbook TUI requires an interactive terminal.')

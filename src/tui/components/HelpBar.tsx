@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import type { SkillRow } from '@/tui/components/SkillRow'
 import type { HarnessInfo, HarnessState } from '@/lib/harness'
-import type { SkillSyncStatus } from '@/lib/project'
+import type { SkillSyncStatus } from '@/lib/project-scan'
 
 export type Tab = 'skills' | 'harnesses'
 
