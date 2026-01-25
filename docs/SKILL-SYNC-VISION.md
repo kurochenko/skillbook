@@ -2,7 +2,7 @@
 
 > **Status**: MVP Development  
 > **Last Updated**: 2026-01-25  
-> **Name**: `skillbook` (available on npm, crates.io, GitHub)
+> **Name**: `skillbook`
 
 ---
 
@@ -90,13 +90,13 @@ project/
 
 ### Skill-Level Status Badges
 
-| Status | Badge | Color | Meaning |
-|--------|-------|-------|---------|
-| OK | `[✓]` | green | Symlinked to .skillbook, up to date |
-| Ahead | `[ahead]` | yellow | Symlinked, local has unpushed changes |
-| Behind | `[behind]` | cyan | Symlinked, library has updates to pull |
-| Detached | `[detached]` | dim | Real file, same as library (safe to sync) |
-| Conflict | `[conflict]` | red | Real file, differs from library (choose action) |
+| Status | Badge | Color | Meaning | Status |
+|--------|-------|-------|---------|--------|
+| OK | `[✓]` | green | Symlinked to .skillbook, up to date | ✅ |
+| Ahead | `[ahead]` | yellow | Symlinked, local has unpushed changes | 🔜 Planned |
+| Behind | `[behind]` | cyan | Symlinked, library has updates to pull | 🔜 Planned |
+| Detached | `[detached]` | dim | Real file, same as library (safe to sync) | ✅ |
+| Conflict | `[conflict]` | red | Real file, differs from library (choose action) | ✅ |
 
 ### Harness-Level Status Badges
 
@@ -138,15 +138,15 @@ typescript-cli
 
 #### Skill Level
 
-| Status | Available Actions |
-|--------|-------------------|
-| `[✓]` | `[u]ninstall` |
-| `[ahead]` | `[p]ush` to library, `[u]ninstall` |
-| `[behind]` | `[s]ync` from library, `[u]ninstall` |
-| `[detached]` | `[s]ync` to link, `[u]ninstall` |
-| `[conflict]` | `[s]ync` (use library), `[p]ush` (use local), `[u]ninstall` |
-| LOCAL | `[p]ush` to add to library |
-| AVAILABLE | `[i]nstall` |
+| Status | Available Actions | Status |
+|--------|-------------------|--------|
+| `[✓]` | `[u]ninstall` | ✅ |
+| `[ahead]` | `[p]ush` to library, `[u]ninstall` | 🔜 Planned |
+| `[behind]` | `[s]ync` from library, `[u]ninstall` | 🔜 Planned |
+| `[detached]` | `[s]ync` to link, `[u]ninstall` | ✅ |
+| `[conflict]` | `[s]ync` (use library), `[p]ush` (use local), `[u]ninstall` | ✅ |
+| LOCAL | `[p]ush` to add to library | ✅ |
+| AVAILABLE | `[i]nstall` | ✅ |
 
 #### Harness Entry Level
 
@@ -199,22 +199,6 @@ HARNESSES
   [~] Cursor                         ← partial, mixed state
   [ ] Other                          ← available, no folder
 ```
-if (folder doesn't exist):
-  state = 'available'
-else if (in config AND all installed skills are symlinked):
-  state = 'enabled'
-else:
-  state = 'partial'  // folder exists but not fully managed
-```
-
-### Harness Tab Display
-
-```
-HARNESSES
-> [✓] Claude Code                    ← enabled, fully managed
-  [~] OpenCode                       ← partial, has content but not managed
-  [ ] Cursor                         ← available, no folder
-```
 
 ---
 
@@ -261,9 +245,9 @@ No separate "setup" step required. On first sync/install action:
 2. Skill is added to sparse checkout
 3. Symlink created in harness folder
 
-### Sync Flow (for `[unlinked]` or `[conflict]` skills)
+### Sync Flow (for `[detached]` or `[conflict]` skills)
 
-When user presses `[s]ync` on an unlinked/conflict skill:
+When user presses `[s]ync` on a detached/conflict skill:
 
 1. If `.skillbook/` doesn't exist → init sparse checkout (lazy init)
 2. Add skill to sparse checkout
@@ -341,12 +325,14 @@ After eject:
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `skillbook` | Interactive TUI (default) |
-| `skillbook scan [path]` | Scan for skills, add to library |
-| `skillbook list` | List skills in library |
-| `skillbook eject` | Convert symlinks to real files, remove .skillbook |
+| Command | Description | Status |
+|---------|-------------|--------|
+| `skillbook` | Interactive TUI (default) | ✅ |
+| `skillbook init` | Initialize skills in current project | ✅ |
+| `skillbook add <path>` | Add a skill file to the library | ✅ |
+| `skillbook list` | List skills in library | ✅ |
+| `skillbook scan [path]` | Scan for skills, add to library (TUI) | ✅ |
+| `skillbook eject` | Convert symlinks to real files, remove .skillbook | 🔜 Planned |
 
 ### Scan Command
 
@@ -421,18 +407,18 @@ Overwrite 'beads' in library? This will replace the existing version.
 [y]es  [n]o
 ```
 
-### TUI Actions
+### TUI Actions (Project View)
 
-| Key | Action | When |
-|-----|--------|------|
-| `i` | Install skill | On AVAILABLE skill |
-| `u` | Uninstall skill | On INSTALLED skill |
-| `p` | Push to library | On `[ahead]`, `[conflict]`, or LOCAL skill |
-| `s` | Sync from library | On `[unlinked]`, `[conflict]`, or `[behind]` skill |
-| `l` | Pull from library | On `[behind]` skill |
-| `Space` | Toggle harness | On harness tab |
-| `Tab` | Switch tabs | Always |
-| `q` | Quit | Always |
+| Key | Action | When | Status |
+|-----|--------|------|--------|
+| `i` | Install skill | On AVAILABLE skill | ✅ |
+| `u` | Uninstall skill | On INSTALLED skill | ✅ |
+| `s` | Sync from library | On `[detached]` or `[conflict]` skill | ✅ |
+| `p` | Push to library | On `[conflict]` or LOCAL skill | ✅ |
+| `p` | Push to library | On `[ahead]` skill | 🔜 Planned |
+| `l` | Pull from library | On `[behind]` skill | 🔜 Planned |
+| `Tab` | Switch tabs | Always | ✅ |
+| `q` | Quit | Always | ✅ |
 
 ---
 
@@ -483,9 +469,13 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 - [x] Scan description explaining purpose: "Find skills and add to library"
 
 ### TODO
-- [ ] Push/pull actions for ahead/behind states
-- [ ] Eject command
-- [ ] Detect ahead/behind states (compare with library)
+
+| Task | Beads Issue |
+|------|-------------|
+| Detect ahead/behind states (compare with library) | `skill-book-g06` |
+| Push/pull actions for ahead/behind states | `skill-book-g06` |
+| Eject command | `skill-book-3vt` |
+| Integration tests for CLI commands | `skill-book-8aa` |
 
 ---
 
