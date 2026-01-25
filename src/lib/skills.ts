@@ -2,6 +2,12 @@ import { basename, dirname } from 'path'
 
 const SKILL_NAME_PATTERN = /^[a-z0-9_][a-z0-9_-]{0,49}$/
 
+const HARNESS_PATTERNS = [
+  /\.claude\/skills\/([^/]+)\/SKILL\.md$/i,
+  /\.cursor\/rules\/([^/]+)\.md$/i,
+  /\.opencode\/skill\/([^/]+)\/SKILL\.md$/i,
+]
+
 export type SkillNameValidation =
   | { valid: true; name: string }
   | { valid: false; error: string }
@@ -32,14 +38,10 @@ export const validateSkillName = (name: string): SkillNameValidation => {
 export const extractSkillName = (filePath: string): string | null => {
   const normalizedPath = filePath.replace(/\\/g, '/')
 
-  const claudeMatch = normalizedPath.match(/\.claude\/skills\/([^/]+)\/SKILL\.md$/i)
-  if (claudeMatch) return claudeMatch[1]?.toLowerCase() ?? null
-
-  const cursorMatch = normalizedPath.match(/\.cursor\/rules\/([^/]+)\.md$/i)
-  if (cursorMatch) return cursorMatch[1]?.toLowerCase() ?? null
-
-  const opencodeMatch = normalizedPath.match(/\.opencode\/skill\/([^/]+)\/SKILL\.md$/i)
-  if (opencodeMatch) return opencodeMatch[1]?.toLowerCase() ?? null
+  for (const pattern of HARNESS_PATTERNS) {
+    const match = normalizedPath.match(pattern)
+    if (match?.[1]) return match[1].toLowerCase()
+  }
 
   const fileName = basename(normalizedPath)
   if (fileName.toLowerCase() === 'skill.md') {
