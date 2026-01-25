@@ -154,7 +154,9 @@ export const addSkillToLibrary = async (
   }
 }
 
-export type SkillStatus = 'detached' | 'synced' | 'ahead'
+// Scan-specific status (for skillbook scan command)
+// Different from SkillSyncStatus in project.ts which is for installed skills
+export type ScanSkillStatus = 'detached' | 'synced' | 'ahead'
 
 export type DiffStats = {
   additions: number
@@ -165,7 +167,7 @@ export type ScannedSkill = {
   name: string
   path: string
   content: string
-  status: SkillStatus
+  status: ScanSkillStatus
   diff: DiffStats | null  // null for 'detached' and 'synced', populated for 'ahead'
   hasConflict: boolean    // true only if multiple locations have DIFFERENT content
   conflictCount: number   // number of different versions (0, 2, 3, etc.)
@@ -240,7 +242,7 @@ type PartialSkill = {
   name: string
   path: string
   content: string
-  status: SkillStatus
+  status: ScanSkillStatus
   diff: DiffStats | null
   project: string
 }
@@ -285,7 +287,7 @@ export const scanProjectSkills = async (
     const libraryContent = getSkillContent(name)
     const project = extractProjectFromPath(file)
 
-    let status: SkillStatus
+    let status: ScanSkillStatus
     let diff: DiffStats | null = null
 
     if (libraryContent === null) {

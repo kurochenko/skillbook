@@ -1,8 +1,10 @@
-import { defineCommand } from 'citty'
 import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
+
+import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
+
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import {
   addSkillToLibrary,

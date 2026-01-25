@@ -49,7 +49,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const availableCount = availableSkills.length
 
   useInput((input, key) => {
-    // Handle confirmation dialog
     if (confirmAction) {
       if (input === 'y') {
         confirmAction.onConfirm()
@@ -60,7 +59,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
       return
     }
 
-    // Navigation
     if (key.upArrow || input === 'k') {
       setSelectedIndex((i) => Math.max(0, i - 1))
     }
@@ -68,33 +66,27 @@ const App = ({ projectPath, inProject }: AppProps) => {
       setSelectedIndex((i) => Math.min(currentList.length - 1, i + 1))
     }
 
-    // Tab switching
     if (key.tab) {
       setTab((t) => (t === 'skills' ? 'harnesses' : 'skills'))
       setSelectedIndex(0)
     }
 
-    // Quit
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit()
     }
 
-    // Actions for skills tab
+    // Skills tab actions
     if (tab === 'skills' && selectedRow) {
-      // Install (available skill)
       if (input === 'i' && selectedRow.type === 'available-skill') {
         const name = selectedRow.skill.name
         installSkill(projectPath, name).then(() => loadData())
       }
 
-      // Uninstall (installed skill - at skill level)
-      // Not destructive - skill stays in library, can reinstall anytime
       if (input === 'u' && selectedRow.type === 'installed-skill') {
         const name = selectedRow.skill.name
         uninstallSkill(projectPath, name).then(() => loadData())
       }
 
-      // Push (installed skill or untracked skill - at skill level)
       if (input === 'p') {
         if (selectedRow.type === 'installed-skill') {
           const name = selectedRow.skill.name
@@ -105,7 +97,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
         }
       }
 
-      // Sync (installed skill - at skill level, uses library version)
       if (input === 's' && selectedRow.type === 'installed-skill') {
         const name = selectedRow.skill.name
         const { status, isUnanimous } = selectedRow.skill
@@ -164,8 +155,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
         }
       }
 
-      // Use as source (untracked harness entry level)
-      // Not destructive - just adding new content to library
       if (input === 's' && selectedRow.type === 'untracked-harness') {
         const { skill } = selectedRow
         const skillName = skill.name
@@ -173,19 +162,17 @@ const App = ({ projectPath, inProject }: AppProps) => {
       }
     }
 
-    // Actions for harnesses tab
+    // Harnesses tab actions
     if (tab === 'harnesses' && selectedHarness) {
       const { state } = selectedHarness
       const installedSkillNames = installedSkills.map((s) => s.name)
       const currentlyEnabled = harnesses.filter((h) => h.state === 'enabled').map((h) => h.id)
 
-      // Enable (e) - available for partial, detached, and available states
       if (input === 'e' && (state === 'partial' || state === 'detached' || state === 'available')) {
         enableHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
         loadData()
       }
 
-      // Remove (r) - available for enabled, detached, and partial states, needs confirmation
       if (input === 'r' && (state === 'enabled' || state === 'detached' || state === 'partial')) {
         setConfirmAction({
           message: `Remove "${selectedHarness.name}" harness folder?\nThis will delete all files in the harness folder.`,
@@ -196,7 +183,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
         })
       }
 
-      // Detach (d) - available for enabled and partial states (not detached - already detached)
       if (input === 'd' && (state === 'enabled' || state === 'partial')) {
         detachHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
         loadData()

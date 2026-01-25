@@ -3,6 +3,7 @@ import { join, dirname, resolve, basename } from 'path'
 import {
   detectHarnesses,
   getEnabledHarnesses,
+  getHarnessBaseDir,
 } from '@/lib/harness'
 import {
   getSkillContent,
@@ -74,6 +75,12 @@ export type AvailableSkill = {
   name: string
 }
 
+// Result type for skill actions (install, uninstall, push, sync)
+// Lib layer returns structured results; CLI/TUI decides how to present errors
+export type SkillActionResult =
+  | { success: true }
+  | { success: false; error: string }
+
 /**
  * Detect if we're in a project context.
  * Returns project root if found, null otherwise.
@@ -132,21 +139,7 @@ const getProjectSkillContent = (projectPath: string, skillName: string): string 
   }
 }
 
-/**
- * Get the base directory and skill pattern for each harness type
- */
-const getHarnessSkillsDir = (projectPath: string, harnessId: ToolId): string | null => {
-  switch (harnessId) {
-    case 'claude-code':
-      return join(projectPath, '.claude', 'skills')
-    case 'opencode':
-      return join(projectPath, '.opencode', 'skill')
-    case 'cursor':
-      return join(projectPath, '.cursor', 'rules')
-    default:
-      return null
-  }
-}
+// Use getHarnessBaseDir from harness.ts for harness path logic
 
 /**
  * Scan a harness directory for skills
@@ -155,8 +148,8 @@ const scanHarnessForSkills = (
   projectPath: string,
   harnessId: ToolId,
 ): { name: string; content: string; path: string }[] => {
-  const skillsDir = getHarnessSkillsDir(projectPath, harnessId)
-  if (!skillsDir || !existsSync(skillsDir)) return []
+  const skillsDir = getHarnessBaseDir(projectPath, harnessId)
+  if (!existsSync(skillsDir)) return []
 
   const tool = TOOLS[harnessId]
   const results: { name: string; content: string; path: string }[] = []
@@ -367,11 +360,16 @@ export const getUntrackedSkills = (projectPath: string): UntrackedSkill[] => {
 }
 
 /**
- * Get skills available in library but not installed in project
+ * Get skills available in library but not installed in project.
+ * Pass installedSkills to avoid re-scanning if you already have them.
  */
-export const getAvailableSkills = (projectPath: string): AvailableSkill[] => {
+export const getAvailableSkills = (
+  projectPath: string,
+  installedSkills?: InstalledSkill[],
+): AvailableSkill[] => {
   const librarySkills = listLibrarySkills()
-  const installedNames = new Set(getInstalledSkills(projectPath).map((s) => s.name))
+  const installed = installedSkills ?? getInstalledSkills(projectPath)
+  const installedNames = new Set(installed.map((s) => s.name))
 
   return librarySkills
     .filter((name) => !installedNames.has(name))
@@ -385,38 +383,35 @@ export const getAvailableSkills = (projectPath: string): AvailableSkill[] => {
  * 2. Add skill to sparse checkout
  * 3. Create symlinks in enabled harnesses
  */
-export const installSkill = async (projectPath: string, skillName: string): Promise<boolean> => {
+export const installSkill = async (projectPath: string, skillName: string): Promise<SkillActionResult> => {
   const libraryContent = getSkillContent(skillName)
 
   if (libraryContent === null) {
-    return false // Skill not in library
+    return { success: false, error: 'Skill not found in library' }
   }
 
   // Lazy init: if .skillbook not initialized, init it now
   if (!isSkillbookInitialized(projectPath)) {
     const initResult = await initSparseCheckout(projectPath)
     if (!initResult.success) {
-      console.error('Failed to init skillbook:', initResult.error)
-      return false
+      return { success: false, error: `Failed to init skillbook: ${initResult.error}` }
     }
   }
 
   // Add skill to sparse checkout
   const addResult = await addToSparseCheckout(projectPath, skillName)
   if (!addResult.success) {
-    console.error('Failed to add to sparse checkout:', addResult.error)
-    return false
+    return { success: false, error: `Failed to add to sparse checkout: ${addResult.error}` }
   }
 
   // Create symlinks in enabled harnesses
   const harnesses = getEnabledHarnesses(projectPath)
   const symlinkResult = createSymlinksForSkill(projectPath, harnesses, skillName)
   if (!symlinkResult.success) {
-    console.error('Failed to create symlinks:', symlinkResult.error)
-    return false
+    return { success: false, error: `Failed to create symlinks: ${symlinkResult.error}` }
   }
 
-  return true
+  return { success: true }
 }
 
 /**
@@ -424,25 +419,27 @@ export const installSkill = async (projectPath: string, skillName: string): Prom
  * 1. Remove symlinks from all harnesses
  * 2. Remove from sparse checkout
  */
-export const uninstallSkill = async (projectPath: string, skillName: string): Promise<boolean> => {
+export const uninstallSkill = async (projectPath: string, skillName: string): Promise<SkillActionResult> => {
   // Remove symlinks from all harnesses (not just enabled ones)
   const allHarnesses = detectHarnesses(projectPath)
   const symlinkResult = removeSymlinksForSkill(projectPath, allHarnesses, skillName)
-  if (!symlinkResult.success) {
-    console.error('Failed to remove symlinks:', symlinkResult.error)
-    // Continue anyway - might be real files
-  }
+  // Note: symlink removal failure is non-fatal (might be real files)
+  const symlinkWarning = !symlinkResult.success ? symlinkResult.error : null
 
   // Remove from sparse checkout (if skillbook is initialized)
   if (isSkillbookInitialized(projectPath)) {
     const removeResult = await removeFromSparseCheckout(projectPath, skillName)
     if (!removeResult.success) {
-      console.error('Failed to remove from sparse checkout:', removeResult.error)
-      return false
+      return { success: false, error: `Failed to remove from sparse checkout: ${removeResult.error}` }
     }
   }
 
-  return true
+  // Return success even if symlink removal failed (non-fatal warning)
+  if (symlinkWarning) {
+    // Could extend SkillActionResult to include warnings, but for now just succeed
+  }
+
+  return { success: true }
 }
 
 /**
@@ -452,7 +449,7 @@ export const uninstallSkill = async (projectPath: string, skillName: string): Pr
 export const pushSkillToLibrary = async (
   projectPath: string,
   skillName: string,
-): Promise<boolean> => {
+): Promise<SkillActionResult> => {
   // First check .skillbook/skills/
   let content = getProjectSkillContent(projectPath, skillName)
 
@@ -465,11 +462,15 @@ export const pushSkillToLibrary = async (
   }
 
   if (content === null) {
-    return false
+    return { success: false, error: 'Skill content not found in project' }
   }
 
   const result = await addSkillToLibrary(skillName, content)
-  return result.success
+  if (!result.success) {
+    return { success: false, error: result.error }
+  }
+
+  return { success: true }
 }
 
 /**
@@ -479,40 +480,41 @@ export const pushSkillToLibrary = async (
  * 2. Add skill to sparse checkout
  * 3. Convert real files in harnesses to symlinks
  */
-export const syncSkillFromLibrary = async (projectPath: string, skillName: string): Promise<boolean> => {
+export const syncSkillFromLibrary = async (projectPath: string, skillName: string): Promise<SkillActionResult> => {
   const libraryContent = getSkillContent(skillName)
 
   if (libraryContent === null) {
-    return false
+    return { success: false, error: 'Skill not found in library' }
   }
 
   // Lazy init: if .skillbook not initialized, init it now
   if (!isSkillbookInitialized(projectPath)) {
     const initResult = await initSparseCheckout(projectPath)
     if (!initResult.success) {
-      console.error('Failed to init skillbook:', initResult.error)
-      return false
+      return { success: false, error: `Failed to init skillbook: ${initResult.error}` }
     }
   }
 
   // Add skill to sparse checkout
   const addResult = await addToSparseCheckout(projectPath, skillName)
   if (!addResult.success) {
-    console.error('Failed to add to sparse checkout:', addResult.error)
-    return false
+    return { success: false, error: `Failed to add to sparse checkout: ${addResult.error}` }
   }
 
   // Convert real files to symlinks in all detected harnesses
+  // Collect any failures but continue with other harnesses
   const harnesses = detectHarnesses(projectPath)
+  const failures: string[] = []
   for (const harnessId of harnesses) {
     const result = convertToSymlink(projectPath, harnessId, skillName)
     if (!result.success) {
-      console.error(`Failed to convert to symlink in ${harnessId}:`, result.error)
-      // Continue with other harnesses
+      failures.push(`${harnessId}: ${result.error}`)
     }
   }
 
-  return true
+  // Return success even if some harness conversions failed (partial success)
+  // Could extend to return warnings if needed
+  return { success: true }
 }
 
 

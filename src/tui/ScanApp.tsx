@@ -4,7 +4,7 @@ import {
   addSkillToLibrary,
   scanProjectSkills,
   type ScannedSkill,
-  type SkillStatus,
+  type ScanSkillStatus,
 } from '@/lib/library'
 import { isSkillbookInitialized } from '@/lib/sparse-checkout'
 import { resolve, dirname } from 'path'
@@ -17,14 +17,14 @@ type ProjectInfo = {
 }
 
 // Status badge configuration
-const SCAN_STATUS_BADGE: Record<SkillStatus, { text: string; color?: string; dim?: boolean }> = {
+const SCAN_STATUS_BADGE: Record<ScanSkillStatus, { text: string; color?: string; dim?: boolean }> = {
   synced: { text: '[matches]', color: 'green' },
   ahead: { text: '[differs]', color: 'yellow' },
   detached: { text: '[local]', dim: true },
 }
 
 // Help actions by status
-const SCAN_HELP_ACTIONS: Partial<Record<SkillStatus, string>> = {
+const SCAN_HELP_ACTIONS: Partial<Record<ScanSkillStatus, string>> = {
   detached: '[a]dd to library',
   ahead: '[o]verwrite library',
 }
@@ -251,7 +251,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     return !nextRow || nextRow.type === 'project'
   }
 
-  // Handle add action
   const handleAdd = async (skill: ScannedSkill) => {
     const result = await addSkillToLibrary(skill.name, skill.content)
     
@@ -269,10 +268,8 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
         break
     }
 
-    // Reload data to update statuses
     await loadData()
     
-    // Clear message after a delay (with cleanup tracking)
     if (messageTimeoutRef.current) {
       clearTimeout(messageTimeoutRef.current)
     }
@@ -280,7 +277,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   }
 
   useInput((input, key) => {
-    // Handle confirmation dialog
     if (pendingConfirm) {
       if (input === 'y' || input === 'Y') {
         const skill = pendingConfirm
@@ -292,7 +288,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       return
     }
 
-    // Navigation
     if (key.upArrow || input === 'k') {
       setSelectedIndex((i) => Math.max(0, i - 1))
     }
@@ -300,12 +295,10 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       setSelectedIndex((i) => Math.min(rows.length - 1, i + 1))
     }
 
-    // Quit
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit()
     }
 
-    // Add to library (for local skills)
     if (input === 'a' && selectedRow?.type === 'skill') {
       const { status } = selectedRow.skill
       if (status === 'detached') {
@@ -313,7 +306,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       }
     }
 
-    // Overwrite library (for differs skills - requires confirmation)
+    // Overwrite requires confirmation (destructive)
     if (input === 'o' && selectedRow?.type === 'skill') {
       const { status } = selectedRow.skill
       if (status === 'ahead') {

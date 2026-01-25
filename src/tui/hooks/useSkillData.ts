@@ -32,7 +32,7 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
   const loadData = useCallback((selectSkillName?: string) => {
     const installed = getInstalledSkills(projectPath)
     const untracked = getUntrackedSkills(projectPath)
-    const available = getAvailableSkills(projectPath)
+    const available = getAvailableSkills(projectPath, installed)
 
     setInstalledSkills(installed)
     setUntrackedSkills(untracked)
