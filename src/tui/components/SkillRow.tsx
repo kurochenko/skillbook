@@ -11,7 +11,6 @@ import type {
 } from '@/lib/project-scan'
 import type { DiffStats } from '@/lib/library'
 
-// A row in the skill list - can be a skill or a harness entry under a skill
 export type SkillRow =
   | { type: 'installed-skill'; skill: InstalledSkill }
   | { type: 'installed-harness'; skill: InstalledSkill; harness: HarnessSkillInfo }
@@ -19,7 +18,6 @@ export type SkillRow =
   | { type: 'untracked-harness'; skill: UntrackedSkill; harness: UntrackedHarnessInfo }
   | { type: 'available-skill'; skill: AvailableSkill }
 
-// Status badge configuration for skill-level statuses
 type BadgeConfig = {
   text: string | ((diff: DiffStats | null) => string)
   color: string
@@ -39,7 +37,6 @@ const SKILL_STATUS_BADGE: Record<SkillSyncStatus, BadgeConfig> = {
   },
 }
 
-// Status badge configuration for harness-level statuses
 const HARNESS_STATUS_BADGE: Record<HarnessSkillStatus, { text: string; color?: string; dim?: boolean }> = {
   ok: { text: '[✓]', color: 'green' },
   detached: { text: '[detached]', dim: true },
@@ -52,7 +49,6 @@ const getSkillBadge = (status: SkillSyncStatus, diff: DiffStats | null) => {
   return { text, color: config.color }
 }
 
-// Build flat list of rows with tree structure
 export const buildSkillRows = (
   installed: InstalledSkill[],
   untracked: UntrackedSkill[],
@@ -60,10 +56,8 @@ export const buildSkillRows = (
 ): SkillRow[] => {
   const rows: SkillRow[] = []
 
-  // Installed skills
   for (const skill of installed) {
     rows.push({ type: 'installed-skill', skill })
-    // Show harness entries only when not unanimous
     if (!skill.isUnanimous) {
       for (const harness of skill.harnesses) {
         rows.push({ type: 'installed-harness', skill, harness })
@@ -71,10 +65,8 @@ export const buildSkillRows = (
     }
   }
 
-  // Untracked (LOCAL) skills
   for (const skill of untracked) {
     rows.push({ type: 'untracked-skill', skill })
-    // Always show harness entries for untracked skills (shows where they exist)
     if (skill.harnesses.length > 0) {
       for (const harness of skill.harnesses) {
         rows.push({ type: 'untracked-harness', skill, harness })
@@ -82,7 +74,6 @@ export const buildSkillRows = (
     }
   }
 
-  // Available skills (no harness entries, just skills)
   for (const skill of available) {
     rows.push({ type: 'available-skill', skill })
   }
@@ -90,13 +81,11 @@ export const buildSkillRows = (
   return rows
 }
 
-// Status badge for harness entries
 const HarnessStatusBadge = ({ status }: { status: HarnessSkillStatus }) => {
   const badge = HARNESS_STATUS_BADGE[status]
   return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
 }
 
-// Render a single row
 export const RowDisplay = ({ row, selected }: { row: SkillRow; selected: boolean }) => {
   const cursor = selected ? '>' : ' '
   const color = selected ? 'blue' : undefined

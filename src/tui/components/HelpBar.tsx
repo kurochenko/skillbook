@@ -11,7 +11,6 @@ type HelpBarProps = {
   selectedHarness: HarnessInfo | null
 }
 
-// Actions for unanimous installed skills by status
 const SKILL_STATUS_ACTIONS: Record<SkillSyncStatus, string[]> = {
   ok: ['[u]ninstall'],
   ahead: ['[p]ush', '[u]ninstall'],
@@ -20,7 +19,6 @@ const SKILL_STATUS_ACTIONS: Record<SkillSyncStatus, string[]> = {
   conflict: ['[s]ync (use library)', '[p]ush (use local)', '[u]ninstall'],
 }
 
-// Actions for harness states
 const HARNESS_STATE_ACTIONS: Record<HarnessState, string[]> = {
   enabled: ['[d]etach', '[r]emove'],
   detached: ['[e]nable', '[r]emove'],
@@ -28,7 +26,6 @@ const HARNESS_STATE_ACTIONS: Record<HarnessState, string[]> = {
   available: ['[e]nable'],
 }
 
-// Get actions for the selected row in skills tab
 const getSkillRowActions = (row: SkillRow | null): string[] => {
   if (!row) return []
 

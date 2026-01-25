@@ -7,9 +7,17 @@ type ConfirmState = {
   onConfirm: () => void | Promise<void>
 }
 
+type KeyState = {
+  upArrow: boolean
+  downArrow: boolean
+  tab: boolean
+  escape: boolean
+  ctrl: boolean
+}
+
 type UseListNavigationOptions = {
   listLength: number
-  onInput?: (input: string, key: { upArrow: boolean; downArrow: boolean; tab: boolean; escape: boolean; ctrl: boolean }) => void
+  onInput?: (input: string, key: KeyState) => void
   confirmState?: ConfirmState | null
   onConfirmCancel?: () => void
 }
@@ -19,15 +27,6 @@ type UseListNavigationResult = {
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
 }
 
-/**
- * Shared hook for list navigation, quit handling, and confirm dialogs.
- * 
- * Handles:
- * - j/k and arrow keys for navigation
- * - q and Ctrl+C for quit
- * - y/n/escape for confirm dialogs
- * - Clamps selection to valid bounds
- */
 export const useListNavigation = ({
   listLength,
   onInput,
@@ -37,7 +36,6 @@ export const useListNavigation = ({
   const { exit } = useApp()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
-  // Clamp selection when list changes
   const clampedSetIndex = useCallback(
     (updater: React.SetStateAction<number>) => {
       setSelectedIndex((current) => {
@@ -50,7 +48,6 @@ export const useListNavigation = ({
   )
 
   useInput((input, key) => {
-    // Confirm dialog handling (takes priority)
     if (confirmState) {
       if (isKey(input, KEYS.CONFIRM)) {
         confirmState.onConfirm()
@@ -64,13 +61,11 @@ export const useListNavigation = ({
       return
     }
 
-    // Quit
     if (isKey(input, KEYS.QUIT) || (key.ctrl && input === 'c')) {
       exit()
       return
     }
 
-    // Navigation
     if (key.upArrow || isKey(input, KEYS.UP)) {
       clampedSetIndex((i) => i - 1)
     }
@@ -78,7 +73,6 @@ export const useListNavigation = ({
       clampedSetIndex((i) => i + 1)
     }
 
-    // Pass through to custom handler
     onInput?.(input, key)
   })
 

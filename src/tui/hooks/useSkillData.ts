@@ -27,7 +27,13 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
   const [harnesses, setHarnesses] = useState<HarnessInfo[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
 
-  // Load data, optionally selecting a specific skill by name
+  const findSkillIndex = (rows: SkillRow[], skillName: string): number =>
+    rows.findIndex(
+      (row) =>
+        (row.type === 'installed-skill' && row.skill.name === skillName) ||
+        (row.type === 'untracked-skill' && row.skill.name === skillName)
+    )
+
   const loadData = useCallback((selectSkillName?: string) => {
     const { installed, untracked } = getProjectSkills(projectPath)
     const available = getAvailableSkills(projectPath, installed)
@@ -41,19 +47,13 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
     const newRows = buildSkillRows(installed, untracked, available)
 
     if (selectSkillName) {
-      // Find the skill row and select it
-      const skillIndex = newRows.findIndex(
-        (r) =>
-          (r.type === 'installed-skill' && r.skill.name === selectSkillName) ||
-          (r.type === 'untracked-skill' && r.skill.name === selectSkillName)
-      )
+      const skillIndex = findSkillIndex(newRows, selectSkillName)
       if (skillIndex >= 0) {
         setSelectedIndex(skillIndex)
         return
       }
     }
 
-    // Fallback: clamp to bounds
     setSelectedIndex((i) => Math.min(i, Math.max(0, newRows.length - 1)))
   }, [projectPath])
 
@@ -61,7 +61,6 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
     loadData()
   }, [loadData])
 
-  // Build flat list of rows for navigation
   const skillRows = buildSkillRows(installedSkills, untrackedSkills, availableSkills)
 
   return {

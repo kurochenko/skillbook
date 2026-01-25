@@ -1,18 +1,16 @@
 import { Box, Text } from 'ink'
 import type { HarnessInfo, HarnessState } from '@/lib/harness'
 
-// Harness state badge
+const HARNESS_STATE_BADGE: Record<HarnessState, { text: string; color?: string; dim?: boolean }> = {
+  enabled: { text: '[✓]', color: 'green' },
+  detached: { text: '[d]', dim: true },
+  partial: { text: '[~]', color: 'yellow' },
+  available: { text: '[ ]', dim: true },
+}
+
 const HarnessStateBadge = ({ state }: { state: HarnessState }) => {
-  if (state === 'enabled') {
-    return <Text color="green">[✓]</Text>
-  }
-  if (state === 'detached') {
-    return <Text dimColor>[d]</Text>
-  }
-  if (state === 'partial') {
-    return <Text color="yellow">[~]</Text>
-  }
-  return <Text dimColor>[ ]</Text>
+  const badge = HARNESS_STATE_BADGE[state]
+  return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
 }
 
 export const HarnessRow = ({
