@@ -154,26 +154,32 @@ describe('App TUI Integration', () => {
     // Wait for initial render
     await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
 
-    const output = lastFrame() ?? ''
+    const output = stripAnsi(lastFrame() ?? '')
 
-    // Check INSTALLED section exists with skills
+    // Check INSTALLED section exists
     expect(output).toContain('INSTALLED')
+
+    // skill-in-lib should show in INSTALLED section
+    // It has mixed status (symlink in claude, conflict in opencode) so shows tree view
     expect(output).toContain('skill-in-lib')
 
-    // skill-in-lib shows as conflict (opencode has different content but isn't in enabled harnesses)
-    expect(output).toContain('[conflict')
-
     // Check skill-detached shows detached status (real file, matches library)
-    expect(output).toContain('skill-detached')
-    expect(output).toContain('[detached]')
+    // The [detached] badge should appear on the same conceptual row
+    expect(output).toContain('[detached] skill-detached')
+
+    // skill-unanimous-conflict should show conflict (unanimous - all harnesses differ)
+    expect(output).toContain('[conflict')
+    expect(output).toContain('skill-unanimous-conflict')
 
     // Check LOCAL section with skill-local
     expect(output).toContain('LOCAL')
-    expect(output).toContain('skill-local')
+    const localSection = output.split('LOCAL')[1]?.split('AVAILABLE')[0] ?? ''
+    expect(localSection).toContain('skill-local')
 
     // Check AVAILABLE section with skill-available
     expect(output).toContain('AVAILABLE')
-    expect(output).toContain('skill-available')
+    const availableSection = output.split('AVAILABLE')[1] ?? ''
+    expect(availableSection).toContain('skill-available')
 
     unmount()
   })
@@ -296,15 +302,17 @@ describe('App TUI Integration', () => {
     unmount()
   })
 
-  test('uninstall skill removes it from project', async () => {
-    // skill-in-lib has a symlink in .claude (will be removed)
-    const skillDirPath = join(
+  test('uninstall skill removes symlink from enabled harness', async () => {
+    // skill-in-lib has a symlink in .claude (enabled harness) and real file in .opencode
+    // Uninstall removes from all harnesses - symlink is removed, real file removal fails
+    // After uninstall, skill still shows because it exists in .opencode
+    const claudeSkillPath = join(
       PROJECT_PATH,
       '.claude/skills/skill-in-lib',
     )
 
-    // Verify it starts as a symlink
-    expect(isSymlink(skillDirPath)).toBe(true)
+    // Verify it starts as a symlink in claude
+    expect(isSymlink(claudeSkillPath)).toBe(true)
 
     const { lastFrame, stdin, unmount } = render(
       <App projectPath={PROJECT_PATH} inProject={true} />,
@@ -323,18 +331,18 @@ describe('App TUI Integration', () => {
     // Press 'u' to uninstall
     stdin.write('u')
 
-    // Wait for uninstall to complete - skill should move to AVAILABLE
-    await waitFor(() => {
-      const frame = stripAnsi(lastFrame() ?? '')
-      // skill-in-lib should no longer be in INSTALLED section
-      // It should appear in AVAILABLE section now
-      return !frame.includes('[detached] skill-in-lib') && 
-             !frame.includes('[conflict] skill-in-lib') &&
-             !frame.includes('[✓] skill-in-lib')
-    }, 3000)
+    // Wait for uninstall to complete
+    // The symlink in claude should be removed
+    // Skill still shows because opencode has a real file (not removed by uninstall)
+    await waitFor(() => !isSymlink(claudeSkillPath), 3000)
 
-    // Verify symlink was removed
-    expect(isSymlink(skillDirPath)).toBe(false)
+    // Verify symlink was removed from claude
+    expect(isSymlink(claudeSkillPath)).toBe(false)
+    expect(pathExists(claudeSkillPath)).toBe(false)
+
+    // Skill still appears in INSTALLED because opencode version exists
+    const frame = stripAnsi(lastFrame() ?? '')
+    expect(frame).toContain('skill-in-lib')
 
     unmount()
   })
@@ -432,3 +440,14 @@ describe('App TUI Integration', () => {
     unmount()
   })
 })
+
+// TODO: Harness tab tests require investigation of Tab key handling in ink-testing-library
+// The Tab key ('\t') doesn't seem to trigger useInput's key.tab flag correctly
+// See: https://github.com/vadimdemedes/ink-testing-library/issues
+//
+// Tests to add once Tab key handling is resolved:
+// - displays harness states correctly (enabled/detached/partial/available)
+// - enable harness creates symlinks for installed skills
+// - detach harness converts symlinks to real files
+// - remove harness deletes folder (with confirmation)
+// - switch between tabs preserves state

@@ -57,14 +57,14 @@ project/
 │       ├── beads/SKILL.md        ← sparse-checked-out from library
 │       └── typescript-cli/SKILL.md
 ├── .claude/skills/
-│   ├── beads/SKILL.md            ← symlink → .skillbook/skills/beads/SKILL.md
-│   └── typescript-cli/SKILL.md   ← symlink
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
+│   └── typescript-cli/           ← directory symlink
 ├── .opencode/skill/
-│   ├── beads/SKILL.md            ← symlink → .skillbook/skills/beads/SKILL.md
-│   └── typescript-cli/SKILL.md   ← symlink
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
+│   └── typescript-cli/           ← directory symlink
 └── .cursor/rules/
-    ├── beads.md                  ← symlink → .skillbook/skills/beads/SKILL.md
-    └── typescript-cli.md         ← symlink
+    ├── beads.md                  ← file symlink → .skillbook/skills/beads/SKILL.md
+    └── typescript-cli.md         ← file symlink
 ```
 
 ### Key Concepts
@@ -475,7 +475,9 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 | Push/pull actions for ahead/behind states | `skill-book-g06` |
 | Eject command | `skill-book-3vt` |
 | Integration tests for CLI commands | `skill-book-8aa` |
-| TUI integration tests for project view | `skill-book-awe` |
+
+### Done (Testing)
+- [x] TUI integration tests for project view (`src/tui/__tests__/App.integration.test.tsx`)
 
 ---
 

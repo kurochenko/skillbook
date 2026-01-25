@@ -25,16 +25,17 @@
 ### 1. Config Module (`src/lib/config.ts`)
 
 ```typescript
-// Project config stored in .skillbook/config.yaml
+// Project config stored in .skillbook/config.json
 type ProjectConfig = {
   harnesses: string[]      // enabled harnesses
-  skills: string[]         // installed skill names (auto-managed)
 }
+
+// Note: No skills array - filesystem is source of truth (sparse checkout contents)
 
 // Functions:
 readConfig(projectPath): ProjectConfig | null     // returns null if no config
 writeConfig(projectPath, config): void            // creates .skillbook/ on write
-getConfigPath(projectPath): string                // .skillbook/config.yaml
+getConfigPath(projectPath): string                // .skillbook/config.json
 ensureSkillbookDir(projectPath): void             // creates .skillbook/ if needed
 ```
 
@@ -69,7 +70,7 @@ syncSkill(projectPath, skillName): void           // pull library -> local
 const HARNESS_PATHS = {
   'claude-code': '.claude/skills/',
   'cursor': '.cursor/rules/',
-  'opencode': '.opencode/skills/',
+  'opencode': '.opencode/skill/',
 }
 
 // Functions:
