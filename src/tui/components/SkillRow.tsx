@@ -1,12 +1,15 @@
 import { Box, Text } from 'ink'
-import { TOOLS } from '../../constants.js'
+import { TOOLS } from '@/constants'
 import type {
   InstalledSkill,
   UntrackedSkill,
   AvailableSkill,
   HarnessSkillInfo,
   UntrackedHarnessInfo,
-} from '../../lib/project.js'
+  SkillSyncStatus,
+  HarnessSkillStatus,
+} from '@/lib/project'
+import type { DiffStats } from '@/lib/library'
 
 // A row in the skill list - can be a skill or a harness entry under a skill
 export type SkillRow =
@@ -15,6 +18,39 @@ export type SkillRow =
   | { type: 'untracked-skill'; skill: UntrackedSkill }
   | { type: 'untracked-harness'; skill: UntrackedSkill; harness: UntrackedHarnessInfo }
   | { type: 'available-skill'; skill: AvailableSkill }
+
+// Status badge configuration for skill-level statuses
+type BadgeConfig = {
+  text: string | ((diff: DiffStats | null) => string)
+  color: string
+}
+
+const SKILL_STATUS_BADGE: Record<SkillSyncStatus, BadgeConfig> = {
+  ok: { text: '[✓]', color: 'green' },
+  ahead: {
+    text: (diff) => diff ? `[ahead +${diff.additions}/-${diff.deletions}]` : '[ahead]',
+    color: 'yellow',
+  },
+  behind: { text: '[behind]', color: 'cyan' },
+  detached: { text: '[detached]', color: 'gray' },
+  conflict: {
+    text: (diff) => diff ? `[conflict +${diff.additions}/-${diff.deletions}]` : '[conflict]',
+    color: 'red',
+  },
+}
+
+// Status badge configuration for harness-level statuses
+const HARNESS_STATUS_BADGE: Record<HarnessSkillStatus, { text: string; color?: string; dim?: boolean }> = {
+  ok: { text: '[✓]', color: 'green' },
+  detached: { text: '[detached]', dim: true },
+  conflict: { text: '[conflict]', color: 'red' },
+}
+
+const getSkillBadge = (status: SkillSyncStatus, diff: DiffStats | null) => {
+  const config = SKILL_STATUS_BADGE[status]
+  const text = typeof config.text === 'function' ? config.text(diff) : config.text
+  return { text, color: config.color }
+}
 
 // Build flat list of rows with tree structure
 export const buildSkillRows = (
@@ -55,14 +91,9 @@ export const buildSkillRows = (
 }
 
 // Status badge for harness entries
-const HarnessStatusBadge = ({ status }: { status: 'ok' | 'detached' | 'conflict' }) => {
-  if (status === 'ok') {
-    return <Text color="green">[✓]</Text>
-  }
-  if (status === 'detached') {
-    return <Text dimColor>[detached]</Text>
-  }
-  return <Text color="red">[conflict]</Text>
+const HarnessStatusBadge = ({ status }: { status: HarnessSkillStatus }) => {
+  const badge = HARNESS_STATUS_BADGE[status]
+  return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
 }
 
 // Render a single row
@@ -74,32 +105,12 @@ export const RowDisplay = ({ row, selected }: { row: SkillRow; selected: boolean
   switch (row.type) {
     case 'installed-skill': {
       const { name, isUnanimous, status, diff } = row.skill
-      // Build badge text inline to avoid Ink rendering issues with embedded components
-      let badgeText = ''
-      let badgeColor: string | undefined
-      if (isUnanimous) {
-        if (status === 'ok') {
-          badgeText = '[✓]'
-          badgeColor = 'green'
-        } else if (status === 'ahead') {
-          badgeText = diff ? `[ahead +${diff.additions}/-${diff.deletions}]` : '[ahead]'
-          badgeColor = 'yellow'
-        } else if (status === 'behind') {
-          badgeText = '[behind]'
-          badgeColor = 'cyan'
-        } else if (status === 'detached') {
-          badgeText = '[detached]'
-          badgeColor = 'gray'
-        } else if (status === 'conflict') {
-          badgeText = diff ? `[conflict +${diff.additions}/-${diff.deletions}]` : '[conflict]'
-          badgeColor = 'red'
-        }
-      }
+      const badge = isUnanimous ? getSkillBadge(status, diff) : null
       return (
         <Box>
           <Text color={color} bold={bold}>{cursor} </Text>
-          {badgeText && <Text color={badgeColor}>{badgeText}</Text>}
-          {badgeText && <Text> </Text>}
+          {badge && <Text color={badge.color}>{badge.text}</Text>}
+          {badge && <Text> </Text>}
           <Text color={color} bold={bold}>{name}</Text>
         </Box>
       )

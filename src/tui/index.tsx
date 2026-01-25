@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { runTUI } from './App.js'
-import { detectProjectContext } from '../lib/project.js'
+import { runTUI } from '@/tui/App'
+import { detectProjectContext } from '@/lib/project'
 
 // Check if we're in an interactive terminal
 if (!process.stdin.isTTY) {

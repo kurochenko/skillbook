@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, lstatSync } from 'fs'
 import { join, dirname } from 'path'
-import { readConfig, setHarnessEnabled } from './config.js'
-import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '../constants.js'
-import { isSkillSymlinked, convertToSymlink, getHarnessSkillPath } from './symlinks.js'
+import { readConfig, setHarnessEnabled } from '@/lib/config'
+import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '@/constants'
+import { isSkillSymlinked, convertToSymlink, getHarnessSkillPath } from '@/lib/symlinks'
 
 // Harness state:
 // - 'enabled': Fully managed, all installed skills are symlinked

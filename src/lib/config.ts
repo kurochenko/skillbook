@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { SKILLBOOK_DIR, SKILLS_DIR } from '../constants.ts'
+import { SKILLBOOK_DIR, SKILLS_DIR } from '@/constants'
 
 export const CONFIG_FILE = 'config.json'
 

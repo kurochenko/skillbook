@@ -8,7 +8,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll } from 'bun:test'
 import { render } from 'ink-testing-library'
 import { join } from 'path'
-import ScanApp from '../ScanApp'
+import ScanApp from '@/tui/ScanApp'
 import {
   setupScanFixtures,
   cleanupScanFixtures,

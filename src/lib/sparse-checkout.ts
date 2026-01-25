@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { getLibraryPath } from './paths.ts'
-import { runGit } from './git.ts'
-import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '../constants.ts'
+import { getLibraryPath } from '@/lib/paths'
+import { runGit } from '@/lib/git'
+import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '@/constants'
 
 export type SparseCheckoutResult =
   | { success: true }

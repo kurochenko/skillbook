@@ -5,18 +5,18 @@ import {
   uninstallSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
-} from '../lib/project.js'
+} from '@/lib/project'
 import {
   enableHarness,
   removeHarness,
   detachHarness,
-} from '../lib/harness.js'
-import { TOOLS } from '../constants.js'
-import { RowDisplay } from './components/SkillRow'
-import { HarnessRow } from './components/HarnessRow'
-import { HelpBar, type Tab } from './components/HelpBar'
-import { ConfirmDialog, type ConfirmAction } from './components/ConfirmDialog'
-import { useSkillData } from './hooks/useSkillData'
+} from '@/lib/harness'
+import { TOOLS } from '@/constants'
+import { RowDisplay } from '@/tui/components/SkillRow'
+import { HarnessRow } from '@/tui/components/HarnessRow'
+import { HelpBar, type Tab } from '@/tui/components/HelpBar'
+import { ConfirmDialog, type ConfirmAction } from '@/tui/components/ConfirmDialog'
+import { useSkillData } from '@/tui/hooks/useSkillData'
 
 type AppProps = {
   projectPath: string

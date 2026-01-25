@@ -8,8 +8,8 @@ const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.i
 
 if (!hasSubcommand && !isHelpOrVersion) {
   // Launch TUI directly
-  const { runTUI } = await import('./tui/App.js')
-  const { detectProjectContext } = await import('./lib/project.js')
+  const { runTUI } = await import('@/tui/App')
+  const { detectProjectContext } = await import('@/lib/project')
 
   if (!process.stdin.isTTY) {
     console.error('Error: skillbook TUI requires an interactive terminal.')
@@ -30,9 +30,9 @@ if (!hasSubcommand && !isHelpOrVersion) {
       description: 'Manage AI coding assistant skills across projects',
     },
     subCommands: {
-      add: () => import('./commands/add.ts').then((m) => m.default),
-      list: () => import('./commands/list.ts').then((m) => m.default),
-      scan: () => import('./commands/scan.ts').then((m) => m.default),
+      add: () => import('@/commands/add').then((m) => m.default),
+      list: () => import('@/commands/list').then((m) => m.default),
+      scan: () => import('@/commands/scan').then((m) => m.default),
     },
   })
 

@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, symlinkSync, unlinkSync, readlinkSync, mkdirSync, rmSync } from 'fs'
 import { join, dirname, relative } from 'path'
-import { TOOLS, type ToolId, SKILL_FILE } from '../constants.ts'
-import { getSkillbookSkillsPath } from './sparse-checkout.ts'
+import { TOOLS, type ToolId, SKILL_FILE } from '@/constants'
+import { getSkillbookSkillsPath } from '@/lib/sparse-checkout'
 
 export type SymlinkResult =
   | { success: true }

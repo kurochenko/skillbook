@@ -3,28 +3,28 @@ import { join, dirname, resolve, basename } from 'path'
 import {
   detectHarnesses,
   getEnabledHarnesses,
-} from './harness.js'
+} from '@/lib/harness'
 import {
   getSkillContent,
   listSkills as listLibrarySkills,
   addSkillToLibrary,
   calculateDiff,
   type DiffStats,
-} from './library.js'
-import { SKILL_FILE, TOOLS, type ToolId } from '../constants.js'
+} from '@/lib/library'
+import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import {
   isSkillbookInitialized,
   initSparseCheckout,
   addToSparseCheckout,
   removeFromSparseCheckout,
   getSkillbookSkillsPath,
-} from './sparse-checkout.js'
+} from '@/lib/sparse-checkout'
 import {
   isSkillSymlinked,
   createSymlinksForSkill,
   removeSymlinksForSkill,
   convertToSymlink,
-} from './symlinks.js'
+} from '@/lib/symlinks'
 
 // Sync status for skills (displayed in TUI)
 //

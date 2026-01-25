@@ -9,7 +9,7 @@ import { describe, test, expect, beforeAll, beforeEach, afterAll } from 'bun:tes
 import { render } from 'ink-testing-library'
 import { rmSync, existsSync } from 'fs'
 import { join } from 'path'
-import App from '../App'
+import App from '@/tui/App'
 import {
   setupFixtures,
   cleanupFixtures,

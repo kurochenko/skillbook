@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { validateSkillName, extractSkillName } from '../skills.ts'
+import { validateSkillName, extractSkillName } from '@/lib/skills'
 
 describe('validateSkillName', () => {
   test('accepts valid names', () => {

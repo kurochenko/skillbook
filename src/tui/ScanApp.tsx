@@ -4,8 +4,9 @@ import {
   addSkillToLibrary,
   scanProjectSkills,
   type ScannedSkill,
-} from '../lib/library.js'
-import { isSkillbookInitialized } from '../lib/sparse-checkout.js'
+  type SkillStatus,
+} from '@/lib/library'
+import { isSkillbookInitialized } from '@/lib/sparse-checkout'
 import { resolve, dirname } from 'path'
 
 type ProjectInfo = {
@@ -13,6 +14,19 @@ type ProjectInfo = {
   path: string
   isManaged: boolean  // Has .skillbook/ initialized
   skills: ScannedSkill[]
+}
+
+// Status badge configuration
+const SCAN_STATUS_BADGE: Record<SkillStatus, { text: string; color?: string; dim?: boolean }> = {
+  synced: { text: '[matches]', color: 'green' },
+  ahead: { text: '[differs]', color: 'yellow' },
+  detached: { text: '[local]', dim: true },
+}
+
+// Help actions by status
+const SCAN_HELP_ACTIONS: Partial<Record<SkillStatus, string>> = {
+  detached: '[a]dd to library',
+  ahead: '[o]verwrite library',
 }
 
 // A row in the scan list - can be a project header or a skill
@@ -47,14 +61,8 @@ const getProjectPath = (skillPath: string, projectName: string): string => {
 
 // Status badge component (right-aligned)
 const SkillStatusBadge = ({ skill }: { skill: ScannedSkill }) => {
-  if (skill.status === 'synced') {
-    return <Text color="green">[matches]</Text>
-  }
-  if (skill.status === 'ahead') {
-    return <Text color="yellow">[differs]</Text>
-  }
-  // detached = local only
-  return <Text dimColor>[local]</Text>
+  const badge = SCAN_STATUS_BADGE[skill.status]
+  return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
 }
 
 // Variant warning component
@@ -131,18 +139,11 @@ const RowDisplay = ({
 
 // Help bar component
 const HelpBar = ({ selectedRow }: { selectedRow: ScanRow | null }) => {
-  const parts: string[] = []
+  const action = selectedRow?.type === 'skill'
+    ? SCAN_HELP_ACTIONS[selectedRow.skill.status]
+    : undefined
 
-  if (selectedRow?.type === 'skill') {
-    const { status } = selectedRow.skill
-    if (status === 'detached') {
-      parts.push('[a]dd to library')
-    } else if (status === 'ahead') {
-      parts.push('[o]verwrite library')
-    }
-  }
-
-  parts.push('[q]uit')
+  const parts = action ? [action, '[q]uit'] : ['[q]uit']
 
   return (
     <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
@@ -249,10 +250,13 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       return
     }
 
-    if (result.action === 'added') {
-      setMessage({ text: `Added '${skill.name}' to library`, color: 'green' })
-    } else if (result.action === 'updated') {
-      setMessage({ text: `Updated '${skill.name}' in library`, color: 'yellow' })
+    switch (result.action) {
+      case 'added':
+        setMessage({ text: `Added '${skill.name}' to library`, color: 'green' })
+        break
+      case 'updated':
+        setMessage({ text: `Updated '${skill.name}' in library`, color: 'yellow' })
+        break
     }
 
     // Reload data to update statuses

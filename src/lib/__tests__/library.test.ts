@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { scanProjectSkills, addSkillToLibrary } from '../library.ts'
+import { scanProjectSkills, addSkillToLibrary } from '@/lib/library'
 
 describe('scanProjectSkills', () => {
   let tempDir: string

@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs'
 import { join, resolve } from 'path'
 import { fdir } from 'fdir'
-import { getLibraryPath, getSkillsPath, getSkillPath } from './paths.ts'
-import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from './git.ts'
-import { SKILL_FILE, SKILLS_DIR } from '../constants.ts'
-import { extractSkillName, validateSkillName } from './skills.ts'
+import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
+import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from '@/lib/git'
+import { SKILL_FILE, SKILLS_DIR } from '@/constants'
+import { extractSkillName, validateSkillName } from '@/lib/skills'
 
 export type LibraryInitResult =
   | { success: true; path: string; created: boolean }

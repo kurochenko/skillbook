@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink'
-import type { HarnessInfo, HarnessState } from '../../lib/harness.js'
+import type { HarnessInfo, HarnessState } from '@/lib/harness'
 
 // Harness state badge
 const HarnessStateBadge = ({ state }: { state: HarnessState }) => {

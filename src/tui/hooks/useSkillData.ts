@@ -6,9 +6,9 @@ import {
   type InstalledSkill,
   type UntrackedSkill,
   type AvailableSkill,
-} from '../../lib/project.js'
-import { getHarnessesInfo, type HarnessInfo } from '../../lib/harness.js'
-import { buildSkillRows, type SkillRow } from '../components/SkillRow'
+} from '@/lib/project'
+import { getHarnessesInfo, type HarnessInfo } from '@/lib/harness'
+import { buildSkillRows, type SkillRow } from '@/tui/components/SkillRow'
 
 export type UseSkillDataResult = {
   installedSkills: InstalledSkill[]

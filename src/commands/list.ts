@@ -1,8 +1,8 @@
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { listSkills } from '../lib/library.ts'
-import { getLibraryPath, getSkillsPath } from '../lib/paths.ts'
+import { listSkills } from '@/lib/library'
+import { getLibraryPath, getSkillsPath } from '@/lib/paths'
 import { existsSync } from 'fs'
 
 export default defineCommand({

@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { extractSkillName, validateSkillName } from '../lib/skills.ts'
+import { extractSkillName, validateSkillName } from '@/lib/skills'
 import {
   addSkillToLibrary,
   skillExists,
   getSkillContent,
-} from '../lib/library.ts'
+} from '@/lib/library'
 
 const runSingleAdd = async (inputPath: string, providedName: string | undefined, force: boolean) => {
   const filePath = resolve(inputPath)

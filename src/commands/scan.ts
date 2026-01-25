@@ -1,5 +1,5 @@
 import { defineCommand } from 'citty'
-import { runScanApp } from '../tui/ScanApp.js'
+import { runScanApp } from '@/tui/ScanApp'
 
 export default defineCommand({
   meta: {

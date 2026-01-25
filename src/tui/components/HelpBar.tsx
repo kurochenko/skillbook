@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink'
-import type { SkillRow } from './SkillRow'
-import type { HarnessInfo } from '../../lib/harness.js'
+import type { SkillRow } from '@/tui/components/SkillRow'
+import type { HarnessInfo, HarnessState } from '@/lib/harness'
+import type { SkillSyncStatus } from '@/lib/project'
 
 export type Tab = 'skills' | 'harnesses'
 
@@ -10,71 +11,55 @@ type HelpBarProps = {
   selectedHarness: HarnessInfo | null
 }
 
+// Actions for unanimous installed skills by status
+const SKILL_STATUS_ACTIONS: Record<SkillSyncStatus, string[]> = {
+  ok: ['[u]ninstall'],
+  ahead: ['[p]ush', '[u]ninstall'],
+  behind: ['[s]ync', '[u]ninstall'],
+  detached: ['[s]ync', '[u]ninstall'],
+  conflict: ['[s]ync (use library)', '[p]ush (use local)', '[u]ninstall'],
+}
+
+// Actions for harness states
+const HARNESS_STATE_ACTIONS: Record<HarnessState, string[]> = {
+  enabled: ['[d]etach', '[r]emove'],
+  detached: ['[e]nable', '[r]emove'],
+  partial: ['[e]nable', '[d]etach'],
+  available: ['[e]nable'],
+}
+
+// Get actions for the selected row in skills tab
+const getSkillRowActions = (row: SkillRow | null): string[] => {
+  if (!row) return []
+
+  switch (row.type) {
+    case 'available-skill':
+      return ['[i]nstall']
+    case 'installed-skill':
+      return row.skill.isUnanimous
+        ? SKILL_STATUS_ACTIONS[row.skill.status]
+        : ['[u]ninstall']
+    case 'installed-harness':
+    case 'untracked-harness':
+      return ['[s] use as source']
+    case 'untracked-skill':
+      return ['[p]ush to library']
+  }
+}
+
 export const HelpBar = ({ tab, selectedRow, selectedHarness }: HelpBarProps) => {
-  if (tab === 'skills') {
-    const parts: string[] = []
+  const isSkillsTab = tab === 'skills'
 
-    if (!selectedRow) {
-      // No selection
-    } else if (selectedRow.type === 'available-skill') {
-      parts.push('[i]nstall')
-    } else if (selectedRow.type === 'installed-skill') {
-      const { status, isUnanimous } = selectedRow.skill
-      if (isUnanimous) {
-        // Skill-level actions for unanimous state
-        if (status === 'ok') {
-          parts.push('[u]ninstall')
-        } else if (status === 'ahead') {
-          parts.push('[p]ush', '[u]ninstall')
-        } else if (status === 'behind') {
-          parts.push('[s]ync', '[u]ninstall')
-        } else if (status === 'detached') {
-          parts.push('[s]ync', '[u]ninstall')
-        } else if (status === 'conflict') {
-          parts.push('[s]ync (use library)', '[p]ush (use local)', '[u]ninstall')
-        }
-      } else {
-        // Mixed state - can still uninstall at skill level
-        parts.push('[u]ninstall')
-      }
-    } else if (selectedRow.type === 'installed-harness') {
-      // Harness entry actions - available for all statuses
-      parts.push('[s] use as source')
-    } else if (selectedRow.type === 'untracked-skill') {
-      parts.push('[p]ush to library')
-    } else if (selectedRow.type === 'untracked-harness') {
-      parts.push('[s] use as source')
-    }
+  const actions = isSkillsTab
+    ? getSkillRowActions(selectedRow)
+    : selectedHarness ? HARNESS_STATE_ACTIONS[selectedHarness.state] : []
 
-    parts.push('[tab] harnesses', '[q]uit')
-
-    return (
-      <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
-        <Text dimColor wrap="truncate">{parts.join('  ')}</Text>
-      </Box>
-    )
-  }
-
-  // Harness tab help bar - context-sensitive based on harness state
-  const harnessParts: string[] = []
-  if (selectedHarness) {
-    const { state } = selectedHarness
-    if (state === 'enabled') {
-      harnessParts.push('[d]etach', '[r]emove')
-    } else if (state === 'detached') {
-      harnessParts.push('[e]nable', '[r]emove')
-    } else if (state === 'partial') {
-      harnessParts.push('[e]nable', '[d]etach')
-    } else {
-      // available
-      harnessParts.push('[e]nable')
-    }
-  }
-  harnessParts.push('[tab] skills', '[q]uit')
+  const navigation = isSkillsTab ? '[tab] harnesses' : '[tab] skills'
+  const parts = [...actions, navigation, '[q]uit']
 
   return (
     <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
-      <Text dimColor wrap="truncate">{harnessParts.join('  ')}</Text>
+      <Text dimColor wrap="truncate">{parts.join('  ')}</Text>
     </Box>
   )
 }
