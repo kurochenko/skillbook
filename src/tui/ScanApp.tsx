@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { render, Box, Text, useInput, useApp } from 'ink'
 import {
   addSkillToLibrary,
@@ -186,6 +186,16 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<Message | null>(null)
   const [pendingConfirm, setPendingConfirm] = useState<ScannedSkill | null>(null)
+  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup message timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Load/reload data
   const loadData = useCallback(async () => {
@@ -262,8 +272,11 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     // Reload data to update statuses
     await loadData()
     
-    // Clear message after a delay
-    setTimeout(() => setMessage(null), 2000)
+    // Clear message after a delay (with cleanup tracking)
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current)
+    }
+    messageTimeoutRef.current = setTimeout(() => setMessage(null), 2000)
   }
 
   useInput((input, key) => {

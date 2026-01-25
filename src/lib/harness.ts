@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, lstatSync }
 import { join, dirname } from 'path'
 import { readConfig, setHarnessEnabled } from '@/lib/config'
 import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '@/constants'
-import { isSkillSymlinked, convertToSymlink, getHarnessSkillPath } from '@/lib/symlinks'
+import { isSkillSymlinked, convertToSymlink } from '@/lib/symlinks'
 
 // Harness state:
 // - 'enabled': Fully managed, all installed skills are symlinked
@@ -142,73 +142,6 @@ export const getHarnessesInfo = (projectPath: string, installedSkillNames: strin
     name: TOOLS[id].name,
     state: getHarnessState(projectPath, id, installedSkillNames),
   }))
-}
-
-/**
- * Write a skill to a specific harness location
- */
-export const writeSkillToHarness = (
-  projectPath: string,
-  harnessId: ToolId,
-  skillName: string,
-  content: string,
-): void => {
-  const skillPath = getHarnessSkillPath(projectPath, harnessId, skillName)
-  const dir = dirname(skillPath)
-
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-
-  writeFileSync(skillPath, content, 'utf-8')
-}
-
-/**
- * Remove a skill from a specific harness location
- */
-export const removeSkillFromHarness = (
-  projectPath: string,
-  harnessId: ToolId,
-  skillName: string,
-): void => {
-  const skillPath = getHarnessSkillPath(projectPath, harnessId, skillName)
-
-  if (!existsSync(skillPath)) {
-    return
-  }
-
-  // For harnesses that use directories (claude-code, opencode), remove the whole dir
-  const tool = TOOLS[harnessId]
-  if (tool.needsDirectory) {
-    const skillDir = dirname(skillPath)
-    if (existsSync(skillDir)) {
-      rmSync(skillDir, { recursive: true, force: true })
-    }
-  } else {
-    // For flat file harnesses (cursor), just remove the file
-    rmSync(skillPath, { force: true })
-  }
-}
-
-/**
- * Read skill content from a harness location
- */
-export const readSkillFromHarness = (
-  projectPath: string,
-  harnessId: ToolId,
-  skillName: string,
-): string | null => {
-  const skillPath = getHarnessSkillPath(projectPath, harnessId, skillName)
-
-  if (!existsSync(skillPath)) {
-    return null
-  }
-
-  try {
-    return readFileSync(skillPath, 'utf-8')
-  } catch {
-    return null
-  }
 }
 
 /**

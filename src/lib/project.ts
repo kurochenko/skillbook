@@ -116,8 +116,9 @@ const getProjectSkillPath = (projectPath: string, skillName: string): string => 
 
 /**
  * Read skill content from project's .skillbook/skills/ directory
+ * (Internal helper - not exported)
  */
-export const getProjectSkillContent = (projectPath: string, skillName: string): string | null => {
+const getProjectSkillContent = (projectPath: string, skillName: string): string | null => {
   const skillPath = getProjectSkillPath(projectPath, skillName)
 
   if (!existsSync(skillPath)) {

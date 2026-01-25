@@ -17,8 +17,9 @@ if (!hasSubcommand && !isHelpOrVersion) {
     process.exit(1)
   }
 
-  const projectPath = detectProjectContext() ?? process.cwd()
-  const inProject = detectProjectContext() !== null
+  const detectedPath = detectProjectContext()
+  const projectPath = detectedPath ?? process.cwd()
+  const inProject = detectedPath !== null
 
   runTUI(projectPath, inProject)
 } else {
