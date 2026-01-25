@@ -12,25 +12,14 @@ const DEFAULT_CONFIG: ProjectConfig = {
   harnesses: [],
 }
 
-export const getSkillbookDir = (projectPath: string): string => {
-  return join(projectPath, SKILLBOOK_DIR)
-}
+const getSkillbookDir = (projectPath: string): string =>
+  join(projectPath, SKILLBOOK_DIR)
 
-export const getConfigPath = (projectPath: string): string => {
-  return join(getSkillbookDir(projectPath), CONFIG_FILE)
-}
+const getConfigPath = (projectPath: string): string =>
+  join(getSkillbookDir(projectPath), CONFIG_FILE)
 
-export const getProjectSkillsDir = (projectPath: string): string => {
-  return join(getSkillbookDir(projectPath), SKILLS_DIR)
-}
-
-export const getProjectSkillPath = (projectPath: string, skillName: string): string => {
-  return join(getProjectSkillsDir(projectPath), skillName, 'SKILL.md')
-}
-
-export const skillbookDirExists = (projectPath: string): boolean => {
-  return existsSync(getSkillbookDir(projectPath))
-}
+const getProjectSkillsDir = (projectPath: string): string =>
+  join(getSkillbookDir(projectPath), SKILLS_DIR)
 
 export const ensureSkillbookDir = (projectPath: string): void => {
   const dir = getSkillbookDir(projectPath)
@@ -72,31 +61,20 @@ export const writeConfig = (projectPath: string, config: ProjectConfig): void =>
   writeFileSync(configPath, content + '\n', 'utf-8')
 }
 
-/**
- * Enable or disable a harness in the config.
- * 
- * @param currentlyEnabled - The harnesses currently enabled (from auto-detection or config).
- *   Required to preserve auto-detected harnesses when config doesn't exist yet.
- */
 export const setHarnessEnabled = (
   projectPath: string,
   harness: string,
   enabled: boolean,
   currentlyEnabled: string[],
 ): void => {
-  let config = readConfig(projectPath)
+  const config = readConfig(projectPath) ?? { harnesses: [...currentlyEnabled] }
+  const harnesses = new Set(config.harnesses)
 
-  // If no config exists, initialize with currently enabled harnesses
-  // This preserves auto-detected harnesses when first creating the config
-  if (!config) {
-    config = { harnesses: [...currentlyEnabled] }
+  if (enabled) {
+    harnesses.add(harness)
+  } else {
+    harnesses.delete(harness)
   }
 
-  if (enabled && !config.harnesses.includes(harness)) {
-    config.harnesses = [...config.harnesses, harness].sort()
-  } else if (!enabled) {
-    config.harnesses = config.harnesses.filter((h) => h !== harness)
-  }
-
-  writeConfig(projectPath, config)
+  writeConfig(projectPath, { harnesses: [...harnesses].sort() })
 }

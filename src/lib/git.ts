@@ -38,6 +38,23 @@ export const runGit = async (dir: string, args: string[]): Promise<GitResult> =>
   }
 }
 
+const ensureGitConfigValue = async (
+  dir: string,
+  key: string,
+  value: string,
+): Promise<GitResult> => {
+  const result = await runGit(dir, ['config', key])
+
+  if (result.success && result.output) {
+    return { success: true, output: result.output, error: '' }
+  }
+
+  const setResult = await runGit(dir, ['config', key, value])
+  if (!setResult.success) return setResult
+
+  return { success: true, output: value, error: '' }
+}
+
 export const gitInit = async (dir: string): Promise<GitResult> => {
   if (isGitRepo(dir)) {
     return { success: true, output: 'Already a git repository', error: '' }
@@ -67,19 +84,11 @@ export const gitCommit = async (dir: string, message: string): Promise<GitCommit
 }
 
 export const ensureGitConfig = async (dir: string): Promise<GitResult> => {
-  const nameResult = await runGit(dir, ['config', 'user.name'])
+  const nameResult = await ensureGitConfigValue(dir, 'user.name', 'skillbook')
+  if (!nameResult.success) return nameResult
 
-  if (!nameResult.success || !nameResult.output) {
-    const setName = await runGit(dir, ['config', 'user.name', 'skillbook'])
-    if (!setName.success) return setName
-  }
-
-  const emailResult = await runGit(dir, ['config', 'user.email'])
-
-  if (!emailResult.success || !emailResult.output) {
-    const setEmail = await runGit(dir, ['config', 'user.email', 'skillbook@local'])
-    if (!setEmail.success) return setEmail
-  }
+  const emailResult = await ensureGitConfigValue(dir, 'user.email', 'skillbook@local')
+  if (!emailResult.success) return emailResult
 
   return { success: true, output: '', error: '' }
 }
