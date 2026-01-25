@@ -37,6 +37,69 @@ const writeSparsePatterns = async (
   return { success: true }
 }
 
+const getCurrentBranch = async (skillbookPath: string): Promise<string | null> => {
+  const branchResult = await runGit(skillbookPath, ['rev-parse', '--abbrev-ref', 'HEAD'])
+  if (branchResult.success && branchResult.output && branchResult.output !== 'HEAD') {
+    return branchResult.output
+  }
+
+  const originHead = await runGit(skillbookPath, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+  if (!originHead.success || !originHead.output) return null
+
+  return originHead.output.replace('origin/', '').trim()
+}
+
+const refreshSparseCheckout = async (
+  skillbookPath: string,
+  skillName: string,
+): Promise<SparseCheckoutResult> => {
+  const statusResult = await runGit(skillbookPath, ['status', '--porcelain'])
+  if (!statusResult.success) {
+    return { success: false, error: `Failed to check library status: ${statusResult.error}` }
+  }
+
+  const isDirty = statusResult.output.length > 0
+  if (!isDirty) {
+    const pullResult = await runGit(skillbookPath, ['pull', '--ff-only'])
+    if (!pullResult.success) {
+      return { success: false, error: `Failed to update library: ${pullResult.error}` }
+    }
+
+    const checkoutResult = await runGit(skillbookPath, ['checkout'])
+    if (!checkoutResult.success) {
+      return { success: false, error: `Failed to refresh sparse checkout: ${checkoutResult.error}` }
+    }
+
+    return { success: true }
+  }
+
+  const skillPath = `${SKILLS_DIR}/${skillName}`
+  const skillStatus = await runGit(skillbookPath, ['status', '--porcelain', '--', skillPath])
+  if (!skillStatus.success) {
+    return { success: false, error: `Failed to check skill status: ${skillStatus.error}` }
+  }
+  if (skillStatus.output.length > 0) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update` }
+  }
+
+  const branch = await getCurrentBranch(skillbookPath)
+  if (!branch) {
+    return { success: false, error: 'Failed to resolve library branch' }
+  }
+
+  const fetchResult = await runGit(skillbookPath, ['fetch', 'origin'])
+  if (!fetchResult.success) {
+    return { success: false, error: `Failed to fetch library: ${fetchResult.error}` }
+  }
+
+  const checkoutResult = await runGit(skillbookPath, ['checkout', `origin/${branch}`, '--', skillPath])
+  if (!checkoutResult.success) {
+    return { success: false, error: `Failed to refresh skill: ${checkoutResult.error}` }
+  }
+
+  return { success: true }
+}
+
 export const initSparseCheckout = async (projectPath: string): Promise<SparseCheckoutResult> => {
   const skillbookPath = getSkillbookPath(projectPath)
   const libraryPath = getLibraryPath()
@@ -102,10 +165,29 @@ export const addToSparseCheckout = async (
   const skillPattern = `skills/${skillName}`
 
   if (currentPatterns.includes(skillPattern)) {
+    const refreshResult = await refreshSparseCheckout(skillbookPath, skillName)
+    if (!refreshResult.success) return refreshResult
+
+    const skillFilePath = join(getSkillbookSkillsPath(projectPath), skillName, SKILL_FILE)
+    if (!existsSync(skillFilePath)) {
+      return { success: false, error: `Skill not found in library checkout: ${skillName}` }
+    }
+
     return { success: true }
   }
 
-  return writeSparsePatterns(skillbookPath, [...currentPatterns, skillPattern])
+  const writeResult = await writeSparsePatterns(skillbookPath, [...currentPatterns, skillPattern])
+  if (!writeResult.success) return writeResult
+
+  const refreshResult = await refreshSparseCheckout(skillbookPath, skillName)
+  if (!refreshResult.success) return refreshResult
+
+  const skillFilePath = join(getSkillbookSkillsPath(projectPath), skillName, SKILL_FILE)
+  if (!existsSync(skillFilePath)) {
+    return { success: false, error: `Skill not found in library checkout: ${skillName}` }
+  }
+
+  return { success: true }
 }
 
 export const removeFromSparseCheckout = async (

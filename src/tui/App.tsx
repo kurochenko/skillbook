@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { render, Box, Text } from 'ink'
 import {
   installSkill,
   uninstallSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
+  type SkillActionResult,
 } from '@/lib/project-actions'
 import type { InstalledSkill, HarnessSkillInfo } from '@/lib/project-scan'
 import {
@@ -29,6 +30,8 @@ type AppProps = {
 const App = ({ projectPath, inProject }: AppProps) => {
   const [tab, setTab] = useState<Tab>('skills')
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [message, setMessage] = useState<{ text: string; color: 'red' } | null>(null)
+  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     installedSkills,
@@ -62,6 +65,50 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
   const selectedRow = tab === 'skills' ? (skillRows[selectedIndex] ?? null) : null
   const selectedHarness = tab === 'harnesses' ? (harnesses[selectedIndex] ?? null) : null
+
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showError = (text: string) => {
+    setMessage({ text, color: 'red' })
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current)
+    }
+    messageTimeoutRef.current = setTimeout(() => setMessage(null), UI.MESSAGE_TIMEOUT_MS)
+  }
+
+  const runAction = async (
+    action: Promise<SkillActionResult>,
+    onSuccess?: () => void,
+  ) => {
+    const result = await action
+    if (result.success) {
+      onSuccess?.()
+      return
+    }
+    showError(result.error)
+  }
+
+  const runPushThenSync = async (skillName: string) => {
+    const pushResult = await pushSkillToLibrary(projectPath, skillName)
+    if (!pushResult.success) {
+      showError(pushResult.error)
+      return
+    }
+
+    const syncResult = await syncSkillFromLibrary(projectPath, skillName)
+    if (!syncResult.success) {
+      showError(syncResult.error)
+      return
+    }
+
+    loadData(skillName)
+  }
 
   const splitSkillRows = (rows: typeof skillRows) => {
     const installed = rows.filter((r) => r.type === 'installed-skill' || r.type === 'installed-harness')
@@ -130,18 +177,18 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
   const handleInstall = () => {
     if (selectedRow?.type !== 'available-skill') return
-    installSkill(projectPath, selectedRow.skill.name).then(() => loadData())
+    void runAction(installSkill(projectPath, selectedRow.skill.name), () => loadData())
   }
 
   const handleUninstall = () => {
     if (selectedRow?.type !== 'installed-skill') return
-    uninstallSkill(projectPath, selectedRow.skill.name).then(() => loadData())
+    void runAction(uninstallSkill(projectPath, selectedRow.skill.name), () => loadData())
   }
 
   const handlePush = () => {
     if (selectedRow?.type !== 'installed-skill' && selectedRow?.type !== 'untracked-skill') return
     const name = selectedRow.skill.name
-    pushSkillToLibrary(projectPath, name).then(() => loadData(name))
+    void runAction(pushSkillToLibrary(projectPath, name), () => loadData(name))
   }
 
   const handleSync = () => {
@@ -159,7 +206,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
     if (selectedRow.type === 'untracked-harness') {
       const name = selectedRow.skill.name
-      pushSkillToLibrary(projectPath, name).then(() => loadData(name))
+      void runAction(pushSkillToLibrary(projectPath, name), () => loadData(name))
     }
   }
 
@@ -169,14 +216,14 @@ const App = ({ projectPath, inProject }: AppProps) => {
     if (!isUnanimous) return
 
     if (status === 'detached' || status === 'behind') {
-      syncSkillFromLibrary(projectPath, name).then(() => loadData(name))
+      void runAction(syncSkillFromLibrary(projectPath, name), () => loadData(name))
       return
     }
 
     if (status === 'conflict') {
       setConfirmAction({
         message: `Sync "${name}"? This will overwrite local changes with library version.`,
-        onConfirm: () => syncSkillFromLibrary(projectPath, name).then(() => loadData(name)),
+        onConfirm: () => void runAction(syncSkillFromLibrary(projectPath, name), () => loadData(name)),
       })
     }
   }
@@ -193,27 +240,22 @@ const App = ({ projectPath, inProject }: AppProps) => {
       if (hasConflicts) {
         setConfirmAction({
           message: `Sync other harnesses to ${harnessName} version of "${skillName}"?\nThis will overwrite conflicting changes in other harnesses.`,
-          onConfirm: () => syncSkillFromLibrary(projectPath, skillName).then(() => loadData(skillName)),
+          onConfirm: () => void runAction(syncSkillFromLibrary(projectPath, skillName), () => loadData(skillName)),
         })
       } else {
-        syncSkillFromLibrary(projectPath, skillName).then(() => loadData(skillName))
+        void runAction(syncSkillFromLibrary(projectPath, skillName), () => loadData(skillName))
       }
       return
     }
 
     if (harness.status === 'detached') {
-      pushSkillToLibrary(projectPath, skillName).then(() =>
-        syncSkillFromLibrary(projectPath, skillName).then(() => loadData(skillName))
-      )
+      void runPushThenSync(skillName)
       return
     }
 
     setConfirmAction({
       message: `Use ${harnessName} version of "${skillName}" as source?\nThis will overwrite the library version and sync all harnesses.`,
-      onConfirm: () =>
-        pushSkillToLibrary(projectPath, skillName).then(() =>
-          syncSkillFromLibrary(projectPath, skillName).then(() => loadData(skillName))
-        ),
+      onConfirm: () => void runPushThenSync(skillName),
     })
   }
 
@@ -296,6 +338,12 @@ const App = ({ projectPath, inProject }: AppProps) => {
           </>
         )}
       </Box>
+
+      {message && (
+        <Box marginTop={1}>
+          <Text color={message.color}>{message.text}</Text>
+        </Box>
+      )}
 
       <Box marginTop={1}>
         <HelpBar tab={tab} selectedRow={selectedRow} selectedHarness={selectedHarness} />

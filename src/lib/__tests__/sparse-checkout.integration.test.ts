@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
@@ -110,6 +110,47 @@ describe('sparse-checkout', () => {
 
       expect(result.success).toBe(true)
       expect(getSparseCheckoutSkills(projectPath)).toEqual(['skill-a'])
+    })
+
+    test('pulls latest library before checkout', async () => {
+      initLibraryRepo(libraryPath)
+      createSkill(libraryPath, 'skill-a', '# Skill A')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill-a')
+
+      await initSparseCheckout(projectPath)
+
+      createSkill(libraryPath, 'skill-new', '# Skill New')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill-new')
+
+      const result = await addToSparseCheckout(projectPath, 'skill-new')
+
+      expect(result.success).toBe(true)
+      expect(getSparseCheckoutSkills(projectPath)).toEqual(['skill-new'])
+    })
+
+    test('adds new skill when checkout is dirty', async () => {
+      initLibraryRepo(libraryPath)
+      createSkill(libraryPath, 'skill-a', '# Skill A')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill-a')
+
+      await initSparseCheckout(projectPath)
+      await addToSparseCheckout(projectPath, 'skill-a')
+
+      const dirtyPath = join(projectPath, '.skillbook', 'skills', 'skill-a', 'SKILL.md')
+      writeFileSync(dirtyPath, '# Skill A (local edit)')
+
+      createSkill(libraryPath, 'skill-new', '# Skill New')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill-new')
+
+      const result = await addToSparseCheckout(projectPath, 'skill-new')
+
+      expect(result.success).toBe(true)
+      expect(readFileSync(dirtyPath, 'utf-8')).toBe('# Skill A (local edit)')
+      expect(getSparseCheckoutSkills(projectPath)).toEqual(['skill-a', 'skill-new'])
     })
   })
 
