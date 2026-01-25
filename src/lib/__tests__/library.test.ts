@@ -297,8 +297,6 @@ describe('scanProjectSkills', () => {
       const skills = await scanProjectSkills(projectDir)
 
       expect(skills).toHaveLength(2)
-      // Synced item should NOT show conflict (it's the canonical version)
-      // Ahead item is the only one with that status, so no conflict within its category
       const synced = skills.find((s) => s.status === 'synced')
       const ahead = skills.find((s) => s.status === 'ahead')
       expect(synced!.hasConflict).toBe(false)

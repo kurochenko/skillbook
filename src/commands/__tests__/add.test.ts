@@ -1,24 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { spawnSync } from 'child_process'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-
-const CLI_PATH = join(import.meta.dir, '../../cli.ts')
-
-const runCli = (args: string[], env: Record<string, string> = {}) => {
-  const result = spawnSync('bun', ['run', CLI_PATH, ...args], {
-    encoding: 'utf-8',
-    env: { ...process.env, ...env },
-  })
-
-  return {
-    stdout: result.stdout,
-    stderr: result.stderr,
-    exitCode: result.status ?? 1,
-    output: result.stdout + result.stderr,
-  }
-}
+import { runCli } from '@/test-utils/cli'
 
 describe('add command', () => {
   let tempDir: string
@@ -256,4 +240,3 @@ describe('add command', () => {
     })
   })
 })
-

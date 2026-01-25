@@ -1,12 +1,9 @@
-/**
- * Shared test helpers for integration tests
- */
-
 import { existsSync, lstatSync, readFileSync } from 'fs'
+import { KEYS } from '@/tui/constants'
 
-/**
- * Helper to wait for a condition with timeout
- */
+const DOWN_KEY = KEYS.DOWN[0] ?? 'j'
+const UP_KEY = KEYS.UP[0] ?? 'k'
+
 export const waitFor = async (
   condition: () => boolean,
   timeout = 2000,
@@ -21,17 +18,10 @@ export const waitFor = async (
   }
 }
 
-/**
- * Helper to strip ANSI escape codes from terminal output
- */
 export const stripAnsi = (str: string): string => {
-  // eslint-disable-next-line no-control-regex
   return str.replace(/\u001b\[[0-9;]*m/g, '')
 }
 
-/**
- * Helper to check if a path is a symlink
- */
 export const isSymlink = (path: string): boolean => {
   try {
     return lstatSync(path).isSymbolicLink()
@@ -40,25 +30,14 @@ export const isSymlink = (path: string): boolean => {
   }
 }
 
-/**
- * Helper to check if path exists
- */
 export const pathExists = (path: string): boolean => {
   return existsSync(path)
 }
 
-/**
- * Helper to read file content
- */
 export const readFile = (path: string): string => {
   return readFileSync(path, 'utf-8')
 }
 
-/**
- * Helper to navigate to a row containing the target text.
- * Scans the frame for the target and moves cursor until it's on that row.
- * Returns true if navigation succeeded, false if target not found.
- */
 export const navigateToRow = async (
   targetText: string,
   stdin: { write: (s: string) => void },
@@ -69,34 +48,23 @@ export const navigateToRow = async (
     const frame = stripAnsi(lastFrame() ?? '')
     const lines = frame.split('\n')
 
-    // Find the cursor line - cursor is "> " somewhere in the line (inside box)
-    // Look for "│ > " or just "> " pattern
     const cursorLineIndex = lines.findIndex(
       (line) => / > /.test(line) || line.trimStart().startsWith('> '),
     )
     if (cursorLineIndex === -1) continue
 
     const cursorLine = lines[cursorLineIndex] ?? ''
+    if (cursorLine.includes(targetText)) return true
 
-    // Check if cursor is on target
-    if (cursorLine.includes(targetText)) {
-      return true
-    }
-
-    // Find target line
     const targetLineIndex = lines.findIndex((line) => line.includes(targetText))
-    if (targetLineIndex === -1) {
-      return false // Target not found in frame
-    }
+    if (targetLineIndex === -1) return false
 
-    // Move toward target
     if (targetLineIndex > cursorLineIndex) {
-      stdin.write('j')
+      stdin.write(DOWN_KEY)
     } else {
-      stdin.write('k')
+      stdin.write(UP_KEY)
     }
 
-    // Wait for UI to update
     await new Promise((r) => setTimeout(r, 50))
   }
 

@@ -1,24 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { spawnSync } from 'child_process'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-
-const CLI_PATH = join(import.meta.dir, '../../cli.ts')
-
-const runCli = (args: string[], env: Record<string, string> = {}) => {
-  const result = spawnSync('bun', ['run', CLI_PATH, ...args], {
-    encoding: 'utf-8',
-    env: { ...process.env, ...env },
-  })
-
-  return {
-    stdout: result.stdout,
-    stderr: result.stderr,
-    exitCode: result.status ?? 1,
-    output: result.stdout + result.stderr,
-  }
-}
+import { runCli } from '@/test-utils/cli'
 
 describe('list command', () => {
   let tempDir: string
@@ -87,7 +71,6 @@ describe('list command', () => {
       expect(result.output).toContain('zod')
       expect(result.output).toContain('3 skills')
 
-      // Check alphabetical order
       const reactPos = result.output.indexOf('react')
       const tsPos = result.output.indexOf('typescript')
       const zodPos = result.output.indexOf('zod')
@@ -97,7 +80,6 @@ describe('list command', () => {
 
     test('only lists directories with SKILL.md', () => {
       createLibrarySkill('valid-skill')
-      // Create directory without SKILL.md
       mkdirSync(join(libraryDir, 'skills', 'invalid-dir'), { recursive: true })
       writeFileSync(join(libraryDir, 'skills', 'invalid-dir', 'README.md'), '# Not a skill')
 

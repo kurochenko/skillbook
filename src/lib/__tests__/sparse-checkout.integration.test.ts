@@ -2,7 +2,6 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { spawnSync } from 'child_process'
 import {
   initSparseCheckout,
   addToSparseCheckout,
@@ -10,14 +9,7 @@ import {
   getSparseCheckoutSkills,
   isSkillbookInitialized,
 } from '@/lib/sparse-checkout'
-
-const git = (cwd: string, ...args: string[]) => {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf-8' })
-  if (result.status !== 0) {
-    throw new Error(`Git failed: git ${args.join(' ')}\n${result.stderr}`)
-  }
-  return result
-}
+import { runGit } from '@/test-utils/git'
 
 const createSkill = (libraryPath: string, skillName: string, content: string) => {
   const skillDir = join(libraryPath, 'skills', skillName)
@@ -27,12 +19,12 @@ const createSkill = (libraryPath: string, skillName: string, content: string) =>
 
 const initLibraryRepo = (libraryPath: string) => {
   mkdirSync(libraryPath, { recursive: true })
-  git(libraryPath, 'init')
-  git(libraryPath, 'config', 'user.email', 'test@test.com')
-  git(libraryPath, 'config', 'user.name', 'Test')
+  runGit(libraryPath, 'init')
+  runGit(libraryPath, 'config', 'user.email', 'test@test.com')
+  runGit(libraryPath, 'config', 'user.name', 'Test')
   writeFileSync(join(libraryPath, 'README.md'), '# Library')
-  git(libraryPath, 'add', '.')
-  git(libraryPath, 'commit', '-m', 'init')
+  runGit(libraryPath, 'add', '.')
+  runGit(libraryPath, 'commit', '-m', 'init')
 }
 
 describe('sparse-checkout', () => {
@@ -64,8 +56,8 @@ describe('sparse-checkout', () => {
     test('initializes .skillbook as sparse checkout', async () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skill')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill')
 
       expect(isSkillbookInitialized(projectPath)).toBe(false)
 
@@ -98,8 +90,8 @@ describe('sparse-checkout', () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
       createSkill(libraryPath, 'skill-b', '# Skill B')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skills')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skills')
 
       await initSparseCheckout(projectPath)
 
@@ -112,8 +104,8 @@ describe('sparse-checkout', () => {
     test('is idempotent', async () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skill')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill')
 
       await initSparseCheckout(projectPath)
       await addToSparseCheckout(projectPath, 'skill-a')
@@ -130,8 +122,8 @@ describe('sparse-checkout', () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
       createSkill(libraryPath, 'skill-b', '# Skill B')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skills')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skills')
 
       await initSparseCheckout(projectPath)
       await addToSparseCheckout(projectPath, 'skill-a')
@@ -147,8 +139,8 @@ describe('sparse-checkout', () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
       createSkill(libraryPath, 'skill-b', '# Skill B')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skills')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skills')
 
       await initSparseCheckout(projectPath)
       await addToSparseCheckout(projectPath, 'skill-a')
@@ -160,8 +152,8 @@ describe('sparse-checkout', () => {
     test('is idempotent', async () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
-      git(libraryPath, 'add', '.')
-      git(libraryPath, 'commit', '-m', 'add skill')
+      runGit(libraryPath, 'add', '.')
+      runGit(libraryPath, 'commit', '-m', 'add skill')
 
       await initSparseCheckout(projectPath)
       await addToSparseCheckout(projectPath, 'skill-a')
