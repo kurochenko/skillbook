@@ -350,43 +350,75 @@ After eject:
 
 ### Scan Command
 
-Scans directories for skills and displays their sync status with the library.
+Scans directories for skills and adds them to your central library. This is the primary way to populate your library from existing skills across projects.
+
+**Purpose:** Find skills across projects and add them to your central library for later use.
 
 #### Scan Status Badges
 
-| Status | Badge | Color | Meaning |
-|--------|-------|-------|---------|
-| Detached | `[detached]` | dim | Not synced to library (local only) |
-| Synced | `[synced]` | green | In library and matches |
-| Ahead | `[ahead +N/-M]` | yellow | In library but local has changes |
+| Status | Badge | Color | Meaning | Action |
+|--------|-------|-------|---------|--------|
+| Local only | `[local]` | dim | Not in library yet | `[a]dd to library` |
+| Matches | `[matches]` | green | In library, content identical | None needed |
+| Differs | `[differs]` | yellow | In library, content different | `[o]verwrite library` |
 
 #### Variant Warnings
 
 When multiple projects have the same skill with **different content**, a warning is shown:
 
 ```
-[ahead +21/-21] atlassian-jira
-[detached] gitlab-mr-review ⚠ 1 of 2 variants
+beads [differs] ⚠ 1 of 3 variants
+gitlab-mr-review [local] ⚠ 1 of 2 variants
 ```
 
 **Key rules:**
-- `[synced]` items **never** show variant warnings (they're the canonical version)
-- Variants are only counted **within the same status category** (detached vs detached, ahead vs ahead)
+- `[matches]` items **never** show variant warnings (they match the library)
+- Variants are only counted **within the same status category**
 - Warning format: `⚠ 1 of N variants` - indicates this is one of N different versions
+
+#### Scan TUI Actions
+
+| Key | Action | When | Confirmation |
+|-----|--------|------|--------------|
+| `a` | Add to library | On `[local]` skill | No |
+| `o` | Overwrite library | On `[differs]` skill | Yes - warns about replacing |
+| `q` | Quit | Always | No |
 
 #### Example Output
 
 ```
-Select skills to add to library (22 in 5 projects):
-◻ frontend (6)
-│ ◻ [ahead +21/-21] atlassian-jira
-│ ◻ [ahead +34/-34] beads ⚠ 1 of 3 variants
-│ ◻ [synced] git-rebase
-│ └ ◻ [detached] gitlab-mr-review ⚠ 1 of 2 variants
-◻ skill-book (3)
-│ ◻ [synced] atlassian-jira          ← no warning (synced)
-│ ◻ [synced] aws-athena-alb-logs
-│ └ ◻ [synced] coding
+skillbook - Library Scan
+
+Find skills across projects and add them to your central library.
+
+[local] not in library  [matches] matches library version  [differs] differs from library version
+
+PROJECTS (5)
+23 skills found
+
+apify-hackaton-2026 (2)
+  ├─ apify [matches]
+  └─ beads [differs] ⚠ 1 of 3 variants
+frontend (6)
+  ├─ atlassian-jira [differs]
+  ├─ git-rebase [matches]
+  └─ gitlab-mr-review [local] ⚠ 1 of 2 variants
+[✓ skillbook] skill-book (4)
+  ├─ atlassian-jira [matches]
+  └─ coding [matches]
+
+┌────────────────────────────────────────────────────────────────┐
+│ [a]dd to library  [q]uit                                       │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### Overwrite Confirmation
+
+When pressing `[o]` on a skill that differs from library:
+
+```
+Overwrite 'beads' in library? This will replace the existing version.
+[y]es  [n]o
 ```
 
 ### TUI Actions
@@ -444,8 +476,11 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 - [x] Harness-level "use as source" action with confirmation prompt
 - [x] Enable harness properly converts real files to symlinks
 - [x] Scan follows symlinks to find skills in skillbook-managed projects
-- [x] Scan status renamed: `untracked` → `detached` (not synced to library)
-- [x] Scan variant warnings only on non-synced items with multiple different versions
+- [x] Scan TUI with Ink (replaced clack prompts)
+- [x] Scan statuses: `[local]`, `[matches]`, `[differs]` with clear meanings
+- [x] Scan actions: `[a]dd` for local, `[o]verwrite` for differs (with confirmation)
+- [x] Scan variant warnings only on non-matches with multiple different versions
+- [x] Scan description explaining purpose: "Find skills and add to library"
 
 ### TODO
 - [ ] Push/pull actions for ahead/behind states
