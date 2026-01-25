@@ -31,7 +31,6 @@ if (!hasSubcommand && !isHelpOrVersion) {
     },
     subCommands: {
       add: () => import('./commands/add.ts').then((m) => m.default),
-      init: () => import('./commands/init.ts').then((m) => m.default),
       list: () => import('./commands/list.ts').then((m) => m.default),
       scan: () => import('./commands/scan.ts').then((m) => m.default),
     },

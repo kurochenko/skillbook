@@ -61,11 +61,11 @@ bun run build
 # 1. Add a skill from an existing project to your library
 skillbook add .claude/skills/typescript/SKILL.md
 
-# 2. In a new project, initialize skills you want
-skillbook init
-
-# 3. See what skills are available
+# 2. See what skills are available
 skillbook list
+
+# 3. Launch the TUI to manage skills in your project
+skillbook
 ```
 
 ### Commands
@@ -81,29 +81,6 @@ skillbook add .claude/skills/beads/SKILL.md
 
 # Force overwrite if skill exists
 skillbook add .claude/skills/beads/SKILL.md --force
-```
-
-#### `skillbook init`
-
-Interactive setup - select skills and tools, creates symlinks.
-
-```bash
-skillbook init
-
-# Prompts:
-# ? Select skills to install
-#   [x] typescript
-#   [x] beads
-#   [ ] review-gitlab
-#
-# ? Select tools to configure
-#   [x] Claude Code
-#   [x] Cursor
-#   [ ] OpenCode
-#
-# Creates:
-#   .claude/skills/typescript/SKILL.md -> ~/.config/skillbook/skills/typescript/SKILL.md
-#   .cursor/rules/typescript.md -> ~/.config/skillbook/skills/typescript/SKILL.md
 ```
 
 #### `skillbook list`
@@ -166,13 +143,15 @@ bun run dev add ./path/to/skill.md
 
 ```
 src/
-├── cli.ts              # Entry point
+├── cli.ts              # Entry point, launches TUI or subcommands
 ├── commands/
 │   ├── add.ts          # skillbook add
-│   ├── init.ts         # skillbook init
-│   └── list.ts         # skillbook list
+│   ├── list.ts         # skillbook list
+│   └── scan.ts         # skillbook scan
+├── tui/                # Interactive TUI
+│   └── App.tsx         # Main TUI application
 ├── lib/
-│   └── paths.ts        # Path utilities
+│   └── ...             # Core utilities
 ├── constants.ts        # Tool configurations
 └── types.ts            # TypeScript types
 ```
@@ -188,17 +167,16 @@ bun test
 ### MVP (Current)
 - [x] Project setup
 - [x] `skillbook add` - Add skill to library
-- [ ] `skillbook add --bulk` - Scan project and bulk add skills
-- [ ] `skillbook list` - List available skills
-- [ ] `skillbook init` - Interactive skill installation
+- [x] `skillbook list` - List available skills
+- [x] `skillbook scan` - Find skills across projects
+- [x] Interactive TUI for skill management
 
 ### Phase 2
 - [ ] `skillbook status` - Show installed skills in project
-- [ ] `skillbook sync` - Pull updates from library
-- [ ] `skillbook push` - Push changes back to library
+- [ ] Ahead/behind state detection
+- [ ] Version tracking
 
 ### Phase 3
-- [ ] Version tracking
 - [ ] Skill composition (skills referencing other skills)
 - [ ] Team library sharing
 

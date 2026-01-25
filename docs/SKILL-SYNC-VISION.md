@@ -328,7 +328,6 @@ After eject:
 | Command | Description | Status |
 |---------|-------------|--------|
 | `skillbook` | Interactive TUI (default) | ✅ |
-| `skillbook init` | Initialize skills in current project | ✅ |
 | `skillbook add <path>` | Add a skill file to the library | ✅ |
 | `skillbook list` | List skills in library | ✅ |
 | `skillbook scan [path]` | Scan for skills, add to library (TUI) | ✅ |
