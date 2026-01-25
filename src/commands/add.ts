@@ -14,8 +14,8 @@ import {
 
 const formatStatus = (skill: ScannedSkill): string => {
   switch (skill.status) {
-    case 'untracked':
-      return pc.dim('[untracked]')
+    case 'detached':
+      return pc.dim('[detached]')
     case 'synced':
       return pc.green('[synced]')
     case 'ahead': {
@@ -33,7 +33,7 @@ const formatStatus = (skill: ScannedSkill): string => {
 
 const formatConflict = (skill: ScannedSkill): string => {
   if (!skill.hasConflict) return ''
-  return pc.red(` ⚠ ${skill.conflictCount} versions`)
+  return pc.red(` ⚠ 1 of ${skill.conflictCount} variants`)
 }
 
 /**
@@ -86,12 +86,12 @@ const runBulkAdd = async (force: boolean, basePath: string) => {
   const projectCount = sortedProjects.length
 
   // Show legend for status labels
-  const untrackedCount = skills.filter((s) => s.status === 'untracked').length
+  const detachedCount = skills.filter((s) => s.status === 'detached').length
   const syncedCount = skills.filter((s) => s.status === 'synced').length
   const aheadCount = skills.filter((s) => s.status === 'ahead').length
 
   const legend = []
-  if (untrackedCount > 0) legend.push(`${pc.dim('[untracked]')} not in library`)
+  if (detachedCount > 0) legend.push(`${pc.dim('[detached]')} not synced to library`)
   if (syncedCount > 0) legend.push(`${pc.green('[synced]')} in library, matches`)
   if (aheadCount > 0) legend.push(`${pc.yellow('[ahead]')} in library, local has changes`)
   p.log.message(legend.join('  '))
@@ -99,7 +99,7 @@ const runBulkAdd = async (force: boolean, basePath: string) => {
   const hasConflicts = skills.some((s) => s.hasConflict)
 
   if (hasConflicts) {
-    p.log.warn(pc.yellow('Some skills have multiple versions. Select only one per name.'))
+    p.log.warn(pc.yellow('Some skills have multiple variants. Select only one per name.'))
   }
 
   // Build grouped options for clack groupMultiselect
@@ -119,8 +119,8 @@ const runBulkAdd = async (force: boolean, basePath: string) => {
     })
   }
 
-  // Pre-select untracked skills that don't have conflicts
-  const initialValues = skills.filter((s) => s.status === 'untracked' && !s.hasConflict)
+  // Pre-select detached skills that don't have conflicts
+  const initialValues = skills.filter((s) => s.status === 'detached' && !s.hasConflict)
 
   let selected: ScannedSkill[]
 

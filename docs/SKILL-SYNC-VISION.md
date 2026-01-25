@@ -1,7 +1,7 @@
 # skillbook: AI Coding Assistant Skill Library Manager
 
 > **Status**: MVP Development  
-> **Last Updated**: 2026-01-24  
+> **Last Updated**: 2026-01-25  
 > **Name**: `skillbook` (available on npm, crates.io, GitHub)
 
 ---
@@ -167,7 +167,7 @@ Destructive actions show confirmation prompts only when information would be los
 | **Enabled** | `[✓]` | Fully managed, all installed skills are symlinked |
 | **Detached** | `[d]` | Folder exists with real files only (no symlinks), clean standalone state |
 | **Partial** | `[~]` | Mixed state (some symlinks, some real files, or inconsistent) |
-| **Available** | `[—]` | No folder exists |
+| **Available** | `[ ]` | No folder exists |
 
 ### Harness Actions
 
@@ -197,7 +197,7 @@ HARNESSES
 > [✓] Claude Code                    ← enabled, fully managed
   [d] OpenCode                       ← detached, real files only
   [~] Cursor                         ← partial, mixed state
-  [—] Other                          ← available, no folder
+  [ ] Other                          ← available, no folder
 ```
 if (folder doesn't exist):
   state = 'available'
@@ -213,7 +213,7 @@ else:
 HARNESSES
 > [✓] Claude Code                    ← enabled, fully managed
   [~] OpenCode                       ← partial, has content but not managed
-  [—] Cursor                         ← available, no folder
+  [ ] Cursor                         ← available, no folder
 ```
 
 ---
@@ -348,6 +348,47 @@ After eject:
 | `skillbook list` | List skills in library |
 | `skillbook eject` | Convert symlinks to real files, remove .skillbook |
 
+### Scan Command
+
+Scans directories for skills and displays their sync status with the library.
+
+#### Scan Status Badges
+
+| Status | Badge | Color | Meaning |
+|--------|-------|-------|---------|
+| Detached | `[detached]` | dim | Not synced to library (local only) |
+| Synced | `[synced]` | green | In library and matches |
+| Ahead | `[ahead +N/-M]` | yellow | In library but local has changes |
+
+#### Variant Warnings
+
+When multiple projects have the same skill with **different content**, a warning is shown:
+
+```
+[ahead +21/-21] atlassian-jira
+[detached] gitlab-mr-review ⚠ 1 of 2 variants
+```
+
+**Key rules:**
+- `[synced]` items **never** show variant warnings (they're the canonical version)
+- Variants are only counted **within the same status category** (detached vs detached, ahead vs ahead)
+- Warning format: `⚠ 1 of N variants` - indicates this is one of N different versions
+
+#### Example Output
+
+```
+Select skills to add to library (22 in 5 projects):
+◻ frontend (6)
+│ ◻ [ahead +21/-21] atlassian-jira
+│ ◻ [ahead +34/-34] beads ⚠ 1 of 3 variants
+│ ◻ [synced] git-rebase
+│ └ ◻ [detached] gitlab-mr-review ⚠ 1 of 2 variants
+◻ skill-book (3)
+│ ◻ [synced] atlassian-jira          ← no warning (synced)
+│ ◻ [synced] aws-athena-alb-logs
+│ └ ◻ [synced] coding
+```
+
 ### TUI Actions
 
 | Key | Action | When |
@@ -401,6 +442,10 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 - [x] Per-harness tree view (show harness entries when status differs)
 - [x] Two-level navigation (skill + harness entry selection)
 - [x] Harness-level "use as source" action with confirmation prompt
+- [x] Enable harness properly converts real files to symlinks
+- [x] Scan follows symlinks to find skills in skillbook-managed projects
+- [x] Scan status renamed: `untracked` → `detached` (not synced to library)
+- [x] Scan variant warnings only on non-synced items with multiple different versions
 
 ### TODO
 - [ ] Push/pull actions for ahead/behind states

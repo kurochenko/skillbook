@@ -154,7 +154,7 @@ export const addSkillToLibrary = async (
   }
 }
 
-export type SkillStatus = 'untracked' | 'synced' | 'ahead'
+export type SkillStatus = 'detached' | 'synced' | 'ahead'
 
 export type DiffStats = {
   additions: number
@@ -166,7 +166,7 @@ export type ScannedSkill = {
   path: string
   content: string
   status: SkillStatus
-  diff: DiffStats | null  // null for 'untracked' and 'synced', populated for 'ahead'
+  diff: DiffStats | null  // null for 'detached' and 'synced', populated for 'ahead'
   hasConflict: boolean    // true only if multiple locations have DIFFERENT content
   conflictCount: number   // number of different versions (0, 2, 3, etc.)
   project: string
@@ -214,16 +214,18 @@ const IGNORED_DIRS_SET = new Set([
 ])
 
 // Check if a path is a skill file we're looking for
+// Note: .skillbook/skills/ is included because fdir resolves symlink paths
 const isSkillFile = (path: string): boolean => {
   return (path.includes('/.claude/skills/') && path.endsWith('/SKILL.md')) ||
          (path.includes('/.cursor/rules/') && path.endsWith('.md')) ||
-         (path.includes('/.opencode/skill/') && path.endsWith('/SKILL.md'))
+         (path.includes('/.opencode/skill/') && path.endsWith('/SKILL.md')) ||
+         (path.includes('/.skillbook/skills/') && path.endsWith('/SKILL.md'))
 }
 
 // Extract project name from skill file path
 const extractProjectFromPath = (filePath: string): string => {
-  // Find the parent directory before .claude/.cursor/.opencode
-  const patterns = ['/.claude/skills/', '/.cursor/rules/', '/.opencode/skill/']
+  // Find the parent directory before .claude/.cursor/.opencode/.skillbook
+  const patterns = ['/.claude/skills/', '/.cursor/rules/', '/.opencode/skill/', '/.skillbook/skills/']
   for (const pattern of patterns) {
     const idx = filePath.indexOf(pattern)
     if (idx !== -1) {
@@ -259,8 +261,10 @@ export const scanProjectSkills = async (
   const absolutePath = resolve(basePath)
 
   // Single fdir pass to find all skill files
+  // withSymlinks() enables following symlinked directories (for skillbook-managed projects)
   const skillFiles = await new fdir()
     .withFullPaths()
+    .withSymlinks()
     .exclude((dirName) => IGNORED_DIRS_SET.has(dirName))
     .filter((path) => isSkillFile(path))
     .crawl(absolutePath)
@@ -285,7 +289,7 @@ export const scanProjectSkills = async (
     let diff: DiffStats | null = null
 
     if (libraryContent === null) {
-      status = 'untracked'
+      status = 'detached'
     } else if (libraryContent === content) {
       status = 'synced'
     } else {
@@ -304,21 +308,26 @@ export const scanProjectSkills = async (
     onSkillFound?.(skill)
   }
 
-  // Determine conflicts: only if multiple locations have DIFFERENT content
-  // Note: synced items all have same content (they match library), so no conflict possible
-  const getConflictInfo = (name: string): { hasConflict: boolean; conflictCount: number } => {
-    const instances = skillsByName.get(name) ?? []
-    if (instances.length <= 1) {
+  // Determine conflicts for a specific skill instance
+  // Only count variants within the SAME status category (detached or ahead)
+  // Synced items never show conflict - they match the canonical library version
+  const getConflictInfo = (skill: PartialSkill): { hasConflict: boolean; conflictCount: number } => {
+    // Synced items never have conflicts - they ARE the canonical version
+    if (skill.status === 'synced') {
       return { hasConflict: false, conflictCount: 0 }
     }
 
-    // If all are synced, no conflict (all identical to library, thus to each other)
-    if (instances.every((s) => s.status === 'synced')) {
+    const allInstances = skillsByName.get(skill.name) ?? []
+    
+    // Filter to same status category (detached or ahead)
+    const sameStatusInstances = allInstances.filter((s) => s.status === skill.status)
+    
+    if (sameStatusInstances.length <= 1) {
       return { hasConflict: false, conflictCount: 0 }
     }
 
-    // Count unique content versions
-    const uniqueContents = new Set(instances.map((s) => s.content))
+    // Count unique content versions within this status category
+    const uniqueContents = new Set(sameStatusInstances.map((s) => s.content))
     const conflictCount = uniqueContents.size
 
     // Conflict exists if there are multiple different versions
@@ -331,7 +340,7 @@ export const scanProjectSkills = async (
   // Add conflict info and sort
   return skills
     .map((skill) => {
-      const { hasConflict, conflictCount } = getConflictInfo(skill.name)
+      const { hasConflict, conflictCount } = getConflictInfo(skill)
       return { ...skill, hasConflict, conflictCount }
     })
     .sort((a, b) => a.name.localeCompare(b.name))

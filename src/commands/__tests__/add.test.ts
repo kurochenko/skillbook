@@ -348,8 +348,8 @@ describe('add --bulk command', () => {
       const result = runCliBulk()
 
       expect(result.output).toContain('2 in 1 projects')
-      expect(result.output).toContain('multiple versions')
-      expect(result.output).toContain('2 versions')
+      expect(result.output).toContain('multiple variants')
+      expect(result.output).toContain('1 of 2 variants')
     })
 
     test('scans specified directory with --dir flag', () => {

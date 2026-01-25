@@ -137,12 +137,12 @@ describe('scanProjectSkills', () => {
 
 
   describe('status detection', () => {
-    test('marks skills not in library as "untracked"', async () => {
+    test('marks skills not in library as "detached"', async () => {
       createProjectSkill('.claude/skills/brand-new/SKILL.md', '# New skill')
 
       const skills = await scanProjectSkills(projectDir)
 
-      expect(skills[0]!.status).toBe('untracked')
+      expect(skills[0]!.status).toBe('detached')
     })
 
     test('marks skills with identical content as "synced"', async () => {
@@ -292,13 +292,17 @@ describe('scanProjectSkills', () => {
       const libraryContent = '# Library version'
       await addSkillToLibrary('shared', libraryContent)
       createProjectSkill('.claude/skills/shared/SKILL.md', libraryContent) // synced
-      createProjectSkill('.cursor/rules/shared.md', '# Different version') // changed
+      createProjectSkill('.cursor/rules/shared.md', '# Different version') // changed (ahead)
 
       const skills = await scanProjectSkills(projectDir)
 
       expect(skills).toHaveLength(2)
-      // Both should show conflict because there are 2 different content versions
-      expect(skills.every((s) => s.hasConflict)).toBe(true)
+      // Synced item should NOT show conflict (it's the canonical version)
+      // Ahead item is the only one with that status, so no conflict within its category
+      const synced = skills.find((s) => s.status === 'synced')
+      const ahead = skills.find((s) => s.status === 'ahead')
+      expect(synced!.hasConflict).toBe(false)
+      expect(ahead!.hasConflict).toBe(false) // Only 1 ahead item, no conflict
     })
 
     test('three versions shows conflictCount of 3', async () => {
