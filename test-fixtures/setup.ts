@@ -27,6 +27,8 @@ const SKILL_CONTENT = {
   'skill-local': '# Local Skill\n\nThis skill is only local, not in library.',
   'skill-conflict': '# Conflict Skill - PROJECT VERSION\n\nThis differs from library.',
   'skill-conflict-lib': '# Conflict Skill - LIBRARY VERSION\n\nOriginal library content.',
+  'skill-unanimous-conflict-lib': '# Unanimous Conflict - LIBRARY VERSION\n\nThis is the library version.',
+  'skill-unanimous-conflict-local': '# Unanimous Conflict - LOCAL VERSION\n\nThis is the local version that differs.',
 }
 
 /**
@@ -59,14 +61,6 @@ const initGitRepo = (path: string) => {
 const createFile = (path: string, content: string) => {
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, content)
-}
-
-/**
- * Create a symlink with parent directories
- */
-const createSymlink = (target: string, linkPath: string) => {
-  mkdirSync(dirname(linkPath), { recursive: true })
-  symlinkSync(target, linkPath)
 }
 
 /**
@@ -104,6 +98,10 @@ const setupLibrary = () => {
     join(LIBRARY_PATH, 'skills', 'skill-conflict', 'SKILL.md'),
     SKILL_CONTENT['skill-conflict-lib'],
   )
+  createFile(
+    join(LIBRARY_PATH, 'skills', 'skill-unanimous-conflict', 'SKILL.md'),
+    SKILL_CONTENT['skill-unanimous-conflict-lib'],
+  )
 
   // Initialize as git repo
   initGitRepo(LIBRARY_PATH)
@@ -111,17 +109,18 @@ const setupLibrary = () => {
 
 /**
  * Set up the .skillbook sparse checkout in project
- * This simulates `git clone --sparse` of the library
+ * Matches production behavior from src/lib/sparse-checkout.ts
  */
 const setupSkillbook = () => {
-  // Clone the library into .skillbook
-  git(PROJECT_PATH, 'clone', '--no-checkout', LIBRARY_PATH, '.skillbook')
+  // Clone the library into .skillbook (matches initSparseCheckout)
+  git(PROJECT_PATH, 'clone', '--filter=blob:none', '--sparse', '--no-checkout', LIBRARY_PATH, '.skillbook')
 
-  // Enable sparse checkout
+  // Init sparse-checkout in cone mode first (matches production)
   git(SKILLBOOK_PATH, 'sparse-checkout', 'init', '--cone')
 
-  // Add skill-in-lib to sparse checkout (the only installed skill)
-  git(SKILLBOOK_PATH, 'sparse-checkout', 'set', 'skills/skill-in-lib')
+  // Set sparse-checkout using --no-cone with patterns (matches production)
+  // Base pattern excludes skills folder, then we add specific skills
+  git(SKILLBOOK_PATH, 'sparse-checkout', 'set', '--no-cone', '/*', '!/skills', 'skills/skill-in-lib')
 
   // Checkout the files
   git(SKILLBOOK_PATH, 'checkout')
@@ -143,10 +142,12 @@ const setupProject = () => {
   )
 
   // .claude/skills/ - main harness (enabled)
-  // skill-in-lib: symlink to .skillbook (status: ok)
-  createSymlink(
-    join('..', '..', '.skillbook', 'skills', 'skill-in-lib', 'SKILL.md'),
-    join(PROJECT_PATH, '.claude', 'skills', 'skill-in-lib', 'SKILL.md'),
+  // skill-in-lib: directory symlink to .skillbook (status: ok)
+  // For directory-based harnesses, symlink is at directory level
+  mkdirSync(join(PROJECT_PATH, '.claude', 'skills'), { recursive: true })
+  symlinkSync(
+    join('..', '..', '.skillbook', 'skills', 'skill-in-lib'),
+    join(PROJECT_PATH, '.claude', 'skills', 'skill-in-lib'),
   )
 
   // skill-detached: real file matching library (status: detached)
@@ -166,6 +167,17 @@ const setupProject = () => {
   createFile(
     join(PROJECT_PATH, '.opencode', 'skill', 'skill-in-lib', 'SKILL.md'),
     SKILL_CONTENT['skill-conflict'],
+  )
+
+  // skill-unanimous-conflict: real file in BOTH harnesses with same local content
+  // This creates a unanimous conflict (all harnesses differ from library)
+  createFile(
+    join(PROJECT_PATH, '.claude', 'skills', 'skill-unanimous-conflict', 'SKILL.md'),
+    SKILL_CONTENT['skill-unanimous-conflict-local'],
+  )
+  createFile(
+    join(PROJECT_PATH, '.opencode', 'skill', 'skill-unanimous-conflict', 'SKILL.md'),
+    SKILL_CONTENT['skill-unanimous-conflict-local'],
   )
 
   // Initialize project as git repo

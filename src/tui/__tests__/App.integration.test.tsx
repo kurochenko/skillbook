@@ -86,6 +86,65 @@ const readFile = (path: string): string => {
   return readFileSync(path, 'utf-8')
 }
 
+/**
+ * Helper to check if path exists
+ */
+const pathExists = (path: string): boolean => {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Helper to navigate to a row containing the target text.
+ * Scans the frame for the target and moves cursor until it's on that row.
+ * Returns true if navigation succeeded, false if target not found.
+ */
+const navigateToRow = async (
+  targetText: string,
+  stdin: { write: (s: string) => void },
+  lastFrame: () => string | undefined,
+  maxMoves = 20,
+): Promise<boolean> => {
+  for (let moves = 0; moves < maxMoves; moves++) {
+    const frame = stripAnsi(lastFrame() ?? '')
+    const lines = frame.split('\n')
+    
+    // Find the cursor line - cursor is "> " somewhere in the line (inside box)
+    // Look for "│ > " or just "> " pattern
+    const cursorLineIndex = lines.findIndex(line => / > /.test(line) || line.trimStart().startsWith('> '))
+    if (cursorLineIndex === -1) continue
+    
+    const cursorLine = lines[cursorLineIndex] ?? ''
+    
+    // Check if cursor is on target
+    if (cursorLine.includes(targetText)) {
+      return true
+    }
+    
+    // Find target line
+    const targetLineIndex = lines.findIndex(line => line.includes(targetText))
+    if (targetLineIndex === -1) {
+      return false // Target not found in frame
+    }
+    
+    // Move toward target
+    if (targetLineIndex > cursorLineIndex) {
+      stdin.write('j')
+    } else {
+      stdin.write('k')
+    }
+    
+    // Wait for UI to update
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  
+  return false
+}
+
 describe('App TUI Integration', () => {
   test('displays correct initial state with all skill statuses', async () => {
     const { lastFrame, unmount } = render(
@@ -146,13 +205,11 @@ describe('App TUI Integration', () => {
     stdin.write('s')
 
     // Wait for sync to complete (status should change from [detached] to [✓])
+    // AND verify the symlink was created (filesystem check)
     await waitFor(() => {
       const frame = stripAnsi(lastFrame() ?? '')
-      return frame.includes('[✓] skill-detached')
+      return frame.includes('[✓] skill-detached') && isSymlink(skillDirPath)
     }, 5000)
-
-    // Give async operations time to complete
-    await new Promise((r) => setTimeout(r, 500))
 
     // Verify directory became a symlink
     expect(isSymlink(skillDirPath)).toBe(true)
@@ -167,7 +224,7 @@ describe('App TUI Integration', () => {
     )
 
     // Verify skill-local doesn't exist in library yet
-    expect(() => readFile(librarySkillPath)).toThrow()
+    expect(pathExists(librarySkillPath)).toBe(false)
 
     const { lastFrame, stdin, unmount } = render(
       <App projectPath={PROJECT_PATH} inProject={true} />,
@@ -176,14 +233,9 @@ describe('App TUI Integration', () => {
     // Wait for render
     await waitFor(() => (lastFrame() ?? '').includes('LOCAL'))
 
-    // Navigate to LOCAL section and skill-local
-    // Structure:
-    // INSTALLED: skill-detached (0), skill-in-lib (1)
-    // LOCAL: skill-local (2), Claude Code harness (3)
-    stdin.write('j') // skill-in-lib (1)
-    stdin.write('j') // skill-local (2)
-
-    await new Promise((r) => setTimeout(r, 100))
+    // Navigate to skill-local using helper (order-independent)
+    const found = await navigateToRow('skill-local', stdin, lastFrame)
+    expect(found).toBe(true)
 
     // Verify we're at skill-local
     expect(stripAnsi(lastFrame() ?? '')).toContain('> skill-local')
@@ -216,7 +268,7 @@ describe('App TUI Integration', () => {
     )
 
     // Verify skill-available doesn't exist in project yet
-    expect(() => lstatSync(skillDirPath)).toThrow()
+    expect(pathExists(skillDirPath)).toBe(false)
 
     const { lastFrame, stdin, unmount } = render(
       <App projectPath={PROJECT_PATH} inProject={true} />,
@@ -225,35 +277,157 @@ describe('App TUI Integration', () => {
     // Wait for render
     await waitFor(() => (lastFrame() ?? '').includes('AVAILABLE'))
 
-    // Navigate to AVAILABLE section
-    // Structure:
-    // INSTALLED: skill-detached (0), skill-in-lib (1)
-    // LOCAL: skill-local (2), Claude Code harness (3)
-    // AVAILABLE: skill-available (4), skill-conflict (5)
-    for (let i = 0; i < 4; i++) {
-      stdin.write('j')
-      await new Promise((r) => setTimeout(r, 30))
-    }
+    // Navigate to skill-available using helper (order-independent)
+    const found = await navigateToRow('skill-available', stdin, lastFrame)
+    expect(found).toBe(true)
 
     // Verify we're at skill-available
-    await new Promise((r) => setTimeout(r, 100))
     expect(stripAnsi(lastFrame() ?? '')).toContain('> skill-available')
 
     // Press 'i' to install
     stdin.write('i')
 
-    // Wait for install to complete
-    await waitFor(() => {
-      try {
-        lstatSync(skillDirPath)
-        return true
-      } catch {
-        return false
-      }
-    }, 3000)
+    // Wait for install to complete (check filesystem)
+    await waitFor(() => pathExists(skillDirPath), 3000)
 
     // Verify symlink was created at directory level
     expect(isSymlink(skillDirPath)).toBe(true)
+
+    unmount()
+  })
+
+  test('uninstall skill removes it from project', async () => {
+    // skill-in-lib has a symlink in .claude (will be removed)
+    const skillDirPath = join(
+      PROJECT_PATH,
+      '.claude/skills/skill-in-lib',
+    )
+
+    // Verify it starts as a symlink
+    expect(isSymlink(skillDirPath)).toBe(true)
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Navigate to skill-in-lib using helper (order-independent)
+    const found = await navigateToRow('skill-in-lib', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Verify we're at skill-in-lib
+    expect(stripAnsi(lastFrame() ?? '')).toContain('> skill-in-lib')
+
+    // Press 'u' to uninstall
+    stdin.write('u')
+
+    // Wait for uninstall to complete - skill should move to AVAILABLE
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      // skill-in-lib should no longer be in INSTALLED section
+      // It should appear in AVAILABLE section now
+      return !frame.includes('[detached] skill-in-lib') && 
+             !frame.includes('[conflict] skill-in-lib') &&
+             !frame.includes('[✓] skill-in-lib')
+    }, 3000)
+
+    // Verify symlink was removed
+    expect(isSymlink(skillDirPath)).toBe(false)
+
+    unmount()
+  })
+
+  test('sync conflict overwrites local with library version', async () => {
+    // skill-unanimous-conflict has conflict status (unanimous) - local differs from library
+    const skillPath = join(
+      PROJECT_PATH,
+      '.claude/skills/skill-unanimous-conflict/SKILL.md',
+    )
+
+    // Verify it starts with local content
+    expect(readFile(skillPath)).toContain('LOCAL VERSION')
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Navigate to skill-unanimous-conflict using helper (order-independent)
+    const found = await navigateToRow('skill-unanimous-conflict', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Verify we're at skill-unanimous-conflict with conflict status
+    expect(stripAnsi(lastFrame() ?? '')).toContain('> [conflict')
+    expect(stripAnsi(lastFrame() ?? '')).toContain('skill-unanimous-conflict')
+
+    // Press 's' to sync - this should show confirmation since it's destructive
+    stdin.write('s')
+
+    // Wait for confirmation dialog
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('Sync') && frame.includes('overwrite')
+    }, 2000)
+
+    // Confirm with 'y'
+    stdin.write('y')
+
+    // Wait for sync to complete (status should change to [✓])
+    // AND verify content matches library (filesystem check)
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      const hasNewStatus = frame.includes('[✓] skill-unanimous-conflict')
+      const hasLibraryContent = readFile(skillPath).includes('LIBRARY VERSION')
+      return hasNewStatus && hasLibraryContent
+    }, 5000)
+
+    // Verify content now matches library version
+    expect(readFile(skillPath)).toContain('LIBRARY VERSION')
+
+    unmount()
+  })
+
+  test('push conflict updates library with local version', async () => {
+    // skill-unanimous-conflict has conflict status - we'll push local to library
+    const libraryPath = join(
+      LIBRARY_PATH,
+      'skills/skill-unanimous-conflict/SKILL.md',
+    )
+
+    // Verify library starts with library content
+    expect(readFile(libraryPath)).toContain('LIBRARY VERSION')
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Navigate to skill-unanimous-conflict using helper (order-independent)
+    const found = await navigateToRow('skill-unanimous-conflict', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Verify we're at skill-unanimous-conflict
+    expect(stripAnsi(lastFrame() ?? '')).toContain('> [conflict')
+
+    // Press 'p' to push local to library
+    stdin.write('p')
+
+    // Wait for push to complete - status should change (library now matches local)
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      // After push, skill should show as ok or detached (local matches library now)
+      return frame.includes('[✓] skill-unanimous-conflict') || 
+             frame.includes('[detached] skill-unanimous-conflict')
+    }, 5000)
+
+    // Verify library now has local content
+    expect(readFile(libraryPath)).toContain('LOCAL VERSION')
 
     unmount()
   })
