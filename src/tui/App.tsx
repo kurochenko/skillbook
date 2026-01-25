@@ -46,14 +46,12 @@ const App = ({ projectPath, inProject }: AppProps) => {
     confirmState: confirmAction,
     onConfirmCancel: () => setConfirmAction(null),
     onInput: (input, key) => {
-      // Tab switching
       if (key.tab) {
         setTab((t) => (t === 'skills' ? 'harnesses' : 'skills'))
         setSelectedIndex(0)
         return
       }
 
-      // Dispatch to tab-specific handlers
       if (tab === 'skills') {
         handleSkillsInput(input)
       } else {
@@ -65,7 +63,18 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const selectedRow = tab === 'skills' ? (skillRows[selectedIndex] ?? null) : null
   const selectedHarness = tab === 'harnesses' ? (harnesses[selectedIndex] ?? null) : null
 
-  // Skills tab input handler
+  const splitSkillRows = (rows: typeof skillRows) => {
+    const installed = rows.filter((r) => r.type === 'installed-skill' || r.type === 'installed-harness')
+    const untracked = rows.filter((r) => r.type === 'untracked-skill' || r.type === 'untracked-harness')
+    const available = rows.filter((r) => r.type === 'available-skill')
+
+    return {
+      installed,
+      untracked,
+      available,
+    }
+  }
+
   const handleSkillsInput = (input: string) => {
     if (!selectedRow) return
 
@@ -85,7 +94,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
     }
   }
 
-  // Harnesses tab input handler
   const handleHarnessesInput = (input: string) => {
     if (!selectedHarness) return
 
@@ -120,7 +128,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
     }
   }
 
-  // Action handlers for skills tab
   const handleInstall = () => {
     if (selectedRow?.type !== 'available-skill') return
     installSkill(projectPath, selectedRow.skill.name).then(() => loadData())
@@ -140,19 +147,16 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const handleSync = () => {
     if (!selectedRow) return
 
-    // Skill-level sync
     if (selectedRow.type === 'installed-skill') {
       handleSkillSync(selectedRow.skill)
       return
     }
 
-    // Harness-level sync (use as source)
     if (selectedRow.type === 'installed-harness') {
       handleHarnessSync(selectedRow.skill, selectedRow.harness)
       return
     }
 
-    // Untracked harness sync
     if (selectedRow.type === 'untracked-harness') {
       const name = selectedRow.skill.name
       pushSkillToLibrary(projectPath, name).then(() => loadData(name))
@@ -182,7 +186,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
     const skillName = skill.name
 
     if (harness.status === 'ok') {
-      // Already symlinked - check for conflicts in other harnesses
       const hasConflicts = skill.harnesses.some(
         (h) => h.harnessId !== harness.harnessId && h.status === 'conflict'
       )
@@ -199,14 +202,12 @@ const App = ({ projectPath, inProject }: AppProps) => {
     }
 
     if (harness.status === 'detached') {
-      // Push then sync (not destructive)
       pushSkillToLibrary(projectPath, skillName).then(() =>
         syncSkillFromLibrary(projectPath, skillName).then(() => loadData(skillName))
       )
       return
     }
 
-    // Conflict - needs confirmation
     setConfirmAction({
       message: `Use ${harnessName} version of "${skillName}" as source?\nThis will overwrite the library version and sync all harnesses.`,
       onConfirm: () =>
@@ -216,14 +217,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
     })
   }
 
-  // Split rows by section
-  const installedRows = skillRows.filter(
-    (r) => r.type === 'installed-skill' || r.type === 'installed-harness'
-  )
-  const untrackedRows = skillRows.filter(
-    (r) => r.type === 'untracked-skill' || r.type === 'untracked-harness'
-  )
-  const availableRows = skillRows.filter((r) => r.type === 'available-skill')
+  const { installed: installedRows, untracked: untrackedRows, available: availableRows } = splitSkillRows(skillRows)
 
   const installedStartIndex = 0
   const untrackedStartIndex = installedRows.length
@@ -231,13 +225,11 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
   return (
     <Box flexDirection="column" padding={1}>
-      {/* Header */}
       <Box marginBottom={1}>
         <Text bold color="cyan">skillbook</Text>
         <Text dimColor> - {inProject ? 'Project Mode' : 'Library Mode'}</Text>
       </Box>
 
-      {/* Tabs */}
       <Box marginBottom={1} gap={2}>
         <Text
           bold={tab === 'skills'}
@@ -255,7 +247,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
         </Text>
       </Box>
 
-      {/* Content */}
       <Box
         flexDirection="column"
         borderStyle="round"
@@ -306,12 +297,10 @@ const App = ({ projectPath, inProject }: AppProps) => {
         )}
       </Box>
 
-      {/* Help bar */}
       <Box marginTop={1}>
         <HelpBar tab={tab} selectedRow={selectedRow} selectedHarness={selectedHarness} />
       </Box>
 
-      {/* Confirmation dialog */}
       {confirmAction && <ConfirmDialog action={confirmAction} />}
     </Box>
   )
