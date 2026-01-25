@@ -350,26 +350,29 @@ const convertSymlinkToRealFile = (
 ): void => {
   const tool = TOOLS[harnessId]
   const skillPath = join(projectPath, tool.skillPath(skillName))
+  const isDirectoryBased = tool.needsDirectory
 
-  // Check if it's a symlink
-  if (!existsSync(skillPath)) {
+  // Check what we need to examine for symlink status
+  // For directory-based harnesses, the symlink is at the directory level
+  // For flat file harnesses, the symlink is the file itself
+  const symlinkPath = isDirectoryBased ? dirname(skillPath) : skillPath
+
+  // Check if the path exists
+  if (!existsSync(symlinkPath)) {
     return
   }
 
   try {
-    const stat = lstatSync(skillPath)
+    const stat = lstatSync(symlinkPath)
     if (!stat.isSymbolicLink()) {
-      // Already a real file, nothing to do
+      // Already a real file/directory, nothing to do
       return
     }
 
     // Read content through symlink
     const content = readFileSync(skillPath, 'utf-8')
 
-    // Check if this is a directory-based harness
-    const isDirectorySymlink = tool.needsDirectory
-
-    if (isDirectorySymlink) {
+    if (isDirectoryBased) {
       // For directory harnesses (claude-code, opencode), the symlink is the skill folder
       const skillDir = dirname(skillPath)
 

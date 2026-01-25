@@ -441,13 +441,200 @@ describe('App TUI Integration', () => {
   })
 })
 
-// TODO: Harness tab tests require investigation of Tab key handling in ink-testing-library
-// The Tab key ('\t') doesn't seem to trigger useInput's key.tab flag correctly
-// See: https://github.com/vadimdemedes/ink-testing-library/issues
-//
-// Tests to add once Tab key handling is resolved:
-// - displays harness states correctly (enabled/detached/partial/available)
-// - enable harness creates symlinks for installed skills
-// - detach harness converts symlinks to real files
-// - remove harness deletes folder (with confirmation)
-// - switch between tabs preserves state
+describe('App TUI Harness Tab Integration', () => {
+  test('tab key switches to harnesses tab and displays harness states', async () => {
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for initial render on skills tab
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Verify we're on skills tab
+    expect(stripAnsi(lastFrame() ?? '')).toContain('INSTALLED')
+
+    // Press Tab to switch to harnesses tab
+    stdin.write('\t')
+
+    // Wait for harnesses tab to render
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('SELECT HARNESSES')
+    }, 2000)
+
+    const frame = stripAnsi(lastFrame() ?? '')
+
+    // Verify harnesses tab content
+    expect(frame).toContain('SELECT HARNESSES')
+
+    // Claude Code should be enabled (in config)
+    expect(frame).toContain('Claude Code')
+
+    // OpenCode should be visible (folder exists)
+    expect(frame).toContain('OpenCode')
+
+    // Cursor should be available (no folder)
+    expect(frame).toContain('Cursor')
+
+    // Help bar should show harness actions
+    expect(frame).toContain('[tab] skills')
+
+    unmount()
+  })
+
+  test('enable harness creates folder and symlinks for installed skills', async () => {
+    // Cursor harness is available (no .cursor folder exists)
+    const cursorDir = join(PROJECT_PATH, '.cursor', 'rules')
+    const skillPath = join(cursorDir, 'skill-in-lib.md')
+
+    // Verify cursor folder doesn't exist yet
+    expect(pathExists(cursorDir)).toBe(false)
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for initial render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Switch to harnesses tab
+    stdin.write('\t')
+
+    // Wait for harnesses tab
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('SELECT HARNESSES')
+    }, 2000)
+
+    // Navigate to Cursor (it's listed after Claude Code and OpenCode)
+    const found = await navigateToRow('Cursor', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Verify we're at Cursor and it shows as available (space in badge)
+    const frame = stripAnsi(lastFrame() ?? '')
+    expect(frame).toContain('> [ ] Cursor')
+
+    // Press 'e' to enable
+    stdin.write('e')
+
+    // Wait for enable to complete - check for symlink creation
+    // Cursor uses flat files so skill-in-lib.md should be created
+    await waitFor(() => pathExists(skillPath), 3000)
+
+    // Verify skill file was created (Cursor uses .md files, not directories)
+    expect(pathExists(skillPath)).toBe(true)
+
+    // Verify harness state changed to enabled
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('[✓] Cursor')
+    }, 2000)
+
+    unmount()
+  })
+
+  test('remove harness deletes folder after confirmation', async () => {
+    // OpenCode harness exists (folder present with real files, not in config)
+    const opencodeDir = join(PROJECT_PATH, '.opencode', 'skill')
+
+    // Verify opencode folder exists
+    expect(pathExists(opencodeDir)).toBe(true)
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for initial render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Switch to harnesses tab
+    stdin.write('\t')
+
+    // Wait for harnesses tab
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('SELECT HARNESSES')
+    }, 2000)
+
+    // Navigate to OpenCode
+    const found = await navigateToRow('OpenCode', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Press 'r' to remove
+    stdin.write('r')
+
+    // Wait for confirmation dialog
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('Remove') && frame.includes('[y]es')
+    }, 2000)
+
+    // Confirm with 'y'
+    stdin.write('y')
+
+    // Wait for removal to complete
+    await waitFor(() => !pathExists(opencodeDir), 3000)
+
+    // Verify folder was deleted
+    expect(pathExists(opencodeDir)).toBe(false)
+
+    unmount()
+  })
+
+  test('detach harness converts symlinks to real files', async () => {
+    // Claude Code harness is enabled with symlinks
+    const claudeSkillDir = join(PROJECT_PATH, '.claude', 'skills', 'skill-in-lib')
+    const claudeSkillFile = join(claudeSkillDir, 'SKILL.md')
+
+    // Verify it starts as a symlink (directory level)
+    expect(isSymlink(claudeSkillDir)).toBe(true)
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for initial render
+    await waitFor(() => lastFrame()?.includes('INSTALLED') ?? false)
+
+    // Switch to harnesses tab
+    stdin.write('\t')
+
+    // Wait for harnesses tab
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('SELECT HARNESSES')
+    }, 2000)
+
+    // Navigate to Claude Code (should be first)
+    const found = await navigateToRow('Claude Code', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Verify it shows as partial [~] (some skills are symlinked, some are real files)
+    // This is expected because fixture has skill-in-lib as symlink but skill-detached as real
+    expect(stripAnsi(lastFrame() ?? '')).toContain('[~] Claude Code')
+
+    // Press 'd' to detach
+    stdin.write('d')
+
+    // Wait for detach to complete - symlink should become real file
+    await waitFor(() => {
+      return pathExists(claudeSkillFile) && !isSymlink(claudeSkillDir)
+    }, 3000)
+
+    // Verify symlink was converted to real file
+    expect(isSymlink(claudeSkillDir)).toBe(false)
+    expect(pathExists(claudeSkillFile)).toBe(true)
+
+    // Verify content is preserved
+    const content = readFile(claudeSkillFile)
+    expect(content).toContain('Skill In Library')
+
+    // Verify harness state changed to detached
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('[d] Claude Code')
+    }, 2000)
+
+    unmount()
+  })
+})
