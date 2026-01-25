@@ -7,7 +7,7 @@
 
 import { describe, test, expect, beforeAll, beforeEach, afterAll } from 'bun:test'
 import { render } from 'ink-testing-library'
-import { lstatSync, readFileSync } from 'fs'
+import { lstatSync, readFileSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
 import App from '../App'
 import {
@@ -634,6 +634,87 @@ describe('App TUI Harness Tab Integration', () => {
       const frame = stripAnsi(lastFrame() ?? '')
       return frame.includes('[d] Claude Code')
     }, 2000)
+
+    unmount()
+  })
+})
+
+describe('App TUI Library Mode', () => {
+  test('library mode shows only AVAILABLE skills (no INSTALLED or LOCAL)', async () => {
+    // Library mode: inProject=false, projectPath points to library
+    // This simulates running `skillbook` from outside a project
+    const { lastFrame, unmount } = render(
+      <App projectPath={LIBRARY_PATH} inProject={false} />,
+    )
+
+    // Wait for render - should show AVAILABLE section
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('AVAILABLE')
+    }, 3000)
+
+    const frame = stripAnsi(lastFrame() ?? '')
+
+    // Should show AVAILABLE section with library skills
+    expect(frame).toContain('AVAILABLE')
+    expect(frame).toContain('skill-available')
+
+    // Should NOT show INSTALLED or LOCAL sections (no project context)
+    expect(frame).not.toContain('INSTALLED')
+    expect(frame).not.toContain('LOCAL')
+
+    // Should show Library Mode indicator
+    expect(frame).toContain('Library Mode')
+
+    unmount()
+  })
+})
+
+describe('App TUI Lazy Init', () => {
+  test('install creates .skillbook sparse checkout when missing', async () => {
+    const skillbookPath = join(PROJECT_PATH, '.skillbook')
+    const skillbookGitPath = join(skillbookPath, '.git')
+
+    // Remove .skillbook to simulate fresh project
+    if (existsSync(skillbookPath)) {
+      rmSync(skillbookPath, { recursive: true, force: true })
+    }
+
+    // Verify .skillbook doesn't exist
+    expect(existsSync(skillbookPath)).toBe(false)
+
+    const { lastFrame, stdin, unmount } = render(
+      <App projectPath={PROJECT_PATH} inProject={true} />,
+    )
+
+    // Wait for render - should still show skills (from harness folders)
+    await waitFor(() => {
+      const frame = stripAnsi(lastFrame() ?? '')
+      return frame.includes('AVAILABLE') || frame.includes('INSTALLED')
+    }, 3000)
+
+    // Navigate to skill-available (in AVAILABLE section, can be installed)
+    const found = await navigateToRow('skill-available', stdin, lastFrame)
+    expect(found).toBe(true)
+
+    // Press 'i' to install
+    stdin.write('i')
+
+    // Verify the skill directory path
+    const skillDir = join(PROJECT_PATH, '.claude', 'skills', 'skill-available')
+
+    // Wait for install to complete - both .skillbook and symlink should be created
+    await waitFor(() => {
+      return existsSync(skillbookGitPath) && existsSync(skillDir)
+    }, 5000)
+
+    // Verify .skillbook was created as a git repo (sparse checkout)
+    expect(existsSync(skillbookPath)).toBe(true)
+    expect(existsSync(skillbookGitPath)).toBe(true)
+
+    // Verify the skill is now installed (symlink created)
+    expect(existsSync(skillDir)).toBe(true)
+    expect(isSymlink(skillDir)).toBe(true)
 
     unmount()
   })
