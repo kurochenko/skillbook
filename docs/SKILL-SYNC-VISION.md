@@ -476,6 +476,7 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 | Push/pull actions for ahead/behind states | `skill-book-g06` |
 | Eject command | `skill-book-3vt` |
 | Integration tests for CLI commands | `skill-book-8aa` |
+| TUI integration tests for project view | `skill-book-awe` |
 
 ---
 
@@ -489,6 +490,48 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 
 ---
 
+## Testing
+
+### Test Strategy
+
+| Layer | Approach | Tools |
+|-------|----------|-------|
+| Unit tests | Test library functions in isolation | `bun:test` |
+| CLI tests | Run CLI as subprocess, check output | `spawnSync` + temp dirs |
+| TUI tests | Render components, simulate input | `ink-testing-library` |
+
+### Test Fixtures
+
+Integration tests use `test-fixtures/` with a reproducible project structure:
+
+```
+test-fixtures/
+├── setup.ts              # Script to create/reset fixtures
+├── library/              # Mock library (git repo)
+│   └── skills/
+│       ├── skill-in-lib/SKILL.md
+│       └── skill-available/SKILL.md
+└── project/              # Mock project (git repo)
+    ├── .skillbook/       # Sparse checkout (git repo)
+    ├── .claude/skills/   # Various skill states
+    └── .opencode/skill/
+```
+
+### Running Tests
+
+```bash
+bun test                    # Run all tests
+bun test App.integration    # Run specific test file
+```
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `SKILLBOOK_LIBRARY` | Override library location (for testing) |
+
+---
+
 ## Technical Decisions
 
 | Choice | Decision | Reasoning |
@@ -498,3 +541,4 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 | Config | JSON | Native to JS, no extra deps |
 | Sync | Sparse checkout + symlinks | Single source, multi-harness |
 | Platform | macOS + Linux | No Windows needed |
+| Testing | `bun:test` + `ink-testing-library` | Native to Bun, official Ink testing |
