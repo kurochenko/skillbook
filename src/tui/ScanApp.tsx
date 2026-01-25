@@ -166,6 +166,13 @@ const Legend = ({ skills }: { skills: ScannedSkill[] }) => {
   )
 }
 
+type MessageColor = 'green' | 'yellow' | 'red' | 'cyan'
+
+type Message = {
+  text: string
+  color: MessageColor
+}
+
 type ScanAppProps = {
   basePath: string
 }
@@ -176,7 +183,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [allSkills, setAllSkills] = useState<ScannedSkill[]>([])
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState<{ text: string; color: string } | null>(null)
+  const [message, setMessage] = useState<Message | null>(null)
   const [pendingConfirm, setPendingConfirm] = useState<ScannedSkill | null>(null)
 
   // Load/reload data
@@ -348,7 +355,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
 
       {message && (
         <Box marginBottom={1}>
-          <Text color={message.color as any}>{message.text}</Text>
+          <Text color={message.color}>{message.text}</Text>
         </Box>
       )}
 

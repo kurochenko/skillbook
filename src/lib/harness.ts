@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, lstatSync }
 import { join, dirname } from 'path'
 import { readConfig, setHarnessEnabled } from './config.js'
 import { TOOLS, type ToolId, SUPPORTED_TOOLS } from '../constants.js'
-import { isSkillSymlinked, convertToSymlink } from './symlinks.js'
+import { isSkillSymlinked, convertToSymlink, getHarnessSkillPath } from './symlinks.js'
 
 // Harness state:
 // - 'enabled': Fully managed, all installed skills are symlinked
@@ -30,18 +30,6 @@ export const getHarnessBaseDir = (projectPath: string, harnessId: ToolId): strin
     case 'cursor':
       return join(projectPath, '.cursor', 'rules')
   }
-}
-
-/**
- * Get the full path where a skill should be written for a harness
- */
-export const getHarnessSkillPath = (
-  projectPath: string,
-  harnessId: ToolId,
-  skillName: string,
-): string => {
-  const tool = TOOLS[harnessId]
-  return join(projectPath, tool.skillPath(skillName))
 }
 
 /**
@@ -220,61 +208,6 @@ export const readSkillFromHarness = (
     return readFileSync(skillPath, 'utf-8')
   } catch {
     return null
-  }
-}
-
-/**
- * Sync a skill to all enabled harnesses
- */
-export const syncSkillToHarnesses = (
-  projectPath: string,
-  skillName: string,
-  content: string,
-): void => {
-  const enabledHarnesses = getEnabledHarnesses(projectPath)
-
-  for (const harnessId of enabledHarnesses) {
-    writeSkillToHarness(projectPath, harnessId, skillName, content)
-  }
-}
-
-/**
- * Remove a skill from all harnesses
- */
-export const removeSkillFromAllHarnesses = (
-  projectPath: string,
-  skillName: string,
-): void => {
-  for (const harnessId of SUPPORTED_TOOLS) {
-    removeSkillFromHarness(projectPath, harnessId, skillName)
-  }
-}
-
-/**
- * Sync all installed skills to a specific harness
- * Used when enabling a harness
- */
-export const syncAllSkillsToHarness = (
-  projectPath: string,
-  harnessId: ToolId,
-  skills: { name: string; content: string }[],
-): void => {
-  for (const skill of skills) {
-    writeSkillToHarness(projectPath, harnessId, skill.name, skill.content)
-  }
-}
-
-/**
- * Remove all skills from a specific harness
- * Used when disabling a harness
- */
-export const removeAllSkillsFromHarness = (
-  projectPath: string,
-  harnessId: ToolId,
-  skillNames: string[],
-): void => {
-  for (const skillName of skillNames) {
-    removeSkillFromHarness(projectPath, harnessId, skillName)
   }
 }
 

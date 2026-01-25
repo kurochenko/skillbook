@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { SKILLBOOK_DIR, SKILLS_DIR } from '../constants.ts'
 
-export const SKILLBOOK_DIR = '.skillbook'
 export const CONFIG_FILE = 'config.json'
-export const PROJECT_SKILLS_DIR = 'skills'
 
 export type ProjectConfig = {
   harnesses: string[]
@@ -22,7 +21,7 @@ export const getConfigPath = (projectPath: string): string => {
 }
 
 export const getProjectSkillsDir = (projectPath: string): string => {
-  return join(getSkillbookDir(projectPath), PROJECT_SKILLS_DIR)
+  return join(getSkillbookDir(projectPath), SKILLS_DIR)
 }
 
 export const getProjectSkillPath = (projectPath: string, skillName: string): string => {

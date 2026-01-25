@@ -1,271 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { render, Box, Text, useInput, useApp } from 'ink'
 import {
-  getInstalledSkills,
-  getUntrackedSkills,
-  getAvailableSkills,
   installSkill,
   uninstallSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
-  type InstalledSkill,
-  type UntrackedSkill,
-  type AvailableSkill,
-  type HarnessSkillInfo,
-  type UntrackedHarnessInfo,
 } from '../lib/project.js'
 import {
-  getHarnessesInfo,
   enableHarness,
   removeHarness,
   detachHarness,
-  type HarnessInfo,
-  type HarnessState,
 } from '../lib/harness.js'
 import { TOOLS } from '../constants.js'
-
-type Tab = 'skills' | 'harnesses'
-
-// A row in the skill list - can be a skill or a harness entry under a skill
-type SkillRow =
-  | { type: 'installed-skill'; skill: InstalledSkill }
-  | { type: 'installed-harness'; skill: InstalledSkill; harness: HarnessSkillInfo }
-  | { type: 'untracked-skill'; skill: UntrackedSkill }
-  | { type: 'untracked-harness'; skill: UntrackedSkill; harness: UntrackedHarnessInfo }
-  | { type: 'available-skill'; skill: AvailableSkill }
-
-// Build flat list of rows with tree structure
-const buildSkillRows = (
-  installed: InstalledSkill[],
-  untracked: UntrackedSkill[],
-  available: AvailableSkill[],
-): SkillRow[] => {
-  const rows: SkillRow[] = []
-
-  // Installed skills
-  for (const skill of installed) {
-    rows.push({ type: 'installed-skill', skill })
-    // Show harness entries only when not unanimous
-    if (!skill.isUnanimous) {
-      for (const harness of skill.harnesses) {
-        rows.push({ type: 'installed-harness', skill, harness })
-      }
-    }
-  }
-
-  // Untracked (LOCAL) skills
-  for (const skill of untracked) {
-    rows.push({ type: 'untracked-skill', skill })
-    // Always show harness entries for untracked skills (shows where they exist)
-    if (skill.harnesses.length > 0) {
-      for (const harness of skill.harnesses) {
-        rows.push({ type: 'untracked-harness', skill, harness })
-      }
-    }
-  }
-
-  // Available skills (no harness entries, just skills)
-  for (const skill of available) {
-    rows.push({ type: 'available-skill', skill })
-  }
-
-  return rows
-}
-
-// Status badge for harness entries
-const HarnessStatusBadge = ({ status }: { status: 'ok' | 'detached' | 'conflict' }) => {
-  if (status === 'ok') {
-    return <Text color="green">[✓]</Text>
-  }
-  if (status === 'detached') {
-    return <Text dimColor>[detached]</Text>
-  }
-  return <Text color="red">[conflict]</Text>
-}
-
-// Render a single row
-const RowDisplay = ({ row, selected }: { row: SkillRow; selected: boolean }) => {
-  const cursor = selected ? '>' : ' '
-  const color = selected ? 'blue' : undefined
-  const bold = selected
-
-  switch (row.type) {
-    case 'installed-skill': {
-      const { name, isUnanimous, status, diff } = row.skill
-      // Build badge text inline to avoid Ink rendering issues with embedded components
-      let badgeText = ''
-      let badgeColor: string | undefined
-      if (isUnanimous) {
-        if (status === 'ok') {
-          badgeText = '[✓]'
-          badgeColor = 'green'
-        } else if (status === 'ahead') {
-          badgeText = diff ? `[ahead +${diff.additions}/-${diff.deletions}]` : '[ahead]'
-          badgeColor = 'yellow'
-        } else if (status === 'behind') {
-          badgeText = '[behind]'
-          badgeColor = 'cyan'
-        } else if (status === 'detached') {
-          badgeText = '[detached]'
-          badgeColor = 'gray'
-        } else if (status === 'conflict') {
-          badgeText = diff ? `[conflict +${diff.additions}/-${diff.deletions}]` : '[conflict]'
-          badgeColor = 'red'
-        }
-      }
-      return (
-        <Box>
-          <Text color={color} bold={bold}>{cursor} </Text>
-          {badgeText && <Text color={badgeColor}>{badgeText}</Text>}
-          {badgeText && <Text> </Text>}
-          <Text color={color} bold={bold}>{name}</Text>
-        </Box>
-      )
-    }
-
-    case 'installed-harness': {
-      const harnessName = TOOLS[row.harness.harnessId].name
-      const isLast = row.skill.harnesses.indexOf(row.harness) === row.skill.harnesses.length - 1
-      const prefix = isLast ? '└─' : '├─'
-      return (
-        <Box>
-          <Text color={color} bold={bold}>{cursor}   {prefix} {harnessName} </Text>
-          <HarnessStatusBadge status={row.harness.status} />
-        </Box>
-      )
-    }
-
-    case 'untracked-skill':
-      return (
-        <Box>
-          <Text color={color} bold={bold}>
-            {cursor} {row.skill.name}
-          </Text>
-        </Box>
-      )
-
-    case 'untracked-harness': {
-      const harnessName = TOOLS[row.harness.harnessId].name
-      const isLast = row.skill.harnesses.indexOf(row.harness) === row.skill.harnesses.length - 1
-      const prefix = isLast ? '└─' : '├─'
-      return (
-        <Box>
-          <Text color={color} bold={bold}>
-            {cursor}   {prefix} {harnessName}
-          </Text>
-        </Box>
-      )
-    }
-
-    case 'available-skill':
-      return (
-        <Box>
-          <Text color={color} bold={bold}>
-            {cursor} {row.skill.name}
-          </Text>
-        </Box>
-      )
-  }
-}
-
-// Harness state badge
-const HarnessStateBadge = ({ state }: { state: HarnessState }) => {
-  if (state === 'enabled') {
-    return <Text color="green">[✓]</Text>
-  }
-  if (state === 'detached') {
-    return <Text dimColor>[d]</Text>
-  }
-  if (state === 'partial') {
-    return <Text color="yellow">[~]</Text>
-  }
-  return <Text dimColor>[ ]</Text>
-}
-
-const HarnessRow = ({
-  harness,
-  selected,
-}: {
-  harness: HarnessInfo
-  selected: boolean
-}) => {
-  return (
-    <Box>
-      <Text color={selected ? 'blue' : undefined} bold={selected}>{selected ? '>' : ' '} </Text>
-      <HarnessStateBadge state={harness.state} />
-      <Text color={selected ? 'blue' : undefined} bold={selected}> {harness.name}</Text>
-    </Box>
-  )
-}
-
-const HelpBar = ({ tab, selectedRow, selectedHarness }: { tab: Tab; selectedRow: SkillRow | null; selectedHarness: HarnessInfo | null }) => {
-  if (tab === 'skills') {
-    const parts: string[] = []
-
-    if (!selectedRow) {
-      // No selection
-    } else if (selectedRow.type === 'available-skill') {
-      parts.push('[i]nstall')
-    } else if (selectedRow.type === 'installed-skill') {
-      const { status, isUnanimous } = selectedRow.skill
-      if (isUnanimous) {
-        // Skill-level actions for unanimous state
-        if (status === 'ok') {
-          parts.push('[u]ninstall')
-        } else if (status === 'ahead') {
-          parts.push('[p]ush', '[u]ninstall')
-        } else if (status === 'behind') {
-          parts.push('[s]ync', '[u]ninstall')
-        } else if (status === 'detached') {
-          parts.push('[s]ync', '[u]ninstall')
-        } else if (status === 'conflict') {
-          parts.push('[s]ync (use library)', '[p]ush (use local)', '[u]ninstall')
-        }
-      } else {
-        // Mixed state - can still uninstall at skill level
-        parts.push('[u]ninstall')
-      }
-    } else if (selectedRow.type === 'installed-harness') {
-      // Harness entry actions - available for all statuses
-      parts.push('[s] use as source')
-    } else if (selectedRow.type === 'untracked-skill') {
-      parts.push('[p]ush to library')
-    } else if (selectedRow.type === 'untracked-harness') {
-      parts.push('[s] use as source')
-    }
-
-    parts.push('[tab] harnesses', '[q]uit')
-
-    return (
-      <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
-        <Text dimColor wrap="truncate">{parts.join('  ')}</Text>
-      </Box>
-    )
-  }
-
-  // Harness tab help bar - context-sensitive based on harness state
-  const harnessParts: string[] = []
-  if (selectedHarness) {
-    const { state } = selectedHarness
-    if (state === 'enabled') {
-      harnessParts.push('[d]etach', '[r]emove')
-    } else if (state === 'detached') {
-      harnessParts.push('[e]nable', '[r]emove')
-    } else if (state === 'partial') {
-      harnessParts.push('[e]nable', '[d]etach')
-    } else {
-      // available
-      harnessParts.push('[e]nable')
-    }
-  }
-  harnessParts.push('[tab] skills', '[q]uit')
-
-  return (
-    <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row">
-      <Text dimColor wrap="truncate">{harnessParts.join('  ')}</Text>
-    </Box>
-  )
-}
+import { RowDisplay } from './components/SkillRow'
+import { HarnessRow } from './components/HarnessRow'
+import { HelpBar, type Tab } from './components/HelpBar'
+import { ConfirmDialog, type ConfirmAction } from './components/ConfirmDialog'
+import { useSkillData } from './hooks/useSkillData'
 
 type AppProps = {
   projectPath: string
@@ -275,57 +26,19 @@ type AppProps = {
 const App = ({ projectPath, inProject }: AppProps) => {
   const { exit } = useApp()
   const [tab, setTab] = useState<Tab>('skills')
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const [confirmAction, setConfirmAction] = useState<{
-    message: string
-    onConfirm: () => void
-  } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
-  // Skill state
-  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>([])
-  const [untrackedSkills, setUntrackedSkills] = useState<UntrackedSkill[]>([])
-  const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([])
+  const {
+    installedSkills,
+    untrackedSkills,
+    availableSkills,
+    harnesses,
+    skillRows,
+    loadData,
+    selectedIndex,
+    setSelectedIndex,
+  } = useSkillData(projectPath)
 
-  // Harness state
-  const [harnesses, setHarnesses] = useState<HarnessInfo[]>([])
-
-  // Load data, optionally selecting a specific skill by name
-  const loadData = useCallback((selectSkillName?: string) => {
-    const installed = getInstalledSkills(projectPath)
-    const untracked = getUntrackedSkills(projectPath)
-    const available = getAvailableSkills(projectPath)
-
-    setInstalledSkills(installed)
-    setUntrackedSkills(untracked)
-    setAvailableSkills(available)
-    const installedSkillNames = installed.map((s) => s.name)
-    setHarnesses(getHarnessesInfo(projectPath, installedSkillNames))
-
-    const newRows = buildSkillRows(installed, untracked, available)
-
-    if (selectSkillName) {
-      // Find the skill row and select it
-      const skillIndex = newRows.findIndex(
-        (r) =>
-          (r.type === 'installed-skill' && r.skill.name === selectSkillName) ||
-          (r.type === 'untracked-skill' && r.skill.name === selectSkillName)
-      )
-      if (skillIndex >= 0) {
-        setSelectedIndex(skillIndex)
-        return
-      }
-    }
-
-    // Fallback: clamp to bounds
-    setSelectedIndex((i) => Math.min(i, Math.max(0, newRows.length - 1)))
-  }, [projectPath])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  // Build flat list of rows for navigation
-  const skillRows = buildSkillRows(installedSkills, untrackedSkills, availableSkills)
   const currentList = tab === 'skills' ? skillRows : harnesses
   const selectedRow = tab === 'skills' ? (skillRows[selectedIndex] ?? null) : null
   const selectedHarness = tab === 'harnesses' ? (harnesses[selectedIndex] ?? null) : null
@@ -334,8 +47,6 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const installedCount = installedSkills.length
   const untrackedCount = untrackedSkills.length
   const availableCount = availableSkills.length
-
-
 
   useInput((input, key) => {
     // Handle confirmation dialog
@@ -620,19 +331,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
       </Box>
 
       {/* Confirmation dialog */}
-      {confirmAction && (
-        <Box
-          borderStyle="round"
-          borderColor="yellow"
-          paddingX={1}
-          paddingY={0}
-          marginTop={1}
-          flexDirection="column"
-        >
-          <Text>{confirmAction.message}</Text>
-          <Text dimColor>[y]es  [n]o</Text>
-        </Box>
-      )}
+      {confirmAction && <ConfirmDialog action={confirmAction} />}
     </Box>
   )
 }

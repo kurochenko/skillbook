@@ -514,15 +514,4 @@ export const syncSkillFromLibrary = async (projectPath: string, skillName: strin
   return true
 }
 
-/**
- * Check if a path looks like a project (has any project indicators)
- */
-export const isProject = (path: string): boolean => {
-  return (
-    existsSync(join(path, '.git')) ||
-    existsSync(join(path, '.skillbook')) ||
-    existsSync(join(path, '.claude')) ||
-    existsSync(join(path, '.cursor')) ||
-    existsSync(join(path, '.opencode'))
-  )
-}
+

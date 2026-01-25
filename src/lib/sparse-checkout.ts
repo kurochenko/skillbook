@@ -1,14 +1,12 @@
 import { existsSync, mkdirSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { getLibraryPath } from './paths.ts'
-import { SKILL_FILE } from '../constants.ts'
+import { runGit } from './git.ts'
+import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '../constants.ts'
 
 export type SparseCheckoutResult =
   | { success: true }
   | { success: false; error: string }
-
-const SKILLBOOK_DIR = '.skillbook'
-const SKILLS_DIR = 'skills'
 
 /**
  * Get the .skillbook directory path for a project
@@ -29,35 +27,6 @@ export const getSkillbookSkillsPath = (projectPath: string): string => {
  */
 export const getSkillbookSkillPath = (projectPath: string, skillName: string): string => {
   return join(getSkillbookSkillsPath(projectPath), skillName, SKILL_FILE)
-}
-
-/**
- * Run a git command in a directory
- */
-const runGit = async (
-  dir: string,
-  args: string[],
-): Promise<{ success: boolean; output: string; error: string }> => {
-  try {
-    const proc = Bun.spawn(['git', ...args], {
-      cwd: dir,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
-
-    const exitCode = await proc.exited
-    const stdout = await new Response(proc.stdout).text()
-    const stderr = await new Response(proc.stderr).text()
-
-    return {
-      success: exitCode === 0,
-      output: stdout.trim(),
-      error: stderr.trim(),
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return { success: false, output: '', error: message }
-  }
 }
 
 /**
@@ -268,39 +237,4 @@ export const getSparseCheckoutSkills = (projectPath: string): string[] => {
   }
 }
 
-/**
- * Pull latest changes from library into sparse checkout.
- */
-export const pullFromLibrary = async (projectPath: string): Promise<SparseCheckoutResult> => {
-  const skillbookPath = getSkillbookPath(projectPath)
 
-  if (!isSkillbookInitialized(projectPath)) {
-    return { success: false, error: 'Skillbook not initialized.' }
-  }
-
-  const pullResult = await runGit(skillbookPath, ['pull', '--rebase'])
-
-  if (!pullResult.success) {
-    return { success: false, error: `Failed to pull: ${pullResult.error}` }
-  }
-
-  return { success: true }
-}
-
-/**
- * Get the content of a skill from the sparse checkout.
- */
-export const getSkillbookSkillContent = (projectPath: string, skillName: string): string | null => {
-  const skillPath = getSkillbookSkillPath(projectPath, skillName)
-
-  if (!existsSync(skillPath)) {
-    return null
-  }
-
-  try {
-    const { readFileSync } = require('fs')
-    return readFileSync(skillPath, 'utf-8')
-  } catch {
-    return null
-  }
-}
