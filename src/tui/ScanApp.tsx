@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { render, Box, Text, useInput, useApp } from 'ink'
+import { render, Box, Text } from 'ink'
+import { resolve, dirname } from 'path'
 import {
   addSkillToLibrary,
   scanProjectSkills,
@@ -7,12 +8,13 @@ import {
   type ScanSkillStatus,
 } from '@/lib/library'
 import { isSkillbookInitialized } from '@/lib/sparse-checkout'
-import { resolve, dirname } from 'path'
+import { useListNavigation } from '@/tui/hooks/useListNavigation'
+import { UI, SECTION_LABELS } from '@/tui/constants'
 
 type ProjectInfo = {
   name: string
   path: string
-  isManaged: boolean  // Has .skillbook/ initialized
+  isManaged: boolean
   skills: ScannedSkill[]
 }
 
@@ -29,7 +31,7 @@ const SCAN_HELP_ACTIONS: Partial<Record<ScanSkillStatus, string>> = {
   ahead: '[o]verwrite library',
 }
 
-// A row in the scan list - can be a project header or a skill
+// Row types for the scan list
 type ScanRow =
   | { type: 'project'; project: ProjectInfo }
   | { type: 'skill'; skill: ScannedSkill; project: ProjectInfo }
@@ -37,83 +39,61 @@ type ScanRow =
 // Build flat list of rows with project grouping
 const buildScanRows = (projects: ProjectInfo[]): ScanRow[] => {
   const rows: ScanRow[] = []
-
   for (const project of projects) {
     rows.push({ type: 'project', project })
     for (const skill of project.skills) {
       rows.push({ type: 'skill', skill, project })
     }
   }
-
   return rows
 }
 
 // Get project path from skill path
 const getProjectPath = (skillPath: string, projectName: string): string => {
-  // Find the project directory in the path
   const idx = skillPath.lastIndexOf(`/${projectName}/`)
   if (idx !== -1) {
     return skillPath.slice(0, idx + projectName.length + 1)
   }
-  // Fallback: go up from skill path
   return dirname(dirname(dirname(skillPath)))
 }
 
-// Status badge component (right-aligned)
+// Component: Status badge
 const SkillStatusBadge = ({ skill }: { skill: ScannedSkill }) => {
   const badge = SCAN_STATUS_BADGE[skill.status]
   return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
 }
 
-// Variant warning component
+// Component: Variant warning
 const VariantWarning = ({ skill }: { skill: ScannedSkill }) => {
   if (!skill.hasConflict) return null
   return <Text color="red"> ⚠ 1 of {skill.conflictCount} variants</Text>
 }
 
-// Project row component
-const ProjectRow = ({
-  project,
-  selected,
-}: {
-  project: ProjectInfo
-  selected: boolean
-}) => {
+// Component: Project row
+const ProjectRow = ({ project, selected }: { project: ProjectInfo; selected: boolean }) => {
   const cursor = selected ? '>' : ' '
-  const color = selected ? 'blue' : undefined
-  const bold = selected
+  const color = selected ? UI.SELECTED_COLOR : undefined
 
   return (
     <Box>
-      <Text color={color} bold={bold}>{cursor} </Text>
+      <Text color={color} bold={selected}>{cursor} </Text>
       {project.isManaged && <Text color="green">[✓ skillbook] </Text>}
-      <Text color={color} bold={bold}>{project.name}</Text>
+      <Text color={color} bold={selected}>{project.name}</Text>
       <Text dimColor> ({project.skills.length})</Text>
     </Box>
   )
 }
 
-// Skill row component
-const SkillRow = ({
-  skill,
-  selected,
-  isLast,
-}: {
-  skill: ScannedSkill
-  selected: boolean
-  isLast: boolean
-}) => {
+// Component: Skill row
+const SkillRow = ({ skill, selected, isLast }: { skill: ScannedSkill; selected: boolean; isLast: boolean }) => {
   const cursor = selected ? '>' : ' '
-  const color = selected ? 'blue' : undefined
-  const bold = selected
+  const color = selected ? UI.SELECTED_COLOR : undefined
   const prefix = isLast ? '└─' : '├─'
 
   return (
     <Box>
-      <Text color={color} bold={bold}>{cursor}   {prefix} </Text>
-      <Text color={color} bold={bold}>
-        {skill.name}
-      </Text>
+      <Text color={color} bold={selected}>{cursor}   {prefix} </Text>
+      <Text color={color} bold={selected}>{skill.name}</Text>
       <Text> </Text>
       <SkillStatusBadge skill={skill} />
       <VariantWarning skill={skill} />
@@ -121,23 +101,15 @@ const SkillRow = ({
   )
 }
 
-// Row display component
-const RowDisplay = ({
-  row,
-  selected,
-  isLastSkill,
-}: {
-  row: ScanRow
-  selected: boolean
-  isLastSkill: boolean
-}) => {
+// Component: Row display (project or skill)
+const RowDisplay = ({ row, selected, isLastSkill }: { row: ScanRow; selected: boolean; isLastSkill: boolean }) => {
   if (row.type === 'project') {
     return <ProjectRow project={row.project} selected={selected} />
   }
   return <SkillRow skill={row.skill} selected={selected} isLast={isLastSkill} />
 }
 
-// Help bar component
+// Component: Help bar
 const HelpBar = ({ selectedRow }: { selectedRow: ScanRow | null }) => {
   const action = selectedRow?.type === 'skill'
     ? SCAN_HELP_ACTIONS[selectedRow.skill.status]
@@ -152,7 +124,7 @@ const HelpBar = ({ selectedRow }: { selectedRow: ScanRow | null }) => {
   )
 }
 
-// Legend component
+// Component: Legend
 const Legend = ({ skills }: { skills: ScannedSkill[] }) => {
   const localCount = skills.filter((s) => s.status === 'detached').length
   const matchesCount = skills.filter((s) => s.status === 'synced').length
@@ -161,26 +133,30 @@ const Legend = ({ skills }: { skills: ScannedSkill[] }) => {
   return (
     <Box marginBottom={1} flexDirection="row" gap={2}>
       {localCount > 0 && <Text dimColor>[local] not in library</Text>}
-      {matchesCount > 0 && <Text><Text color="green">[matches]</Text><Text dimColor> matches library version</Text></Text>}
-      {differsCount > 0 && <Text><Text color="yellow">[differs]</Text><Text dimColor> differs from library version</Text></Text>}
+      {matchesCount > 0 && (
+        <Text>
+          <Text color="green">[matches]</Text>
+          <Text dimColor> matches library version</Text>
+        </Text>
+      )}
+      {differsCount > 0 && (
+        <Text>
+          <Text color="yellow">[differs]</Text>
+          <Text dimColor> differs from library version</Text>
+        </Text>
+      )}
     </Box>
   )
 }
 
 type MessageColor = 'green' | 'yellow' | 'red' | 'cyan'
-
-type Message = {
-  text: string
-  color: MessageColor
-}
+type Message = { text: string; color: MessageColor }
 
 type ScanAppProps = {
   basePath: string
 }
 
 const ScanApp = ({ basePath }: ScanAppProps) => {
-  const { exit } = useApp()
-  const [selectedIndex, setSelectedIndex] = useState(0)
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [allSkills, setAllSkills] = useState<ScannedSkill[]>([])
   const [loading, setLoading] = useState(true)
@@ -211,8 +187,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       const projectSkills = projectMap.get(skill.project) ?? []
       projectSkills.push(skill)
       projectMap.set(skill.project, projectSkills)
-      
-      // Store project path
+
       if (!projectPaths.has(skill.project)) {
         projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
       }
@@ -226,7 +201,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       const skills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
       const path = projectPaths.get(name) ?? ''
       const isManaged = path ? isSkillbookInitialized(path) : false
-
       projectInfos.push({ name, path, isManaged, skills })
     }
 
@@ -240,20 +214,43 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
 
   // Build flat list of rows
   const rows = buildScanRows(projects)
+
+  const { selectedIndex } = useListNavigation({
+    listLength: rows.length,
+    confirmState: pendingConfirm ? {
+      message: `Overwrite '${pendingConfirm.name}' in library?`,
+      onConfirm: () => handleAdd(pendingConfirm),
+    } : null,
+    onConfirmCancel: () => setPendingConfirm(null),
+    onInput: (input) => {
+      const selectedRow = rows[selectedIndex] ?? null
+      if (!selectedRow || selectedRow.type !== 'skill') return
+
+      const { status } = selectedRow.skill
+
+      if (input === 'a' && status === 'detached') {
+        handleAdd(selectedRow.skill)
+      }
+
+      if (input === 'o' && status === 'ahead') {
+        setPendingConfirm(selectedRow.skill)
+      }
+    },
+  })
+
   const selectedRow = rows[selectedIndex] ?? null
 
   // Check if current skill row is last in its project
   const isLastSkillInProject = (index: number): boolean => {
     const row = rows[index]
     if (row?.type !== 'skill') return false
-    
     const nextRow = rows[index + 1]
     return !nextRow || nextRow.type === 'project'
   }
 
   const handleAdd = async (skill: ScannedSkill) => {
     const result = await addSkillToLibrary(skill.name, skill.content)
-    
+
     if (!result.success) {
       setMessage({ text: `Failed: ${result.error}`, color: 'red' })
       return
@@ -269,51 +266,12 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     }
 
     await loadData()
-    
+
     if (messageTimeoutRef.current) {
       clearTimeout(messageTimeoutRef.current)
     }
-    messageTimeoutRef.current = setTimeout(() => setMessage(null), 2000)
+    messageTimeoutRef.current = setTimeout(() => setMessage(null), UI.MESSAGE_TIMEOUT_MS)
   }
-
-  useInput((input, key) => {
-    if (pendingConfirm) {
-      if (input === 'y' || input === 'Y') {
-        const skill = pendingConfirm
-        setPendingConfirm(null)
-        handleAdd(skill)
-      } else if (input === 'n' || input === 'N' || key.escape) {
-        setPendingConfirm(null)
-      }
-      return
-    }
-
-    if (key.upArrow || input === 'k') {
-      setSelectedIndex((i) => Math.max(0, i - 1))
-    }
-    if (key.downArrow || input === 'j') {
-      setSelectedIndex((i) => Math.min(rows.length - 1, i + 1))
-    }
-
-    if (input === 'q' || (key.ctrl && input === 'c')) {
-      exit()
-    }
-
-    if (input === 'a' && selectedRow?.type === 'skill') {
-      const { status } = selectedRow.skill
-      if (status === 'detached') {
-        handleAdd(selectedRow.skill)
-      }
-    }
-
-    // Overwrite requires confirmation (destructive)
-    if (input === 'o' && selectedRow?.type === 'skill') {
-      const { status } = selectedRow.skill
-      if (status === 'ahead') {
-        setPendingConfirm(selectedRow.skill)
-      }
-    }
-  })
 
   if (loading) {
     return (
@@ -332,22 +290,19 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     )
   }
 
-  const totalSkills = allSkills.length
-  const projectCount = projects.length
-
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>skillbook</Text>
       <Text dimColor> - Library Scan</Text>
       <Box marginTop={1} />
-      
+
       <Text dimColor>Find skills across projects and add them to your central library.</Text>
       <Box marginTop={1} />
 
       <Legend skills={allSkills} />
 
-      <Text bold>PROJECTS ({projectCount})</Text>
-      <Text dimColor>{totalSkills} skills found</Text>
+      <Text bold>{SECTION_LABELS.PROJECTS} ({projects.length})</Text>
+      <Text dimColor>{allSkills.length} skills found</Text>
       <Box marginTop={1} />
 
       <Box flexDirection="column">
