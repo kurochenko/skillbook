@@ -1,8 +1,8 @@
 # skillbook: AI Coding Assistant Skill Library Manager
 
 > **Status**: MVP Development  
-> **Last Updated**: 2025-01-23  
-> **Name**: `skillbook` (available on npm, crates.io, GitHub)
+> **Last Updated**: 2026-01-25  
+> **Name**: `skillbook`
 
 ---
 
@@ -22,266 +22,524 @@ My AI coding assistant skills (Claude Code, Cursor, OpenCode) are **copy-pasted 
 - Team members have their own copies that diverge
 - No single source of truth
 
-### The Broader Problem
-
-This is a widely-felt pain point in the AI coding assistant community:
-
-- **Reddit threads** full of developers asking "how do I sync my Claude Code skills across projects?"
-- **Enterprise teams** (50+ developers) struggling to maintain consistent rules
-- **Manual copying** described as "tedious" and "prone to drift"
-- **No standardization** across different AI tools (Claude Code vs Cursor vs OpenCode)
-
 ---
 
 ## Solution: skillbook
 
 A CLI tool to manage AI coding assistant skills across projects.
 
-### MVP Commands
+**Core principles:**
+1. **Git is enabler, CLI is interface** - Users don't need to know git
+2. **Single source of truth** - Library is the canonical version
+3. **Multi-harness sync** - One skill file, symlinked to all harnesses
+4. **Progressive adoption** - Works read-only before migration
+5. **Reversible** - Eject anytime, back to vanilla files
+
+---
+
+## Architecture: Sparse Checkout + Symlinks
+
+### Overview
+
+```
+~/.skillbook/                     # Library (git repo, ALL skills)
+├── .git/
+├── skills/
+│   ├── beads/SKILL.md
+│   ├── typescript-cli/SKILL.md
+│   ├── code-review/SKILL.md
+│   └── ... (all your skills)
+└── config.json
+
+project/
+├── .skillbook/                   # Sparse checkout of library (only project's skills)
+│   └── skills/
+│       ├── beads/SKILL.md        ← sparse-checked-out from library
+│       └── typescript-cli/SKILL.md
+├── .claude/skills/
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
+│   └── typescript-cli/           ← directory symlink
+├── .opencode/skill/
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
+│   └── typescript-cli/           ← directory symlink
+└── .cursor/rules/
+    ├── beads.md                  ← file symlink → .skillbook/skills/beads/SKILL.md
+    └── typescript-cli.md         ← file symlink
+```
+
+### Key Concepts
+
+| Component | Location | What It Is | Git Status |
+|-----------|----------|------------|------------|
+| **Library** | `~/.skillbook/` | Git repo with ALL skills | Own git repo |
+| **Project Cache** | `.skillbook/` | Sparse checkout of library | Part of project git |
+| **Harness Folders** | `.claude/`, `.cursor/`, `.opencode/` | Symlinks to `.skillbook/` | Part of project git |
+
+### Why This Architecture?
+
+| Problem | Solution |
+|---------|----------|
+| Skills duplicated per harness | Single file in `.skillbook/`, symlinked to harnesses |
+| Skills drift between projects | Library is source of truth, sparse checkout syncs |
+| Team members use different tools | Symlinks work for all harnesses from same source |
+| Want to leave skillbook | `eject` converts symlinks to real files |
+
+---
+
+## Status Reference
+
+### Skill-Level Status Badges
+
+| Status | Badge | Color | Meaning | Status |
+|--------|-------|-------|---------|--------|
+| OK | `[✓]` | green | Symlinked to .skillbook, up to date | ✅ |
+| Ahead | `[ahead]` | yellow | Symlinked, local has unpushed changes | 🔜 Planned |
+| Behind | `[behind]` | cyan | Symlinked, library has updates to pull | 🔜 Planned |
+| Detached | `[detached]` | dim | Real file, same as library (safe to sync) | ✅ |
+| Conflict | `[conflict]` | red | Real file, differs from library (choose action) | ✅ |
+
+### Harness-Level Status Badges
+
+When a skill has different states across harnesses, we show a tree with per-harness entries.
+These statuses only apply to individual harness entries:
+
+| Status | Badge | Meaning |
+|--------|-------|---------|
+| OK | `[✓]` | Symlinked to .skillbook |
+| Detached | `[detached]` | Real file, matches library |
+| Conflict | `[conflict]` | Real file, differs from library |
+
+**Note:** `ahead`/`behind` are skill-level only because symlinks share the same `.skillbook/` source.
+
+### Sections
+
+| Section | Contents |
+|---------|----------|
+| **INSTALLED** | Skills present locally AND in library |
+| **LOCAL** | Skills present locally but NOT in library |
+| **AVAILABLE** | Skills in library but NOT installed locally |
+
+### Tree View Display
+
+Skills show on a single line when **unanimous** (all harnesses have same status):
+```
+[✓] beads                    ← all harnesses symlinked
+[detached] typescript-cli    ← all harnesses have real files matching library
+```
+
+Skills show a tree when harnesses **differ**:
+```
+typescript-cli
+  ├─ claude-code    [✓]          ← symlinked
+  └─ opencode       [conflict]   ← real file, differs
+```
+
+### Actions by Level
+
+#### Skill Level
+
+| Status | Available Actions | Status |
+|--------|-------------------|--------|
+| `[✓]` | `[u]ninstall` | ✅ |
+| `[ahead]` | `[p]ush` to library, `[u]ninstall` | 🔜 Planned |
+| `[behind]` | `[s]ync` from library, `[u]ninstall` | 🔜 Planned |
+| `[detached]` | `[s]ync` to link, `[u]ninstall` | ✅ |
+| `[conflict]` | `[s]ync` (use library), `[p]ush` (use local), `[u]ninstall` | ✅ |
+| LOCAL | `[p]ush` to add to library | ✅ |
+| AVAILABLE | `[i]nstall` | ✅ |
+
+#### Harness Entry Level
+
+| Action | Key | Description |
+|--------|-----|-------------|
+| Use as source | `s` | Push this harness's content to library, sync all other harnesses |
+
+Destructive actions show confirmation prompts only when information would be lost.
+
+---
+
+## Harness Tab
+
+### Harness States
+
+| State | Symbol | Description |
+|-------|--------|-------------|
+| **Enabled** | `[✓]` | Fully managed, all installed skills are symlinked |
+| **Detached** | `[d]` | Folder exists with real files only (no symlinks), clean standalone state |
+| **Partial** | `[~]` | Mixed state (some symlinks, some real files, or inconsistent) |
+| **Available** | `[ ]` | No folder exists |
+
+### Harness Actions
+
+| Key | Action | When Available | Description | Confirm? |
+|-----|--------|----------------|-------------|----------|
+| `e` | **Enable** | Partial, Detached, Available | Add to config, sync all installed skills (create symlinks) | No |
+| `r` | **Remove** | Enabled, Detached, Partial | Delete the harness folder entirely | Yes |
+| `d` | **Detach** | Enabled, Partial | Convert symlinks to real files, remove from config | No |
+
+### Harness State Detection
+
+```
+if (folder doesn't exist):
+  state = 'available'
+else if (in config AND all installed skills are symlinked):
+  state = 'enabled'
+else if (not in config AND all present skills are real files):
+  state = 'detached'
+else:
+  state = 'partial'  // mixed state
+```
+
+### Harness Tab Display
+
+```
+HARNESSES
+> [✓] Claude Code                    ← enabled, fully managed
+  [d] OpenCode                       ← detached, real files only
+  [~] Cursor                         ← partial, mixed state
+  [ ] Other                          ← available, no folder
+```
+
+---
+
+## User Flows
+
+### TUI Display
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ skillbook                                                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ INSTALLED                                                   │
+│   [✓] beads                    ← unanimous, all symlinked   │
+│   [ahead] typescript-cli       ← unanimous, local changes   │
+│   git-workflow                 ← discrepancy, show tree     │
+│     ├─ claude-code    [✓]                                   │
+│     └─ opencode       [conflict]                            │
+│   [detached] my-skill          ← unanimous, real files      │
+│                                                             │
+│ LOCAL                                                       │
+│   my-custom                    ← not in library yet         │
+│     └─ claude-code                                          │
+│                                                             │
+│ AVAILABLE                                                   │
+│   code-review                  ← can install                │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [s]ync  [p]ush  [u]ninstall  [tab] harnesses  [q]uit        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Navigation
+
+- **Arrow keys**: Navigate skills AND harness entries (two-level selection)
+- **Tab**: Switch between Skills and Harnesses tabs
+- **Actions**: Context-sensitive based on selection level
+
+### Lazy Initialization
+
+No separate "setup" step required. On first sync/install action:
+
+1. `.skillbook/` is automatically created as sparse checkout of library
+2. Skill is added to sparse checkout
+3. Symlink created in harness folder
+
+### Sync Flow (for `[detached]` or `[conflict]` skills)
+
+When user presses `[s]ync` on a detached/conflict skill:
+
+1. If `.skillbook/` doesn't exist → init sparse checkout (lazy init)
+2. Add skill to sparse checkout
+3. Remove real file/folder from harness
+4. Create symlink to `.skillbook/skills/<name>/`
+
+For `[conflict]`: sync uses library version (local changes lost)
+
+### Install Skill
+
+After setup, installing a skill:
+
+```
+1. Add skill to sparse checkout (git sparse-checkout add)
+2. Create symlinks in all enabled harnesses
+```
+
+### Uninstall Skill
+
+```
+1. Remove symlinks from all harnesses
+2. Remove from sparse checkout (git sparse-checkout remove)
+```
+
+### Push Changes
+
+When user edits a skill (via any harness symlink):
+
+```
+Changes are in .skillbook/skills/ (sparse checkout)
+  ↓
+Commit in .skillbook/ = commit in library
+  ↓
+Push to library remote (if configured)
+```
+
+### Sync / Pull
+
+```
+git pull in .skillbook/
+  ↓
+Sparse checkout updates automatically
+  ↓
+Symlinks point to updated files
+```
+
+### Eject
+
+User wants to leave skillbook:
+
+```
+skillbook eject
+
+Ejecting will:
+  1. Copy all skills to harness folders as real files
+  2. Remove symlinks
+  3. Remove .skillbook/ folder
+
+You can run 'skillbook' again anytime to re-setup.
+
+Which harnesses to eject to?
+  [x] opencode
+  [ ] claude-code
+  [ ] cursor
+
+[Enter] Confirm  [Esc] Cancel
+```
+
+After eject:
+- Harness folders have real files (copies)
+- No `.skillbook/` folder
+- Running `skillbook` again shows read-only mode, offers setup
+
+---
+
+## Commands
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `skillbook` | Interactive TUI (default) | ✅ |
+| `skillbook add <path>` | Add a skill file to the library | ✅ |
+| `skillbook list` | List skills in library | ✅ |
+| `skillbook scan [path]` | Scan for skills, add to library (TUI) | ✅ |
+| `skillbook eject` | Convert symlinks to real files, remove .skillbook | 🔜 Planned |
+
+### Scan Command
+
+Scans directories for skills and adds them to your central library. This is the primary way to populate your library from existing skills across projects.
+
+**Purpose:** Find skills across projects and add them to your central library for later use.
+
+#### Scan Status Badges
+
+| Status | Badge | Color | Meaning | Action |
+|--------|-------|-------|---------|--------|
+| Local only | `[local]` | dim | Not in library yet | `[a]dd to library` |
+| Matches | `[matches]` | green | In library, content identical | None needed |
+| Differs | `[differs]` | yellow | In library, content different | `[o]verwrite library` |
+
+#### Variant Warnings
+
+When multiple projects have the same skill with **different content**, a warning is shown:
+
+```
+beads [differs] ⚠ 1 of 3 variants
+gitlab-mr-review [local] ⚠ 1 of 2 variants
+```
+
+**Key rules:**
+- `[matches]` items **never** show variant warnings (they match the library)
+- Variants are only counted **within the same status category**
+- Warning format: `⚠ 1 of N variants` - indicates this is one of N different versions
+
+#### Scan TUI Actions
+
+| Key | Action | When | Confirmation |
+|-----|--------|------|--------------|
+| `a` | Add to library | On `[local]` skill | No |
+| `o` | Overwrite library | On `[differs]` skill | Yes - warns about replacing |
+| `q` | Quit | Always | No |
+
+#### Example Output
+
+```
+skillbook - Library Scan
+
+Find skills across projects and add them to your central library.
+
+[local] not in library  [matches] matches library version  [differs] differs from library version
+
+PROJECTS (5)
+23 skills found
+
+apify-hackaton-2026 (2)
+  ├─ apify [matches]
+  └─ beads [differs] ⚠ 1 of 3 variants
+frontend (6)
+  ├─ atlassian-jira [differs]
+  ├─ git-rebase [matches]
+  └─ gitlab-mr-review [local] ⚠ 1 of 2 variants
+[✓ skillbook] skill-book (4)
+  ├─ atlassian-jira [matches]
+  └─ coding [matches]
+
+┌────────────────────────────────────────────────────────────────┐
+│ [a]dd to library  [q]uit                                       │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### Overwrite Confirmation
+
+When pressing `[o]` on a skill that differs from library:
+
+```
+Overwrite 'beads' in library? This will replace the existing version.
+[y]es  [n]o
+```
+
+### TUI Actions (Project View)
+
+| Key | Action | When | Status |
+|-----|--------|------|--------|
+| `i` | Install skill | On AVAILABLE skill | ✅ |
+| `u` | Uninstall skill | On INSTALLED skill | ✅ |
+| `s` | Sync from library | On `[detached]` or `[conflict]` skill | ✅ |
+| `p` | Push to library | On `[conflict]` or LOCAL skill | ✅ |
+| `p` | Push to library | On `[ahead]` skill | 🔜 Planned |
+| `l` | Pull from library | On `[behind]` skill | 🔜 Planned |
+| `Tab` | Switch tabs | Always | ✅ |
+| `q` | Quit | Always | ✅ |
+
+---
+
+## Config
+
+### Project Config (`.skillbook/config.json`)
+
+```json
+{
+  "harnesses": ["opencode", "claude-code"]
+}
+```
+
+Note: No `skills` array - filesystem is source of truth (sparse checkout contents).
+
+### Library Config (`~/.skillbook/config.json`)
+
+```json
+{
+  "defaultHarnesses": ["claude-code"]
+}
+```
+
+---
+
+## Implementation Status
+
+### Done
+- [x] Library management (add, list, scan)
+- [x] TUI prototype with Ink
+- [x] Harness detection
+- [x] Config module (JSON-based)
+- [x] Sparse checkout for `.skillbook/`
+- [x] Symlink management (folder symlinks for directory harnesses)
+- [x] Lazy init on first sync/install
+- [x] Install/uninstall/sync actions
+- [x] Status naming convention (ok/ahead/behind/detached/conflict)
+- [x] Harness enable/disable with auto-detection preservation
+- [x] Per-harness tree view (show harness entries when status differs)
+- [x] Two-level navigation (skill + harness entry selection)
+- [x] Harness-level "use as source" action with confirmation prompt
+- [x] Enable harness properly converts real files to symlinks
+- [x] Scan follows symlinks to find skills in skillbook-managed projects
+- [x] Scan TUI with Ink (replaced clack prompts)
+- [x] Scan statuses: `[local]`, `[matches]`, `[differs]` with clear meanings
+- [x] Scan actions: `[a]dd` for local, `[o]verwrite` for differs (with confirmation)
+- [x] Scan variant warnings only on non-matches with multiple different versions
+- [x] Scan description explaining purpose: "Find skills and add to library"
+
+### TODO
+
+| Task | Beads Issue |
+|------|-------------|
+| Detect ahead/behind states (compare with library) | `skill-book-g06` |
+| Push/pull actions for ahead/behind states | `skill-book-g06` |
+| Eject command | `skill-book-3vt` |
+| Integration tests for CLI commands | `skill-book-8aa` |
+
+### Done (Testing)
+- [x] TUI integration tests for project view (`src/tui/__tests__/App.integration.test.tsx`)
+
+---
+
+## Tool-Specific Paths (Harnesses)
+
+| Tool | Skill Location | Format |
+|------|---------------|--------|
+| **Claude Code** | `.claude/skills/<name>/SKILL.md` | Directory + SKILL.md |
+| **Cursor** | `.cursor/rules/<name>.md` | Flat file |
+| **OpenCode** | `.opencode/skill/<name>/SKILL.md` | Directory + SKILL.md |
+
+---
+
+## Testing
+
+### Test Strategy
+
+| Layer | Approach | Tools |
+|-------|----------|-------|
+| Unit tests | Test library functions in isolation | `bun:test` |
+| CLI tests | Run CLI as subprocess, check output | `spawnSync` + temp dirs |
+| TUI tests | Render components, simulate input | `ink-testing-library` |
+
+### Test Fixtures
+
+Integration tests use `test-fixtures/` with a reproducible project structure:
+
+```
+test-fixtures/
+├── setup.ts              # Script to create/reset fixtures
+├── library/              # Mock library (git repo)
+│   └── skills/
+│       ├── skill-in-lib/SKILL.md
+│       └── skill-available/SKILL.md
+└── project/              # Mock project (git repo)
+    ├── .skillbook/       # Sparse checkout (git repo)
+    ├── .claude/skills/   # Various skill states
+    └── .opencode/skill/
+```
+
+### Running Tests
 
 ```bash
-# Add a skill from current project to the library
-skillbook add .claude/skills/beads/SKILL.md
-# -> Copies to ~/.config/skillbook/skills/beads/SKILL.md
-
-# Initialize skills in a new project
-skillbook init
-# -> Interactive checkbox selection
-# -> Creates symlinks to tool-specific locations
-
-# List available skills in library
-skillbook list
-# -> Shows all skills in ~/.config/skillbook/skills/
+bun test                    # Run all tests
+bun test App.integration    # Run specific test file
 ```
 
-### Library Structure (Convention-based)
+### Environment Variables
 
-```
-~/.config/skillbook/
-└── skills/
-    ├── beads/
-    │   └── SKILL.md
-    ├── typescript/
-    │   └── SKILL.md
-    ├── review-gitlab/
-    │   └── SKILL.md
-    └── sentry/
-        └── SKILL.md
-```
-
-**Convention:** Each folder in `skills/` is a skill. Folder name = skill name. No config files needed for MVP.
-
-### Project Structure After `skillbook init`
-
-```
-project/
-├── .claude/skills/
-│   └── beads/SKILL.md      -> symlink to library
-├── .cursor/rules/
-│   └── beads.md            -> symlink to library
-└── .opencode/skills/
-    └── beads.md            -> symlink to library
-```
+| Variable | Purpose |
+|----------|---------|
+| `SKILLBOOK_LIBRARY` | Override library location (for testing) |
 
 ---
 
 ## Technical Decisions
 
-### Tech Stack
-
 | Choice | Decision | Reasoning |
 |--------|----------|-----------|
-| **Language** | TypeScript + Bun | Fast development, familiar, can compile to binary later |
-| **CLI Framework** | citty | Lightweight (7KB), modern, good TypeScript support |
-| **Interactive UI** | @clack/prompts | Beautiful checkboxes, used by Astro/SvelteKit |
-| **Colors** | picocolors | Fastest, smallest |
-| **Config Format** | JSON (if needed) | Native to TypeScript, machine-generated |
-| **Sync Strategy** | Symlinks | Simple, instant updates, no duplication |
-| **Platform** | macOS + Linux | No Windows support needed |
-
-### Dependencies (Minimal)
-
-```json
-{
-  "dependencies": {
-    "citty": "^0.1.6",
-    "@clack/prompts": "^0.8.0",
-    "picocolors": "^1.1.0"
-  }
-}
-```
-
-### Binary Distribution (Future)
-
-When ready to distribute:
-```bash
-bun build ./src/cli.ts --compile --outfile skillbook
-```
-
----
-
-## MVP Scope
-
-### Phase 0: Minimal MVP (Current)
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `skillbook add <path>` | Copy skill from project to library | TODO |
-| `skillbook init` | Interactive select + create symlinks | TODO |
-| `skillbook list` | Show available skills | TODO |
-
-**No config files, no versioning, no manifest** - just files and symlinks.
-
-### Phase 1: Basic Workflow
-
-| Command | Description |
-|---------|-------------|
-| `skillbook status` | Show installed skills in current project |
-| `skillbook remove <skill>` | Remove skill symlinks from project |
-
-### Phase 2: Sync Features
-
-| Command | Description |
-|---------|-------------|
-| `skillbook sync` | Pull updates (re-link if library changed) |
-| `skillbook push <skill>` | Copy modified skill back to library |
-| `skillbook diff <skill>` | Show differences between project and library |
-
-### Phase 3: Advanced
-
-| Feature | Description |
-|---------|-------------|
-| Version tracking | Track which commit each skill was installed from |
-| Manifest file | `.skillbook/manifest.json` for project state |
-| Skill composition | Skills that reference other skills |
-| Team sharing | Multiple library sources |
-
----
-
-## Tool-Specific Paths
-
-| Tool | Skill Location | Symlink Target |
-|------|---------------|----------------|
-| **Claude Code** | `.claude/skills/<name>/SKILL.md` | `~/.config/skillbook/skills/<name>/SKILL.md` |
-| **Cursor** | `.cursor/rules/<name>.md` | `~/.config/skillbook/skills/<name>/SKILL.md` |
-| **OpenCode** | `.opencode/skills/<name>.md` | `~/.config/skillbook/skills/<name>/SKILL.md` |
-
-Note: Claude Code expects a directory with SKILL.md inside. Cursor/OpenCode expect a flat .md file.
-
----
-
-## Implementation Plan
-
-### File Structure
-
-```
-src/
-├── cli.ts                 # Entry point, citty setup
-├── commands/
-│   ├── add.ts             # skillbook add <path>
-│   ├── init.ts            # skillbook init  
-│   └── list.ts            # skillbook list
-├── lib/
-│   ├── paths.ts           # Path helpers (~/.config/skillbook, etc.)
-│   ├── library.ts         # Library operations (scan, add skill)
-│   └── symlinks.ts        # Create symlinks for each tool
-└── constants.ts           # Tool configs, paths
-```
-
-### Command: `skillbook add <path>`
-
-```typescript
-// 1. Validate path exists and is a .md file
-// 2. Extract skill name from parent folder
-//    .claude/skills/beads/SKILL.md -> "beads"
-// 3. Create ~/.config/skillbook/skills/<name>/
-// 4. Copy file to ~/.config/skillbook/skills/<name>/SKILL.md
-// 5. Print success message
-```
-
-### Command: `skillbook init`
-
-```typescript
-// 1. Scan ~/.config/skillbook/skills/ for available skills
-// 2. Show multi-select checkbox prompt
-// 3. Ask which tools to configure (Claude Code, Cursor, OpenCode)
-// 4. For each selected skill + tool:
-//    - Create tool-specific directory if needed
-//    - Create symlink from tool location to library
-// 5. Print summary of created symlinks
-```
-
-### Command: `skillbook list`
-
-```typescript
-// 1. Scan ~/.config/skillbook/skills/
-// 2. For each folder, print skill name
-// 3. Optionally show if skill.md exists
-```
-
----
-
-## Research Findings
-
-### Existing Tools (Competition/Inspiration)
-
-| Tool | Stars | What It Does | Gap |
-|------|-------|--------------|-----|
-| **[skillshare](https://github.com/runkids/skillshare)** | 249 | Multi-tool symlink sync | No selective install |
-| **[agent-resources](https://github.com/kasperjunge/agent-resources)** | 349 | Package manager for skills | Claude Code only |
-| **[craftdesk](https://github.com/mensfeld/craftdesk)** | 39 | Full package manager | Complex |
-| **[glooit](https://github.com/nikuscs/glooit)** | 18 | Multi-tool + MCP sync | No selection UI |
-
-### Why Build Our Own?
-
-None of the existing tools offer the simple workflow we want:
-1. **Add skill from project** - Most are pull-only from registries
-2. **Interactive selection** - Most are config-file based
-3. **Multi-tool symlinks** - Some do this, but with complex config
-
-Our approach: **Simplest possible thing that works**, then iterate.
-
-### Native Tool Capabilities
-
-| Feature | Claude Code | Cursor | OpenCode |
-|---------|-------------|--------|----------|
-| Skill location | `.claude/skills/` | `.cursor/rules/` | `.opencode/skills/` |
-| File format | `SKILL.md` in folder | `.md` or `.mdc` | `.md` |
-| Symlinks work? | Yes | Yes | Yes |
-| User-level skills | `~/.claude/skills/` | `~/.cursor/skills/` | `~/.opencode/skills/` |
-
----
-
-## Open Questions (Resolved)
-
-| Question | Decision |
-|----------|----------|
-| TOML vs JSON? | **JSON** - native to TypeScript, machine-generated |
-| Symlinks vs Copy? | **Symlinks** - simpler for MVP |
-| Manifest file? | **No** - not needed for MVP |
-| Windows support? | **No** - macOS + Linux only |
-| Binary distribution? | **Later** - Bun runtime OK for now |
-
----
-
-## References
-
-### Tools to Study
-
-- skillshare: https://github.com/runkids/skillshare
-- agent-resources: https://github.com/kasperjunge/agent-resources
-- chezmoi: https://github.com/twpayne/chezmoi
-- GNU Stow: https://www.gnu.org/software/stow/
-
-### Standards
-
-- Agent Skills: https://agentskills.io
-- Claude Code docs: https://docs.anthropic.com/en/docs/claude-code
-- Cursor docs: https://docs.cursor.com/context/rules
-
-### CLI Frameworks Evaluated
-
-- citty (chosen): https://github.com/unjs/citty
-- @clack/prompts (chosen): https://github.com/bombshell-dev/clack
-- commander: https://github.com/tj/commander.js
-- ink: https://github.com/vadimdemedes/ink
+| Language | TypeScript + Bun | Fast, familiar |
+| TUI | Ink (React) | Used by Claude Code, modern |
+| Config | JSON | Native to JS, no extra deps |
+| Sync | Sparse checkout + symlinks | Single source, multi-harness |
+| Platform | macOS + Linux | No Windows needed |
+| Testing | `bun:test` + `ink-testing-library` | Native to Bun, official Ink testing |

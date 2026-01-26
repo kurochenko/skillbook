@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { join } from 'path'
-import { DEFAULT_LIBRARY_PATH, SKILLS_DIR } from '../constants.ts'
+import { DEFAULT_LIBRARY_PATH, SKILLS_DIR } from '@/constants'
 
 export const expandPath = (path: string) =>
   path.startsWith('~') ? path.replace('~', homedir()) : path

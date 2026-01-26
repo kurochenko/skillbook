@@ -1,24 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { spawnSync } from 'child_process'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-
-const CLI_PATH = join(import.meta.dir, '../../cli.ts')
-
-const runCli = (args: string[], env: Record<string, string> = {}) => {
-  const result = spawnSync('bun', ['run', CLI_PATH, ...args], {
-    encoding: 'utf-8',
-    env: { ...process.env, ...env },
-  })
-
-  return {
-    stdout: result.stdout,
-    stderr: result.stderr,
-    exitCode: result.status ?? 1,
-    output: result.stdout + result.stderr,
-  }
-}
+import { runCli } from '@/test-utils/cli'
 
 describe('add command', () => {
   let tempDir: string
@@ -50,44 +34,42 @@ describe('add command', () => {
     return existsSync(path) ? readFileSync(path, 'utf-8') : null
   }
 
-
   describe('basic functionality', () => {
-    test('adds a skill from .claude/skills/<name>/SKILL.md', () => {
-      const skillPath = createSkillFile(
-        '.claude/skills/typescript/SKILL.md',
-        '# TypeScript Skill\n\nBest practices for TypeScript.',
-      )
+    const cases = [
+      {
+        label: 'adds a skill from .claude/skills/<name>/SKILL.md',
+        path: '.claude/skills/typescript/SKILL.md',
+        content: '# TypeScript Skill\n\nBest practices for TypeScript.',
+        args: (skillPath: string) => ['add', skillPath],
+        expectedName: 'typescript',
+      },
+      {
+        label: 'adds a skill from .cursor/rules/<name>.md',
+        path: '.cursor/rules/react-patterns.md',
+        content: '# React Patterns',
+        args: (skillPath: string) => ['add', skillPath],
+        expectedName: 'react-patterns',
+      },
+      {
+        label: 'adds a skill with explicit --name',
+        path: 'random/file.md',
+        content: '# My Custom Skill',
+        args: (skillPath: string) => ['add', skillPath, '--name', 'custom'],
+        expectedName: 'custom',
+      },
+    ]
 
-      const result = runCli(['add', skillPath], env())
+    for (const { label, path, content, args, expectedName } of cases) {
+      test(label, () => {
+        const skillPath = createSkillFile(path, content)
 
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('Added')
-      expect(result.output).toContain('typescript')
-      expect(getLibrarySkill('typescript')).toBe('# TypeScript Skill\n\nBest practices for TypeScript.')
-    })
+        const result = runCli(args(skillPath), env())
 
-    test('adds a skill from .cursor/rules/<name>.md', () => {
-      const skillPath = createSkillFile(
-        '.cursor/rules/react-patterns.md',
-        '# React Patterns',
-      )
-
-      const result = runCli(['add', skillPath], env())
-
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('react-patterns')
-      expect(getLibrarySkill('react-patterns')).toBe('# React Patterns')
-    })
-
-    test('adds a skill with explicit --name', () => {
-      const skillPath = createSkillFile('random/file.md', '# My Custom Skill')
-
-      const result = runCli(['add', skillPath, '--name', 'custom'], env())
-
-      expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('custom')
-      expect(getLibrarySkill('custom')).toBe('# My Custom Skill')
-    })
+        expect(result.exitCode).toBe(0)
+        expect(result.output).toContain(expectedName)
+        expect(getLibrarySkill(expectedName)).toBe(content)
+      })
+    }
   })
 
 
@@ -192,7 +174,6 @@ describe('add command', () => {
       { path: '.claude/skills/my_skill/SKILL.md', expected: 'my_skill' },
       { path: '.claude/skills/_private/SKILL.md', expected: '_private' },
       { path: '.cursor/rules/my-skill.md', expected: 'my-skill' },
-      { path: '.opencode/skills/my-skill.md', expected: 'my-skill' },
       { path: '.opencode/skill/my-skill/SKILL.md', expected: 'my-skill' },
       { path: 'custom-skill/SKILL.md', expected: 'custom-skill' },
     ]
@@ -246,6 +227,14 @@ describe('add command', () => {
 
       expect(result.exitCode).toBe(0)
       expect(getLibrarySkill('skill-v2')).toBe('# Skill')
+    })
+
+    test('requires path when not using --bulk', () => {
+      const result = runCli(['add'], env())
+
+      expect(result.exitCode).toBe(1)
+      expect(result.output).toContain('Path is required')
+      expect(result.output).toContain('skillbook scan')
     })
   })
 })

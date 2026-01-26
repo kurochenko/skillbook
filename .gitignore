@@ -38,3 +38,7 @@ SKILL.md
 
 # Beads issue tracker
 .beads
+
+# Test fixtures (generated)
+test-fixtures/library
+test-fixtures/project

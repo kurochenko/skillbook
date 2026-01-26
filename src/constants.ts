@@ -11,8 +11,8 @@ export const TOOLS = {
   },
   opencode: {
     name: 'OpenCode',
-    skillPath: (name: string) => `.opencode/skills/${name}.md`,
-    needsDirectory: false,
+    skillPath: (name: string) => `.opencode/skill/${name}/SKILL.md`,
+    needsDirectory: true,
   },
 } as const
 
@@ -20,6 +20,7 @@ export type ToolId = keyof typeof TOOLS
 
 export const SUPPORTED_TOOLS = Object.keys(TOOLS) as ToolId[]
 
-export const DEFAULT_LIBRARY_PATH = '~/.config/skillbook'
+export const DEFAULT_LIBRARY_PATH = '~/.skillbook'
+export const SKILLBOOK_DIR = '.skillbook'
 export const SKILLS_DIR = 'skills'
 export const SKILL_FILE = 'SKILL.md'

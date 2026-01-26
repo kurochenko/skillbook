@@ -4,7 +4,7 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 
 ## The Problem
 
-**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skills/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
+**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skill/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
 
 **Experimentation clutter.** You want to try a new skill - maybe a coding style guide or a review checklist. But committing experimental skills to your project repo feels wrong. You end up with half-baked `.md` files cluttering your projects, or you avoid trying new skills altogether.
 
@@ -13,14 +13,14 @@ A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasti
 **skillbook** gives you a central library of skills that sync to any project. Try skills freely, toggle them on/off per project, keep your repos clean:
 
 ```
-~/.config/skillbook/skills/     # Your skill library (one source of truth)
+~/.skillbook/skills/            # Your skill library (one source of truth)
 ├── typescript/
 ├── review-gitlab/
 └── beads/
 
 project-a/.claude/skills/       # Symlinked from library
 project-b/.cursor/rules/        # Same skills, different tool
-project-c/.opencode/skills/     # Always in sync
+project-c/.opencode/skill/      # Always in sync
 ```
 
 ## Installation
@@ -61,11 +61,11 @@ bun run build
 # 1. Add a skill from an existing project to your library
 skillbook add .claude/skills/typescript/SKILL.md
 
-# 2. In a new project, initialize skills you want
-skillbook init
-
-# 3. See what skills are available
+# 2. See what skills are available
 skillbook list
+
+# 3. Launch the TUI to manage skills in your project
+skillbook
 ```
 
 ### Commands
@@ -77,33 +77,10 @@ Add a skill from your current project to the central library.
 ```bash
 # Add a skill - extracts name from parent folder
 skillbook add .claude/skills/beads/SKILL.md
-# -> Copies to ~/.config/skillbook/skills/beads/SKILL.md
+# -> Copies to ~/.skillbook/skills/beads/SKILL.md
 
 # Force overwrite if skill exists
 skillbook add .claude/skills/beads/SKILL.md --force
-```
-
-#### `skillbook init`
-
-Interactive setup - select skills and tools, creates symlinks.
-
-```bash
-skillbook init
-
-# Prompts:
-# ? Select skills to install
-#   [x] typescript
-#   [x] beads
-#   [ ] review-gitlab
-#
-# ? Select tools to configure
-#   [x] Claude Code
-#   [x] Cursor
-#   [ ] OpenCode
-#
-# Creates:
-#   .claude/skills/typescript/SKILL.md -> ~/.config/skillbook/skills/typescript/SKILL.md
-#   .cursor/rules/typescript.md -> ~/.config/skillbook/skills/typescript/SKILL.md
 ```
 
 #### `skillbook list`
@@ -122,10 +99,10 @@ skillbook list
 
 ## Skill Library Structure
 
-Skills live in `~/.config/skillbook/skills/`:
+Skills live in `~/.skillbook/skills/`:
 
 ```
-~/.config/skillbook/
+~/.skillbook/
 └── skills/
     ├── typescript/
     │   └── SKILL.md
@@ -143,7 +120,7 @@ Each skill is a folder containing a `SKILL.md` file. The folder name is the skil
 |------|---------------|--------|
 | **Claude Code** | `.claude/skills/<name>/SKILL.md` | Directory with SKILL.md |
 | **Cursor** | `.cursor/rules/<name>.md` | Flat .md file |
-| **OpenCode** | `.opencode/skills/<name>.md` | Flat .md file |
+| **OpenCode** | `.opencode/skill/<name>/SKILL.md` | Directory with SKILL.md |
 
 ## Development
 
@@ -166,13 +143,15 @@ bun run dev add ./path/to/skill.md
 
 ```
 src/
-├── cli.ts              # Entry point
+├── cli.ts              # Entry point, launches TUI or subcommands
 ├── commands/
 │   ├── add.ts          # skillbook add
-│   ├── init.ts         # skillbook init
-│   └── list.ts         # skillbook list
+│   ├── list.ts         # skillbook list
+│   └── scan.ts         # skillbook scan
+├── tui/                # Interactive TUI
+│   └── App.tsx         # Main TUI application
 ├── lib/
-│   └── paths.ts        # Path utilities
+│   └── ...             # Core utilities
 ├── constants.ts        # Tool configurations
 └── types.ts            # TypeScript types
 ```
@@ -187,17 +166,17 @@ bun test
 
 ### MVP (Current)
 - [x] Project setup
-- [ ] `skillbook list` - List available skills
-- [ ] `skillbook add` - Add skill to library
-- [ ] `skillbook init` - Interactive skill installation
+- [x] `skillbook add` - Add skill to library
+- [x] `skillbook list` - List available skills
+- [x] `skillbook scan` - Find skills across projects
+- [x] Interactive TUI for skill management
 
 ### Phase 2
 - [ ] `skillbook status` - Show installed skills in project
-- [ ] `skillbook sync` - Pull updates from library
-- [ ] `skillbook push` - Push changes back to library
+- [ ] Ahead/behind state detection
+- [ ] Version tracking
 
 ### Phase 3
-- [ ] Version tracking
 - [ ] Skill composition (skills referencing other skills)
 - [ ] Team library sharing
 

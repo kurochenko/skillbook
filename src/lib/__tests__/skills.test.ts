@@ -1,97 +1,70 @@
 import { describe, expect, test } from 'bun:test'
-import { validateSkillName, extractSkillName } from '../skills.ts'
+import { validateSkillName, extractSkillName } from '@/lib/skills'
 
 describe('validateSkillName', () => {
   test('accepts valid names', () => {
-    expect(validateSkillName('beads')).toEqual({ valid: true, name: 'beads' })
-    expect(validateSkillName('typescript')).toEqual({ valid: true, name: 'typescript' })
-    expect(validateSkillName('review-gitlab')).toEqual({ valid: true, name: 'review-gitlab' })
-    expect(validateSkillName('my-skill-2')).toEqual({ valid: true, name: 'my-skill-2' })
-    expect(validateSkillName('my_skill')).toEqual({ valid: true, name: 'my_skill' })
-    expect(validateSkillName('snake_case_name')).toEqual({ valid: true, name: 'snake_case_name' })
-    expect(validateSkillName('_private')).toEqual({ valid: true, name: '_private' })
-    expect(validateSkillName('_underscore_start')).toEqual({ valid: true, name: '_underscore_start' })
-    expect(validateSkillName('a')).toEqual({ valid: true, name: 'a' })
-    expect(validateSkillName('1')).toEqual({ valid: true, name: '1' })
-    expect(validateSkillName('123skill')).toEqual({ valid: true, name: '123skill' })
-    expect(validateSkillName('2fa')).toEqual({ valid: true, name: '2fa' })
+    const cases = [
+      'beads',
+      'typescript',
+      'review-gitlab',
+      'my-skill-2',
+      'my_skill',
+      'snake_case_name',
+      '_private',
+      '_underscore_start',
+      'a',
+      '1',
+      '123skill',
+      '2fa',
+    ]
+
+    for (const name of cases) {
+      expect(validateSkillName(name)).toEqual({ valid: true, name })
+    }
   })
 
-  test('rejects empty name', () => {
-    const result = validateSkillName('')
-    expect(result.valid).toBe(false)
-    if (!result.valid) expect(result.error).toContain('empty')
-  })
+  test('rejects invalid names', () => {
+    const cases = [
+      { name: '', error: 'empty' },
+      { name: 'a'.repeat(51), error: '50 characters' },
+      { name: 'Beads', error: 'lowercase' },
+      { name: 'my skill', error: 'spaces' },
+      { name: 'skill@test', error: null },
+      { name: 'skill.test', error: null },
+      { name: 'skill/test', error: null },
+      { name: '-skill', error: null },
+    ]
 
-  test('rejects name too long', () => {
-    const result = validateSkillName('a'.repeat(51))
-    expect(result.valid).toBe(false)
-    if (!result.valid) expect(result.error).toContain('50 characters')
-  })
-
-  test('rejects uppercase letters', () => {
-    const result = validateSkillName('Beads')
-    expect(result.valid).toBe(false)
-    if (!result.valid) expect(result.error).toContain('lowercase')
-  })
-
-  test('rejects spaces', () => {
-    const result = validateSkillName('my skill')
-    expect(result.valid).toBe(false)
-    if (!result.valid) expect(result.error).toContain('spaces')
-  })
-
-  test('rejects special characters', () => {
-    expect(validateSkillName('skill@test').valid).toBe(false)
-    expect(validateSkillName('skill.test').valid).toBe(false)
-    expect(validateSkillName('skill/test').valid).toBe(false)
-  })
-
-  test('rejects name starting with hyphen', () => {
-    const result = validateSkillName('-skill')
-    expect(result.valid).toBe(false)
+    for (const { name, error } of cases) {
+      const result = validateSkillName(name)
+      expect(result.valid).toBe(false)
+      if (error && !result.valid) expect(result.error).toContain(error)
+    }
   })
 })
 
 describe('extractSkillName', () => {
-  test('extracts from .claude/skills/<name>/SKILL.md', () => {
-    expect(extractSkillName('.claude/skills/beads/SKILL.md')).toBe('beads')
-    expect(extractSkillName('/Users/foo/.claude/skills/typescript/SKILL.md')).toBe('typescript')
-    expect(extractSkillName('./project/.claude/skills/review-gitlab/SKILL.md')).toBe('review-gitlab')
-  })
+  test('extracts names from supported paths', () => {
+    const cases: Array<[string, string | null]> = [
+      ['.claude/skills/beads/SKILL.md', 'beads'],
+      ['/Users/foo/.claude/skills/typescript/SKILL.md', 'typescript'],
+      ['./project/.claude/skills/review-gitlab/SKILL.md', 'review-gitlab'],
+      ['.cursor/rules/typescript.md', 'typescript'],
+      ['/Users/foo/.cursor/rules/beads.md', 'beads'],
+      ['.opencode/skill/beads/SKILL.md', 'beads'],
+      ['/Users/foo/.opencode/skill/typescript/SKILL.md', 'typescript'],
+      ['my-skill/SKILL.md', 'my-skill'],
+      ['/some/path/custom-skill/SKILL.md', 'custom-skill'],
+      ['.claude/skills/MySkill/SKILL.md', 'myskill'],
+      ['.cursor/rules/TypeScript.md', 'typescript'],
+      ['./random/file.md', null],
+      ['./skill.md', null],
+      ['SKILL.md', null],
+      ['.claude\\skills\\beads\\SKILL.md', 'beads'],
+    ]
 
-  test('extracts from .cursor/rules/<name>.md', () => {
-    expect(extractSkillName('.cursor/rules/typescript.md')).toBe('typescript')
-    expect(extractSkillName('/Users/foo/.cursor/rules/beads.md')).toBe('beads')
-  })
-
-  test('extracts from .opencode/skills/<name>.md (flat)', () => {
-    expect(extractSkillName('.opencode/skills/beads.md')).toBe('beads')
-    expect(extractSkillName('.opencode/skill/typescript.md')).toBe('typescript')
-  })
-
-  test('extracts from .opencode/skill/<name>/SKILL.md (directory)', () => {
-    expect(extractSkillName('.opencode/skill/beads/SKILL.md')).toBe('beads')
-    expect(extractSkillName('.opencode/skills/typescript/SKILL.md')).toBe('typescript')
-  })
-
-  test('extracts from generic <folder>/SKILL.md', () => {
-    expect(extractSkillName('my-skill/SKILL.md')).toBe('my-skill')
-    expect(extractSkillName('/some/path/custom-skill/SKILL.md')).toBe('custom-skill')
-  })
-
-  test('handles case insensitively and returns lowercase', () => {
-    expect(extractSkillName('.claude/skills/MySkill/SKILL.md')).toBe('myskill')
-    expect(extractSkillName('.cursor/rules/TypeScript.md')).toBe('typescript')
-  })
-
-  test('returns null for unrecognized patterns', () => {
-    expect(extractSkillName('./random/file.md')).toBe(null)
-    expect(extractSkillName('./skill.md')).toBe(null)
-    expect(extractSkillName('SKILL.md')).toBe(null)
-  })
-
-  test('handles Windows-style paths', () => {
-    expect(extractSkillName('.claude\\skills\\beads\\SKILL.md')).toBe('beads')
+    for (const [path, expected] of cases) {
+      expect(extractSkillName(path)).toBe(expected)
+    }
   })
 })
