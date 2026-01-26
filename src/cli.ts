@@ -6,6 +6,12 @@ import { VERSION, checkForUpdate } from '@/lib/version'
 const args = process.argv.slice(2)
 const hasSubcommand = args.length > 0 && !args[0]?.startsWith('-')
 const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.includes('--version')
+const isVersionFlag = args.includes('--version') || args.includes('-v')
+
+if (isVersionFlag) {
+  process.stdout.write(`${VERSION}\n`)
+  process.exit(0)
+}
 
 async function showUpdateBannerIfNeeded(): Promise<void> {
   try {
