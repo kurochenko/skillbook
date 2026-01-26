@@ -180,11 +180,9 @@ const deriveSkillStatus = (
     if (firstHarness.content === libraryContent) {
       return { status: 'ok', isUnanimous: true, diff: null }
     }
-    return {
-      status: 'ahead',
-      isUnanimous: true,
-      diff: calculateDiff(libraryContent, firstHarness.content),
-    }
+    const diff = calculateDiff(libraryContent, firstHarness.content)
+    const status = diff.deletions > diff.additions ? 'behind' : 'ahead'
+    return { status, isUnanimous: true, diff }
   }
 
   if (isUnanimous) {
