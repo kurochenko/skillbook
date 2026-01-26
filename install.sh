@@ -69,19 +69,19 @@ detect_arch() {
 get_download_url() {
 	local os="$1"
 	local arch="$2"
-	local version="$3"
+	local tag="$3"
 
 	local binary_name="skillbook-${os}-${arch}"
 
-	if [ "$version" = "latest" ]; then
+	if [ "$tag" = "latest" ]; then
 		echo "https://github.com/${REPO}/releases/latest/download/${binary_name}"
 	else
-		echo "https://github.com/${REPO}/releases/download/v${version}/${binary_name}"
+		echo "https://github.com/${REPO}/releases/download/${tag}/${binary_name}"
 	fi
 }
 
-# Fetch latest version from GitHub
-get_latest_version() {
+# Fetch latest tag from GitHub
+get_latest_tag() {
 	local url="https://api.github.com/repos/${REPO}/releases/latest"
 
 	if command -v curl &>/dev/null; then
@@ -99,6 +99,19 @@ normalize_version() {
 	version="${version#skillbook-}"
 	version="${version#v}"
 	echo "$version"
+}
+
+resolve_tag() {
+	local input="$1"
+	if [[ "$input" == skillbook-* ]]; then
+		echo "$input"
+		return
+	fi
+	if [[ "$input" == v* ]]; then
+		echo "$input"
+		return
+	fi
+	echo "v${input}"
 }
 
 # Download file
@@ -204,19 +217,21 @@ main() {
 	local arch=$(detect_arch)
 	info "Detected platform: ${os}-${arch}"
 
-	# Get version
-	local version="${SKILLBOOK_VERSION:-}"
-	if [ -z "$version" ]; then
+	local tag="${SKILLBOOK_VERSION:-}"
+	if [ -z "$tag" ]; then
 		info "Fetching latest version..."
-		version=$(get_latest_version)
-		if [ -z "$version" ]; then
+		tag=$(get_latest_tag)
+		if [ -z "$tag" ]; then
 			warn "Could not determine latest version. Installing latest release."
-			version="latest"
+			tag="latest"
 		fi
+	else
+		tag=$(resolve_tag "$tag")
 	fi
 
-	if [ "$version" != "latest" ]; then
-		version=$(normalize_version "$version")
+	local version="latest"
+	if [ "$tag" != "latest" ]; then
+		version=$(normalize_version "$tag")
 		if [ -z "$version" ]; then
 			error "Could not parse version tag. Please set SKILLBOOK_VERSION explicitly."
 		fi
@@ -227,7 +242,7 @@ main() {
 	mkdir -p "$INSTALL_DIR"
 
 	# Download binary
-	local download_url=$(get_download_url "$os" "$arch" "$version")
+	local download_url=$(get_download_url "$os" "$arch" "$tag")
 	local tmp_file
 	tmp_file=$(mktemp)
 	trap 'rm -f "${tmp_file:-}"' EXIT
