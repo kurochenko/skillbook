@@ -11,16 +11,21 @@ compatibility: opencode, claude-code, cursor
 
 Manages AI coding assistant skills in one place. Create skills once, reuse them across all projects.
 
-## IMPORTANT: Where to Edit Skills
+## CRITICAL: Never Touch Git
 
-The main library at \`~/.skillbook/\` is **off-limits**. Never modify files there directly.
+**NEVER run git commands on \`.skillbook/\` or \`~/.skillbook/\` folders.**
 
-When updating a skill:
+No \`git pull\`, \`git push\`, \`git commit\`, \`git stash\` - nothing. The skillbook CLI handles all git operations internally.
 
-1. **Work in the project folder** - Edit skills in \`.skillbook/skills/<name>/SKILL.md\` within the current project
-2. **Initialize if needed** - If \`.skillbook/\` doesn't exist, run \`skillbook\` TUI and install a skill first
-3. **Don't commit** - Let the skillbook CLI handle all git operations
-4. **Use the TUI to sync** - After editing, use \`skillbook\` TUI to push changes to the library
+### When Editing Skills
+
+1. **Edit in project folder** - Modify \`.skillbook/skills/<name>/SKILL.md\` in the current project
+2. **Initialize first** - If \`.skillbook/\` doesn't exist, run \`skillbook\` TUI and install a skill
+3. **Use CLI to sync** - After editing, open \`skillbook\` TUI and press \`p\` to push changes
+
+### When Skills Are Outdated
+
+If a skill shows \`[behind]\` status, tell the user to run \`skillbook\` and sync from TUI. Do NOT run git commands yourself.
 
 ## Quick Reference
 
