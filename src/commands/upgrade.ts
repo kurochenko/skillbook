@@ -10,6 +10,7 @@ import {
   getInstallPath,
   getPlatformBinary,
 } from '@/lib/version'
+import { ensureDefaultSkills } from '@/lib/library'
 
 type UpgradeInfo = {
   updateAvailable: boolean
@@ -160,6 +161,8 @@ export default defineCommand({
 
       installBinary(installPath, tempPath)
       spinner.stop('Installed successfully')
+
+      await ensureDefaultSkills()
 
       if (latestVersion) {
         p.log.success(`Upgraded to ${pc.green(`v${latestVersion}`)}`)

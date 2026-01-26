@@ -5,6 +5,7 @@ import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
 import { extractSkillName, validateSkillName } from '@/lib/skills'
+import { DEFAULT_SKILLS } from '@/lib/default-skills'
 
 export type LibraryInitResult =
   | { success: true; path: string; created: boolean }
@@ -178,6 +179,31 @@ const getConflictInfo = (
   }
 }
 
+export const ensureDefaultSkills = async (): Promise<void> => {
+  const libraryPath = getLibraryPath()
+  if (!existsSync(libraryPath)) return
+
+  for (const { name, content } of DEFAULT_SKILLS) {
+    const skillDir = getSkillPath(name)
+    const skillFilePath = join(skillDir, SKILL_FILE)
+    const existingContent = readFileSafe(skillFilePath)
+
+    if (existingContent !== content) {
+      if (!existsSync(skillDir)) {
+        mkdirSync(skillDir, { recursive: true })
+      }
+
+      writeFileSync(skillFilePath, content, 'utf-8')
+
+      const relativeSkillPath = `${SKILLS_DIR}/${name}/${SKILL_FILE}`
+      await gitAdd(libraryPath, relativeSkillPath)
+
+      const action = existingContent === null ? 'Add' : 'Update'
+      await gitCommit(libraryPath, `${action} default skill: ${name}`)
+    }
+  }
+}
+
 export const ensureLibrary = async (): Promise<LibraryInitResult> => {
   const libraryPath = getLibraryPath()
   const skillsPath = getSkillsPath()
@@ -211,6 +237,8 @@ export const ensureLibrary = async (): Promise<LibraryInitResult> => {
       await gitAdd(libraryPath, '.')
       await gitCommit(libraryPath, 'Initialize skillbook library')
     }
+
+    await ensureDefaultSkills()
 
     return { success: true, path: libraryPath, created }
   } catch (error) {

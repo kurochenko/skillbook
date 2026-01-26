@@ -19,7 +19,7 @@ export default defineCommand({
     if (!existsSync(skillsPath)) {
       p.log.warn('No skills library found')
       p.log.info(pc.dim(`Library path: ${libraryPath}`))
-      p.log.info(pc.dim('Run `skillbook add` to add skills'))
+      p.log.info(pc.dim('Run `skillbook scan` to initialize'))
       return
     }
 

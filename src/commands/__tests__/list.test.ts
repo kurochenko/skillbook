@@ -32,7 +32,7 @@ describe('list command', () => {
 
       expect(result.exitCode).toBe(0)
       expect(result.output).toContain('No skills library found')
-      expect(result.output).toContain('skillbook add')
+      expect(result.output).toContain('skillbook scan')
     })
 
     test('shows message when library exists but has no skills', () => {
