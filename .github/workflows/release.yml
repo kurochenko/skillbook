@@ -1,0 +1,113 @@
+name: Build Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  BUN_VERSION: latest
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: bun-darwin-arm64
+            binary: skillbook-darwin-arm64
+          - os: macos-latest
+            target: bun-darwin-x64
+            binary: skillbook-darwin-x64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            binary: skillbook-linux-x64
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            binary: skillbook-linux-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build binary
+        run: |
+          bun build src/cli.ts \
+            --compile \
+            --minify \
+            --sourcemap \
+            --target=${{ matrix.target }} \
+            --define BUILD_VERSION='"${{ steps.version.outputs.version }}"' \
+            --outfile dist/${{ matrix.binary }}
+
+      - name: Generate checksum
+        run: |
+          shasum -a 256 dist/${{ matrix.binary }} | cut -d ' ' -f1 > dist/${{ matrix.binary }}.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary }}
+          path: |
+            dist/${{ matrix.binary }}
+            dist/${{ matrix.binary }}.sha256
+
+  upload:
+    name: Upload to Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: List binaries
+        run: ls -la binaries/
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: binaries/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
