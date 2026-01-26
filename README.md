@@ -1,86 +1,140 @@
 # skillbook
 
-A CLI tool to manage AI coding assistant skills across projects. Stop copy-pasting your Claude Code, Cursor, and OpenCode skills - maintain them in one place and sync to all your projects.
+A CLI tool to manage AI coding assistant skills across projects and teams.
+
+<!-- TODO: Add screenshot/demo image here -->
 
 ## The Problem
 
-**Skill drift across projects.** You work on multiple projects. Each has its own AI assistant skills scattered across `.claude/skills/`, `.cursor/rules/`, `.opencode/skill/`. You improve a skill in Project A, forget to update Projects B-F. They drift. Chaos ensues.
+**Skills drift across your projects.** You work on multiple projects. Each has its own AI assistant skills. You improve a skill in Project A, forget to update Projects B, C, D. They drift apart. You end up with different versions everywhere, unsure which is best.
 
-**Experimentation clutter.** You want to try a new skill - maybe a coding style guide or a review checklist. But committing experimental skills to your project repo feels wrong. You end up with half-baked `.md` files cluttering your projects, or you avoid trying new skills altogether.
+**Skills drift across harnesses.** You use Claude Code, Cursor, and OpenCode. Each stores skills differently. Keeping them in sync manually is tedious and error-prone.
+
+**Skills drift across team members.** Your teammate improves a skill, but you never know. You have a better version, but they're stuck with the old one. There's no shared source of truth.
+
+**No shared learning.** You want to share skills company-wide. But copy-pasting files across repos doesn't scale. You need a central library that everyone can fetch from and update.
 
 ## The Solution
 
-**skillbook** gives you a central library of skills that sync to any project. Try skills freely, toggle them on/off per project, keep your repos clean:
+**skillbook** is a centralized Git repository that serves as your skill library. Projects link to it via sparse checkouts, keeping skills in sync automatically:
 
 ```
-~/.skillbook/skills/            # Your skill library (one source of truth)
-├── typescript/
-├── review-gitlab/
-└── beads/
+~/.skillbook/                    # Central library (Git repo)
+└── skills/
+    ├── typescript/
+    ├── review-gitlab/
+    └── beads/
 
-project-a/.claude/skills/       # Symlinked from library
-project-b/.cursor/rules/        # Same skills, different tool
-project-c/.opencode/skill/      # Always in sync
+project-a/.claude/skills/        # Sparse checkout from library
+project-b/.cursor/rules/         # Same skills, always in sync
+project-c/.opencode/skill/       # Team-wide consistency
 ```
+
+**Share with your team.** Push your library to a shared Git remote. Team members clone it. When you update a skill and push, they pull. Everyone stays in sync.
+
+**Company-wide skill library.** Set up a company repo that everyone can fetch from and contribute to. Best practices propagate automatically.
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Recommended)
 
-- [Bun](https://bun.sh/) runtime installed
+```bash
+curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/main/install.sh | bash
+```
+
+Windows is not supported. Use WSL or run on macOS/Linux.
+
+### Homebrew (coming soon)
+
+```bash
+brew install kurochenko/tap/skillbook
+```
 
 ### From Source
 
+Requires [Bun](https://bun.sh/) runtime.
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/skillbook.git
+git clone https://github.com/kurochenko/skillbook.git
 cd skillbook
-
-# Install dependencies
 bun install
-
-# Run directly
-bun run src/cli.ts --help
-
-# Or link globally for development
 bun link
 ```
 
-### Build Binary (Optional)
+## Updating
+
+skillbook can update itself:
 
 ```bash
-bun run build
-./dist/skillbook --help
+skillbook upgrade
 ```
+
+It also checks for updates automatically and notifies you when a new version is available.
 
 ## Usage
 
-### Quick Start
+### Initialize Your Library
 
 ```bash
-# 1. Add a skill from an existing project to your library
-skillbook add .claude/skills/typescript/SKILL.md
+# Create the central library
+skillbook init
+```
 
-# 2. See what skills are available
-skillbook list
+### Find Skills Across Projects
 
-# 3. Launch the TUI to manage skills in your project
+Run `scan` from a parent directory containing multiple projects:
+
+```bash
+cd ~/projects
+skillbook scan
+```
+
+This finds all skills in subdirectories and lets you add them to your library interactively.
+
+### Project View
+
+Run `skillbook` without arguments inside a project folder:
+
+```bash
+cd my-project
 skillbook
 ```
 
+**Skills tab** shows:
+- Installed skills in the current project
+- Available skills from your library
+- Differences between installed and library versions
+
+**Harness tab** lets you:
+- See which harnesses are installed (Claude Code, Cursor, OpenCode)
+- Install a harness to start syncing skills to it
+- Eject a harness to stop syncing
+
 ### Commands
+
+#### `skillbook` (no args)
+
+Interactive project view. Shows installed vs available skills and their sync status.
+
+#### `skillbook scan`
+
+Scan for skills in subdirectories. Run from a parent folder containing multiple projects.
+
+```bash
+cd ~/projects
+skillbook scan
+# Finds skills in project-a/.claude/skills/, project-b/.cursor/rules/, etc.
+```
 
 #### `skillbook add <path>`
 
-Add a skill from your current project to the central library.
+Add a skill from your current project to the library.
 
 ```bash
-# Add a skill - extracts name from parent folder
 skillbook add .claude/skills/beads/SKILL.md
 # -> Copies to ~/.skillbook/skills/beads/SKILL.md
 
-# Force overwrite if skill exists
-skillbook add .claude/skills/beads/SKILL.md --force
+skillbook add .claude/skills/beads/SKILL.md --force  # Overwrite existing
 ```
 
 #### `skillbook list`
@@ -89,17 +143,17 @@ Show all skills in your library.
 
 ```bash
 skillbook list
+```
 
-# Output:
-# Available skills:
-#   - beads
-#   - typescript
-#   - review-gitlab
+#### `skillbook upgrade`
+
+Update skillbook to the latest version.
+
+```bash
+skillbook upgrade
 ```
 
 ## Skill Library Structure
-
-Skills live in `~/.skillbook/skills/`:
 
 ```
 ~/.skillbook/
@@ -124,71 +178,11 @@ Each skill is a folder containing a `SKILL.md` file. The folder name is the skil
 
 ## Development
 
-### Running Locally
-
 ```bash
-# Run CLI during development
-bun run src/cli.ts <command>
-
-# Or use the dev script
-bun run dev <command>
-
-# Examples
-bun run dev --help
-bun run dev list
-bun run dev add ./path/to/skill.md
+bun run src/cli.ts <command>   # Run during development
+bun test                        # Run tests
+bun run build                   # Build binary
 ```
-
-### Project Structure
-
-```
-src/
-├── cli.ts              # Entry point, launches TUI or subcommands
-├── commands/
-│   ├── add.ts          # skillbook add
-│   ├── list.ts         # skillbook list
-│   └── scan.ts         # skillbook scan
-├── tui/                # Interactive TUI
-│   └── App.tsx         # Main TUI application
-├── lib/
-│   └── ...             # Core utilities
-├── constants.ts        # Tool configurations
-└── types.ts            # TypeScript types
-```
-
-### Running Tests
-
-```bash
-bun test
-```
-
-## Roadmap
-
-### MVP (Current)
-- [x] Project setup
-- [x] `skillbook add` - Add skill to library
-- [x] `skillbook list` - List available skills
-- [x] `skillbook scan` - Find skills across projects
-- [x] Interactive TUI for skill management
-
-### Phase 2
-- [ ] `skillbook status` - Show installed skills in project
-- [ ] Ahead/behind state detection
-- [ ] Version tracking
-
-### Phase 3
-- [ ] Skill composition (skills referencing other skills)
-- [ ] Team library sharing
-
-## Why Not Use Existing Tools?
-
-We evaluated [skillshare](https://github.com/runkids/skillshare), [agent-resources](https://github.com/kasperjunge/agent-resources), [craftdesk](https://github.com/mensfeld/craftdesk), and [glooit](https://github.com/nikuscs/glooit). Each solves part of the problem, but none offer:
-
-1. **Add from project** - Most are pull-only from registries
-2. **Interactive selection** - Most use config files
-3. **Multi-tool symlinks** - With a simple, no-config approach
-
-skillbook aims to be the simplest possible thing that works.
 
 ## License
 
