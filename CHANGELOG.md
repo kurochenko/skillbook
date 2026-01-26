@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/kurochenko/skillbook/compare/v0.1.3...v0.1.4) (2026-01-26)
+
+
+### Features
+
+* test release-please ([1862943](https://github.com/kurochenko/skillbook/commit/1862943bc45b4a3f8f41d71e1a12a06b383f4dc1))
+
 ## [0.1.3](https://github.com/kurochenko/skillbook/compare/v0.1.2...v0.1.3) (2026-01-26)
 
 
