@@ -354,8 +354,7 @@ main() {
 		echo ""
 		success "Installation complete!"
 		echo ""
-		echo "Run 'skillbook --help' to get started."
-		echo "Run 'skillbook upgrade' to update to new versions."
+		echo "Run 'skillbook' to get started."
 		echo ""
 	fi
 }

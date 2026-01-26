@@ -1,50 +1,96 @@
 #!/usr/bin/env bun
+import { existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineCommand, runMain } from 'citty'
 import pc from 'picocolors'
 import { VERSION, checkForUpdate } from '@/lib/version'
 
-const args = process.argv.slice(2)
-const hasSubcommand = args.length > 0 && !args[0]?.startsWith('-')
-const isHelpOrVersion = args.includes('--help') || args.includes('-h') || args.includes('--version')
-const isVersionFlag = args.includes('--version') || args.includes('-v')
+const SUBCOMMANDS = ['add', 'list', 'scan', 'upgrade']
 
-if (isVersionFlag) {
-  process.stdout.write(`${VERSION}\n`)
-  process.exit(0)
-}
+const out = (s: string) => process.stdout.write(`${s}\n`)
+const err = (s: string) => process.stderr.write(`${s}\n`)
 
-async function showUpdateBannerIfNeeded(): Promise<void> {
+const showUpdateBanner = async () => {
   try {
     const { updateAvailable, latestVersion } = await checkForUpdate()
     if (updateAvailable && latestVersion) {
-      console.log()
-      console.log(pc.cyan(`  Update available: ${pc.yellow(VERSION)} -> ${pc.green(latestVersion)}`))
-      console.log(pc.dim(`  Run 'skillbook upgrade' to update`))
-      console.log()
+      out('')
+      out(pc.cyan(`  Update available: ${pc.yellow(VERSION)} -> ${pc.green(latestVersion)}`))
+      out(pc.dim(`  Run 'skillbook upgrade' to update`))
+      out('')
     }
-  } catch {
-    return
-  }
+  } catch {}
 }
 
-if (!hasSubcommand && !isHelpOrVersion) {
+const helpText = () => `
+${pc.bold(pc.cyan('skillbook'))}${pc.dim(` v${VERSION}`)}
+
+Manage AI coding assistant skills in one place.
+Create skills once, reuse them across all your projects.
+
+${pc.bold('GETTING STARTED')}
+
+${pc.dim('  1.')} Build your skill library by scanning your projects root:
+${pc.cyan('     skillbook scan ~/projects')}
+${pc.dim('     Finds skills across projects and lets you choose which to add.')}
+
+${pc.dim('  2.')} Open the interactive manager in any project:
+${pc.cyan('     cd my-project && skillbook')}
+${pc.dim('     Or specify a path: ')}${pc.cyan('skillbook ~/projects/my-app')}
+
+${pc.bold('COMMANDS')}
+
+${pc.cyan('  skillbook')}${pc.dim('                Open TUI (in project directory)')}
+${pc.cyan('  skillbook <path>')}${pc.dim('         Open TUI for specific path')}
+${pc.cyan('  skillbook scan [path]')}${pc.dim('    Scan and import skills to library')}
+${pc.cyan('  skillbook list')}${pc.dim('           List skills in your library')}
+${pc.cyan('  skillbook add <source>')}${pc.dim('   Add skill from URL or path')}
+${pc.cyan('  skillbook upgrade')}${pc.dim('        Upgrade to latest version')}
+
+${pc.dim("Tip: alias sb='skillbook' for quick access")}
+`
+
+const showHelp = () => out(helpText())
+
+const validatePath = (pathArg: string): string => {
+  const resolved = resolve(pathArg)
+  if (!existsSync(resolved)) {
+    err(pc.red(`Error: Path does not exist: ${resolved}`))
+    process.exit(1)
+  }
+  if (!statSync(resolved).isDirectory()) {
+    err(pc.red(`Error: Path is not a directory: ${resolved}`))
+    process.exit(1)
+  }
+  return resolved
+}
+
+const openTUI = async (pathArg?: string) => {
   const { runTUI } = await import('@/tui/App')
   const { detectProjectContext } = await import('@/lib/project-scan')
 
   if (!process.stdin.isTTY) {
-    console.error('Error: skillbook TUI requires an interactive terminal.')
-    console.error('Run a subcommand instead: skillbook --help')
+    err('Error: skillbook TUI requires an interactive terminal.')
+    err('Run a subcommand instead: skillbook --help')
     process.exit(1)
   }
 
-  showUpdateBannerIfNeeded()
+  if (pathArg) {
+    void showUpdateBanner()
+    runTUI(validatePath(pathArg), true)
+    return
+  }
 
-  const detectedPath = detectProjectContext()
-  const projectPath = detectedPath ?? process.cwd()
-  const inProject = detectedPath !== null
+  const detected = detectProjectContext()
+  if (detected) {
+    void showUpdateBanner()
+    runTUI(detected, true)
+  } else {
+    showHelp()
+  }
+}
 
-  runTUI(projectPath, inProject)
-} else {
+const runSubcommand = () => {
   const main = defineCommand({
     meta: {
       name: 'skillbook',
@@ -58,6 +104,31 @@ if (!hasSubcommand && !isHelpOrVersion) {
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
   })
-
   runMain(main)
 }
+
+const main = () => {
+  const args = process.argv.slice(2)
+  const firstArg = args[0]
+
+  if (args.includes('--version') || args.includes('-v')) {
+    out(VERSION)
+    return
+  }
+
+  const isHelp = args.includes('--help') || args.includes('-h')
+  const isSubcommand = firstArg && SUBCOMMANDS.includes(firstArg)
+  const isPath = firstArg && !firstArg.startsWith('-') && !isSubcommand
+
+  if (isHelp && !isSubcommand) {
+    showHelp()
+  } else if (isSubcommand) {
+    runSubcommand()
+  } else if (isPath) {
+    void openTUI(firstArg)
+  } else {
+    void openTUI()
+  }
+}
+
+main()

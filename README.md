@@ -61,6 +61,8 @@ bun install
 bun link
 ```
 
+Once installed, run `skillbook` to see how to get started.
+
 ## Updating
 
 skillbook can update itself:
