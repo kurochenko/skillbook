@@ -14,7 +14,7 @@ import {
 type UpgradeInfo = {
   updateAvailable: boolean
   currentVersion: string
-  latestVersion: string
+  latestVersion: string | null
 }
 
 const safeUnlink = (path: string): void => {
@@ -38,14 +38,18 @@ const formatError = (error: unknown): string =>
 
 const fetchUpgradeInfo = async (
   spinner: ReturnType<typeof p.spinner>,
-): Promise<UpgradeInfo | null> => {
+): Promise<UpgradeInfo> => {
   spinner.start('Checking for updates...')
 
   const { updateAvailable, currentVersion, latestVersion } = await checkForUpdate()
 
   if (!latestVersion) {
     spinner.stop('Could not check for updates')
-    return null
+    return {
+      updateAvailable: false,
+      currentVersion,
+      latestVersion: null,
+    }
   }
 
   spinner.stop(`Current: ${pc.yellow(currentVersion)} | Latest: ${pc.green(latestVersion)}`)
@@ -59,10 +63,14 @@ const fetchUpgradeInfo = async (
 
 const confirmUpgrade = async (
   currentVersion: string,
-  latestVersion: string,
+  latestVersion: string | null,
 ): Promise<boolean> => {
+  const message = latestVersion
+    ? `Upgrade from ${pc.yellow(currentVersion)} to ${pc.green(latestVersion)}?`
+    : 'Install the latest release?'
+
   const shouldUpgrade = await p.confirm({
-    message: `Upgrade from ${pc.yellow(currentVersion)} to ${pc.green(latestVersion)}?`,
+    message,
     initialValue: true,
   })
 
@@ -118,15 +126,13 @@ export default defineCommand({
     const spinner = p.spinner()
     const info = await fetchUpgradeInfo(spinner)
 
-    if (!info) {
-      p.log.error('Failed to fetch latest version from GitHub.')
-      p.log.info('Check your internet connection or try again later.')
-      process.exit(1)
-    }
-
     const { updateAvailable, currentVersion, latestVersion } = info
 
-    if (!updateAvailable && !args.force) {
+    if (!latestVersion && !args.force) {
+      p.log.warn('Could not determine latest version. Installing latest release.')
+    }
+
+    if (latestVersion && !updateAvailable && !args.force) {
       p.log.success('You are already on the latest version!')
       p.outro('Nothing to do.')
       return
@@ -139,7 +145,7 @@ export default defineCommand({
     const shouldUpgrade = await confirmUpgrade(currentVersion, latestVersion)
     if (!shouldUpgrade) return
 
-    const downloadUrl = getDownloadUrl(latestVersion)
+    const downloadUrl = getDownloadUrl(latestVersion ?? 'latest')
     const installPath = getInstallPath()
     const tempPath = `${installPath}.new`
 
@@ -155,7 +161,11 @@ export default defineCommand({
       installBinary(installPath, tempPath)
       spinner.stop('Installed successfully')
 
-      p.log.success(`Upgraded to ${pc.green(`v${latestVersion}`)}`)
+      if (latestVersion) {
+        p.log.success(`Upgraded to ${pc.green(`v${latestVersion}`)}`)
+      } else {
+        p.log.success('Upgraded to the latest release')
+      }
       p.outro('Run `skillbook --version` to verify.')
     } catch (error) {
       spinner.stop('Upgrade failed')

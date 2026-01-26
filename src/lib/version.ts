@@ -47,7 +47,7 @@ const writeCache = (cache: UpdateCache): void => {
   }
 }
 
-const fetchLatestVersion = async (): Promise<string | null> => {
+const fetchLatestTagFromApi = async (): Promise<string | null> => {
   try {
     const response = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
@@ -65,13 +65,52 @@ const fetchLatestVersion = async (): Promise<string | null> => {
     const tag = data.tag_name
     if (!tag) return null
 
-    return tag.startsWith('v') ? tag.slice(1) : tag
+    return tag
   } catch {
     return null
   }
 }
 
+const extractTagFromUrl = (url: string): string | null => {
+  const match = url.match(/\/releases\/tag\/([^/]+)$/)
+  return match ? match[1] ?? null : null
+}
+
+const fetchLatestTagFromRedirect = async (): Promise<string | null> => {
+  try {
+    const response = await fetch(`https://github.com/${GITHUB_REPO}/releases/latest`, {
+      method: 'HEAD',
+      redirect: 'manual',
+    })
+
+    const location = response.headers.get('location')
+    if (location) return extractTagFromUrl(location)
+
+    if (response.url) return extractTagFromUrl(response.url)
+    return null
+  } catch {
+    return null
+  }
+}
+
+const fetchLatestTag = async (): Promise<string | null> => {
+  const apiTag = await fetchLatestTagFromApi()
+  if (apiTag) return apiTag
+  return fetchLatestTagFromRedirect()
+}
+
 const normalizeVersion = (value: string): string | null => clean(value, { loose: true })
+
+const normalizeTagToVersion = (tag: string): string | null => {
+  const stripped = tag.replace(/^skillbook-/, '').replace(/^v/, '')
+  return normalizeVersion(stripped)
+}
+
+const fetchLatestVersion = async (): Promise<string | null> => {
+  const tag = await fetchLatestTag()
+  if (!tag) return null
+  return normalizeTagToVersion(tag)
+}
 
 const isNewerVersion = (current: string, latest: string): boolean => {
   if (current === 'dev') return false
@@ -93,7 +132,7 @@ export const checkForUpdate = async (): Promise<UpdateCheckResult> => {
   const cache = readCache()
   const now = Date.now()
 
-  if (cache && now - cache.lastCheck < CHECK_INTERVAL_MS) {
+  if (cache && cache.latestVersion && now - cache.lastCheck < CHECK_INTERVAL_MS) {
     return {
       updateAvailable: cache.latestVersion
         ? isNewerVersion(VERSION, cache.latestVersion)
@@ -132,9 +171,16 @@ export const getPlatformBinary = (): string => {
   throw new Error(`Unsupported platform: ${platform}-${arch}`)
 }
 
-export const getDownloadUrl = (version: string): string => {
+export const getDownloadUrl = (tagOrVersion: string): string => {
   const binary = getPlatformBinary()
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${binary}`
+  if (tagOrVersion === 'latest') {
+    return `https://github.com/${GITHUB_REPO}/releases/latest/download/${binary}`
+  }
+
+  const tag = tagOrVersion.startsWith('v') || tagOrVersion.startsWith('skillbook-')
+    ? tagOrVersion
+    : `v${tagOrVersion}`
+  return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${binary}`
 }
 
 export const getInstallPath = (): string => {
