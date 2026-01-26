@@ -64,7 +64,14 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#skillbook-v}
+          VERSION=${VERSION#skillbook-}
+          VERSION=${VERSION#v}
+          if [ -z "$VERSION" ]; then
+            echo "Could not parse version from tag: $TAG"
+            exit 1
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 

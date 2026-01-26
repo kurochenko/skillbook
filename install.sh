@@ -85,12 +85,20 @@ get_latest_version() {
 	local url="https://api.github.com/repos/${REPO}/releases/latest"
 
 	if command -v curl &>/dev/null; then
-		curl -fsSL "$url" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
+		curl -fsSL "$url" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p'
 	elif command -v wget &>/dev/null; then
-		wget -qO- "$url" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
+		wget -qO- "$url" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p'
 	else
 		error "Neither curl nor wget found. Please install one of them."
 	fi
+}
+
+normalize_version() {
+	local version="$1"
+	version="${version#skillbook-v}"
+	version="${version#skillbook-}"
+	version="${version#v}"
+	echo "$version"
 }
 
 # Download file
@@ -206,6 +214,13 @@ main() {
 			version="latest"
 		fi
 	fi
+
+	if [ "$version" != "latest" ]; then
+		version=$(normalize_version "$version")
+		if [ -z "$version" ]; then
+			error "Could not parse version tag. Please set SKILLBOOK_VERSION explicitly."
+		fi
+	fi
 	info "Installing version: ${version}"
 
 	# Prepare install directory
@@ -215,7 +230,7 @@ main() {
 	local download_url=$(get_download_url "$os" "$arch" "$version")
 	local tmp_file
 	tmp_file=$(mktemp)
-	trap 'rm -f "$tmp_file"' EXIT
+	trap 'rm -f "${tmp_file:-}"' EXIT
 	download "$download_url" "$tmp_file"
 	verify_checksum "$tmp_file" "$download_url"
 
