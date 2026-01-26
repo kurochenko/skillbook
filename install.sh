@@ -3,10 +3,10 @@
 # skillbook installer
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/master/install.sh | bash
 #
 # Options (via environment variables):
-#   SKILLBOOK_INSTALL_DIR - Installation directory (default: ~/.local/bin)
+#   SKILLBOOK_INSTALL_DIR - Installation directory (default: /usr/local/bin if writable and on PATH, else ~/.local/bin)
 #   SKILLBOOK_VERSION     - Specific version to install (default: latest)
 #
 # This script:
@@ -19,7 +19,6 @@
 set -euo pipefail
 
 REPO="kurochenko/skillbook"
-INSTALL_DIR="${SKILLBOOK_INSTALL_DIR:-$HOME/.local/bin}"
 BINARY_NAME="skillbook"
 
 # Colors for output
@@ -191,6 +190,68 @@ is_in_path() {
 	esac
 }
 
+is_writable_dir() {
+	local dir="$1"
+	[ -d "$dir" ] && [ -w "$dir" ]
+}
+
+is_writable_target() {
+	local target="$1"
+	if [ -e "$target" ]; then
+		[ -w "$target" ]
+		return
+	fi
+
+	local dir
+	dir=$(dirname "$target")
+	[ -d "$dir" ] && [ -w "$dir" ]
+}
+
+detect_install_dir() {
+	if [ -n "${SKILLBOOK_INSTALL_DIR:-}" ]; then
+		echo "$SKILLBOOK_INSTALL_DIR"
+		return
+	fi
+
+	if is_in_path "/usr/local/bin" && is_writable_dir "/usr/local/bin"; then
+		echo "/usr/local/bin"
+		return
+	fi
+
+	local local_bin="$HOME/.local/bin"
+	if is_in_path "$local_bin"; then
+		echo "$local_bin"
+		return
+	fi
+
+	echo "$local_bin"
+}
+
+add_path_to_shell_config() {
+	local dir="$1"
+	local shell_config
+	local shell_name
+	local line
+	local config_dir
+
+	shell_config=$(get_shell_config)
+	shell_name=$(basename "$SHELL")
+	config_dir=$(dirname "$shell_config")
+
+	if [ "$shell_name" = "fish" ]; then
+		line="set -gx PATH \"${dir}\" \$PATH"
+	else
+		line="export PATH=\"${dir}:\$PATH\""
+	fi
+
+	mkdir -p "$config_dir"
+	if [ -f "$shell_config" ] && grep -Fqs "$line" "$shell_config"; then
+		return 0
+	fi
+
+	printf "\n%s\n" "$line" >> "$shell_config"
+}
+
 # Get shell config file
 get_shell_config() {
 	case "$(basename "$SHELL")" in
@@ -238,6 +299,13 @@ main() {
 	fi
 	info "Installing version: ${version}"
 
+	local INSTALL_DIR
+	local install_dir_from_env=0
+	if [ -n "${SKILLBOOK_INSTALL_DIR:-}" ]; then
+		install_dir_from_env=1
+	fi
+	INSTALL_DIR=$(detect_install_dir)
+
 	# Prepare install directory
 	mkdir -p "$INSTALL_DIR"
 
@@ -251,6 +319,16 @@ main() {
 
 	# Install binary
 	local install_path="${INSTALL_DIR}/${BINARY_NAME}"
+	if ! is_writable_target "$install_path"; then
+		if [ "$install_dir_from_env" -eq 1 ]; then
+			error "${INSTALL_DIR} is not writable. Try:\n  sudo env SKILLBOOK_INSTALL_DIR=${INSTALL_DIR} bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/${REPO}/master/install.sh)\""
+		fi
+
+		warn "${install_path} is not writable. Falling back to ~/.local/bin"
+		INSTALL_DIR="$HOME/.local/bin"
+		install_path="${INSTALL_DIR}/${BINARY_NAME}"
+		mkdir -p "$INSTALL_DIR"
+	fi
 
 	mv "$tmp_file" "$install_path"
 	trap - EXIT
@@ -261,28 +339,13 @@ main() {
 	# Check if in PATH
 	if ! is_in_path "$INSTALL_DIR"; then
 		warn "${INSTALL_DIR} is not in your PATH"
+		add_path_to_shell_config "$INSTALL_DIR"
 
 		local shell_config=$(get_shell_config)
-		local shell_name=$(basename "$SHELL")
-
 		echo ""
-		echo "Add this to your ${shell_config}:"
-		echo ""
-
-		if [ "$shell_name" = "fish" ]; then
-			echo "  set -gx PATH \"${INSTALL_DIR}\" \$PATH"
-		else
-			echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
-		fi
-
-		echo ""
-		echo "Then restart your terminal or run:"
-		echo ""
-		if [ "$shell_name" = "fish" ]; then
-			echo "  source ${shell_config}"
-		else
-			echo "  source ${shell_config}"
-		fi
+		echo "Added to PATH in ${shell_config}"
+		echo "Reload your shell:"
+		echo "  source ${shell_config}"
 		echo ""
 	fi
 
