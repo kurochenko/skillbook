@@ -36,6 +36,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Skills (managed separately)
 SKILL.md
 
+# Harness folders (local config)
+.opencode
+.claude
+.cursor
+
 # Beads issue tracker
 .beads
 
