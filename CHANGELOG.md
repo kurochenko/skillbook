@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.6](https://github.com/kurochenko/skillbook/compare/v0.1.5...v0.1.6) (2026-01-26)
+
+
+### Features
+
+* add version command ([1eaff4d](https://github.com/kurochenko/skillbook/commit/1eaff4d808d050e57fc717d7694a9460d8d09147))
+* improved help section ([#10](https://github.com/kurochenko/skillbook/issues/10)) ([a8bd85d](https://github.com/kurochenko/skillbook/commit/a8bd85dc294055d915c6da106b3f5a95a6c9a26d))
+* install skillbook skill into library on upgrade ([#13](https://github.com/kurochenko/skillbook/issues/13)) ([a3c41d5](https://github.com/kurochenko/skillbook/commit/a3c41d5624b13cd567364931fe4869910a07213d))
+
+
+### Bug Fixes
+
+* add "behind" sync status ([#12](https://github.com/kurochenko/skillbook/issues/12)) ([7bf98e2](https://github.com/kurochenko/skillbook/commit/7bf98e21477a9ec4a286ff5c69b5b7f9594dba87))
+* upgrade command ([d2105fb](https://github.com/kurochenko/skillbook/commit/d2105fbf5c827f0e344d4f8d502fe92f47a78cb5))
+
 ## [0.1.5](https://github.com/kurochenko/skillbook/compare/v0.1.4...v0.1.5) (2026-01-26)
 
 
