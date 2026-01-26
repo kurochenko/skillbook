@@ -29,7 +29,10 @@ const SKILL_STATUS_BADGE: Record<SkillSyncStatus, BadgeConfig> = {
     text: (diff) => diff ? `[ahead +${diff.additions}/-${diff.deletions}]` : '[ahead]',
     color: 'yellow',
   },
-  behind: { text: '[behind]', color: 'cyan' },
+  behind: {
+    text: (diff) => diff ? `[behind +${diff.additions}/-${diff.deletions}]` : '[behind]',
+    color: 'cyan',
+  },
   detached: { text: '[detached]', color: 'gray' },
   conflict: {
     text: (diff) => diff ? `[conflict +${diff.additions}/-${diff.deletions}]` : '[conflict]',
