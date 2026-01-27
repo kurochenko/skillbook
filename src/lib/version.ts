@@ -128,7 +128,12 @@ export type UpdateCheckResult = {
   latestVersion: string | null
 }
 
-export const checkForUpdate = async (skipCache = false): Promise<UpdateCheckResult> => {
+type UpdateCheckOptions = {
+  skipCache?: boolean
+}
+
+export const checkForUpdate = async (options: UpdateCheckOptions = {}): Promise<UpdateCheckResult> => {
+  const { skipCache } = options
   const cache = readCache()
   const now = Date.now()
 

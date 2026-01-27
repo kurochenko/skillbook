@@ -42,7 +42,7 @@ const fetchUpgradeInfo = async (
 ): Promise<UpgradeInfo> => {
   spinner.start('Checking for updates...')
 
-  const { updateAvailable, currentVersion, latestVersion } = await checkForUpdate(true)
+  const { updateAvailable, currentVersion, latestVersion } = await checkForUpdate({ skipCache: true })
 
   if (!latestVersion) {
     spinner.stop('Could not check for updates')
