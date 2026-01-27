@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/kurochenko/skillbook/compare/v0.1.7...v0.1.8) (2026-01-27)
+
+
+### Features
+
+* add opt-in logging and surface harness failures ([#20](https://github.com/kurochenko/skillbook/issues/20)) ([541e296](https://github.com/kurochenko/skillbook/commit/541e296acf154f2018d8ab54b8be46de2840ab7b))
+
 ## [0.1.7](https://github.com/kurochenko/skillbook/compare/v0.1.6...v0.1.7) (2026-01-27)
 
 
