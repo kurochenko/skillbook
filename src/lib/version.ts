@@ -128,11 +128,17 @@ export type UpdateCheckResult = {
   latestVersion: string | null
 }
 
-export const checkForUpdate = async (): Promise<UpdateCheckResult> => {
+type UpdateCheckOptions = {
+  skipCache?: boolean
+}
+
+export const checkForUpdate = async (options: UpdateCheckOptions = {}): Promise<UpdateCheckResult> => {
+  const { skipCache } = options
   const cache = readCache()
   const now = Date.now()
 
-  if (cache && cache.latestVersion && now - cache.lastCheck < CHECK_INTERVAL_MS) {
+  const cacheValid = cache && cache.latestVersion && now - cache.lastCheck < CHECK_INTERVAL_MS
+  if (!skipCache && cacheValid) {
     return {
       updateAvailable: cache.latestVersion
         ? isNewerVersion(VERSION, cache.latestVersion)
