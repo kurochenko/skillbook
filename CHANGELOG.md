@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.7](https://github.com/kurochenko/skillbook/compare/v0.1.6...v0.1.7) (2026-01-27)
+
+
+### Features
+
+* add remove action for detached/conflict skills ([#14](https://github.com/kurochenko/skillbook/issues/14)) ([e69d797](https://github.com/kurochenko/skillbook/commit/e69d7976dad965ba678b1bf0e725118ca0f3bb9a))
+
+
+### Bug Fixes
+
+* skip cache in upgrade command to get fresh version data ([#15](https://github.com/kurochenko/skillbook/issues/15)) ([1aec052](https://github.com/kurochenko/skillbook/commit/1aec052ca864b17f71cc91daf14df8aa8784bfa4))
+
 ## [0.1.6](https://github.com/kurochenko/skillbook/compare/v0.1.5...v0.1.6) (2026-01-26)
 
 
