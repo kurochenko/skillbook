@@ -2,6 +2,11 @@
 
 A CLI tool to manage AI coding assistant skills across projects and teams.
 
+**Install:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/main/install.sh | bash
+```
+
 <!-- TODO: Add screenshot/demo image here -->
 
 ## The Problem
