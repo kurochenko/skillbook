@@ -15,8 +15,8 @@ const SKILL_STATUS_ACTIONS: Record<SkillSyncStatus, string[]> = {
   ok: ['[u]ninstall'],
   ahead: ['[p]ush', '[u]ninstall'],
   behind: ['[s]ync', '[u]ninstall'],
-  detached: ['[s]ync', '[u]ninstall'],
-  conflict: ['[s]ync (use library)', '[p]ush (use local)', '[u]ninstall'],
+  detached: ['[s]ync', '[r]emove'],
+  conflict: ['[s]ync (use library)', '[p]ush (use local)', '[r]emove'],
 }
 
 const HARNESS_STATE_ACTIONS: Record<HarnessState, string[]> = {

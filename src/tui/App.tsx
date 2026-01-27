@@ -3,6 +3,7 @@ import { render, Box, Text } from 'ink'
 import {
   installSkill,
   uninstallSkill,
+  removeSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
   type SkillActionResult,
@@ -132,6 +133,9 @@ const App = ({ projectPath, inProject }: AppProps) => {
       case 'u':
         handleUninstall()
         break
+      case 'r':
+        handleRemove()
+        break
       case 'p':
         handlePush()
         break
@@ -183,6 +187,13 @@ const App = ({ projectPath, inProject }: AppProps) => {
   const handleUninstall = () => {
     if (selectedRow?.type !== 'installed-skill') return
     void runAction(uninstallSkill(projectPath, selectedRow.skill.name), () => loadData())
+  }
+
+  const handleRemove = () => {
+    if (selectedRow?.type !== 'installed-skill') return
+    const { status } = selectedRow.skill
+    if (status !== 'detached' && status !== 'conflict') return
+    void runAction(removeSkill(projectPath, selectedRow.skill.name), () => loadData())
   }
 
   const handlePush = () => {
