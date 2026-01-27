@@ -36,6 +36,9 @@ export const initLogger = (options: {
   }
 }
 
+export const isLoggingEnabled = (): boolean =>
+  Boolean(loggerConfig && (loggerConfig.logToFile || loggerConfig.logToStderr))
+
 const ensureLogDir = (filePath: string): void => {
   const dir = dirname(filePath)
   if (!existsSync(dir)) {
@@ -105,6 +108,7 @@ export const logError = (message: string, error?: unknown, context?: LogContext)
   writeLog('error', message, context, error)
 
 export const isIgnoredFsError = (error: unknown): boolean => {
+  if (isLoggingEnabled()) return false
   if (!error || typeof error !== 'object') return false
   const code = (error as NodeJS.ErrnoException).code
   return code === 'ENOENT' || code === 'ENOTDIR'
