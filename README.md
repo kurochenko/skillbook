@@ -19,6 +19,16 @@ curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/master/install
 
 **No shared learning.** You want to share skills company-wide. But copy-pasting files across repos doesn't scale. You need a central library that everyone can fetch from and update.
 
+## Why not just ~/.claude?
+
+A single global folder works if you only use Claude Code and you are solo. It breaks down when you:
+
+- Use multiple harnesses (Cursor, OpenCode) with different formats and locations
+- Need team sharing, review, and version history for skills
+- Want skills versioned per project so collaborators get the same behavior
+- Want project-scoped skill sets instead of a global dump (JS vs Java, frontend vs backend)
+- Need diffs and auditability between library and project copies
+
 ## The Solution
 
 **skillbook** is a centralized Git repository that serves as your skill library. Projects link to it via sparse checkouts, keeping skills in sync automatically:
