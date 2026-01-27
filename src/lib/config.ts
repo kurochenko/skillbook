@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { SKILLBOOK_DIR, SKILLS_DIR } from '@/constants'
+import { logError } from '@/lib/logger'
 
 export const CONFIG_FILE = 'config.json'
 
@@ -47,7 +48,8 @@ export const readConfig = (projectPath: string): ProjectConfig | null => {
     return {
       harnesses: parsed.harnesses ?? DEFAULT_CONFIG.harnesses,
     }
-  } catch {
+  } catch (error) {
+    logError('Failed to read config', error, { configPath })
     return null
   }
 }

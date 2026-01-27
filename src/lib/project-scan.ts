@@ -9,6 +9,7 @@ import {
 } from '@/lib/library'
 import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import { isSkillSymlinked } from '@/lib/symlinks'
+import { isIgnoredFsError, logError } from '@/lib/logger'
 
 export type SkillSyncStatus = 'ok' | 'ahead' | 'behind' | 'detached' | 'conflict'
 export type HarnessSkillStatus = 'ok' | 'detached' | 'conflict'
@@ -79,7 +80,10 @@ export const detectProjectContext = (startPath: string = process.cwd()): string 
 const readFileSafe = (path: string): string | null => {
   try {
     return readFileSync(path, 'utf-8')
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read file', error, { path })
+    }
     return null
   }
 }
@@ -94,7 +98,8 @@ const scanHarnessForSkills = (projectPath: string, harnessId: ToolId): ScannedSk
   let entries: string[]
   try {
     entries = readdirSync(skillsDir)
-  } catch {
+  } catch (error) {
+    logError('Failed to read harness directory', error, { skillsDir, harnessId })
     return []
   }
 
@@ -106,7 +111,10 @@ const scanHarnessForSkills = (projectPath: string, harnessId: ToolId): ScannedSk
       try {
         const stat = statSync(entryPath)
         isDir = stat.isDirectory()
-      } catch {
+      } catch (error) {
+        if (!isIgnoredFsError(error)) {
+          logError('Failed to stat harness entry', error, { entryPath, harnessId })
+        }
         continue
       }
       if (!isDir) continue

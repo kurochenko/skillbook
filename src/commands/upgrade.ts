@@ -11,6 +11,7 @@ import {
   getPlatformBinary,
 } from '@/lib/version'
 import { ensureDefaultSkills } from '@/lib/library'
+import { logError, logWarn } from '@/lib/logger'
 
 type UpgradeInfo = {
   updateAvailable: boolean
@@ -21,16 +22,16 @@ type UpgradeInfo = {
 const safeUnlink = (path: string): void => {
   try {
     unlinkSync(path)
-  } catch {
-    return
+  } catch (error) {
+    logWarn('Failed to unlink path during upgrade', error, { path })
   }
 }
 
 const safeRename = (from: string, to: string): void => {
   try {
     renameSync(from, to)
-  } catch {
-    return
+  } catch (error) {
+    logWarn('Failed to rename path during upgrade', error, { from, to })
   }
 }
 
@@ -173,6 +174,8 @@ export default defineCommand({
     } catch (error) {
       spinner.stop('Upgrade failed')
       safeUnlink(tempPath)
+
+      logError('Upgrade failed', error, { downloadUrl, installPath })
 
       p.log.error(`Failed to upgrade: ${formatError(error)}`)
       p.log.info('You can try manually downloading from:')

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { getLibraryPath } from '@/lib/paths'
 import { runGit } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '@/constants'
+import { isIgnoredFsError, logError } from '@/lib/logger'
 
 export type SparseCheckoutResult =
   | { success: true }
@@ -225,7 +226,10 @@ export const getSparseCheckoutSkills = (projectPath: string): string[] => {
       .filter((entry) => existsSync(join(skillsPath, entry.name, SKILL_FILE)))
       .map((entry) => entry.name)
       .sort()
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read sparse checkout skills', error, { skillsPath })
+    }
     return []
   }
 }

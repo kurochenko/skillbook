@@ -4,11 +4,34 @@ import { resolve } from 'node:path'
 import { defineCommand, runMain } from 'citty'
 import pc from 'picocolors'
 import { VERSION, checkForUpdate } from '@/lib/version'
+import { initLogger, logWarn } from '@/lib/logger'
 
 const SUBCOMMANDS = ['add', 'list', 'scan', 'upgrade']
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
 const err = (s: string) => process.stderr.write(`${s}\n`)
+
+const parseLogFlags = (args: string[]) => {
+  let logToFile = false
+  let logToStderr = false
+  const filteredArgs: string[] = []
+
+  for (const arg of args) {
+    if (arg === '--log') {
+      logToFile = true
+      continue
+    }
+
+    if (arg === '--log-stderr') {
+      logToStderr = true
+      continue
+    }
+
+    filteredArgs.push(arg)
+  }
+
+  return { logToFile, logToStderr, filteredArgs }
+}
 
 const showUpdateBanner = async () => {
   try {
@@ -19,7 +42,9 @@ const showUpdateBanner = async () => {
       out(pc.dim(`  Run 'skillbook upgrade' to update`))
       out('')
     }
-  } catch {}
+  } catch (error) {
+    logWarn('Failed to check for updates', error)
+  }
 }
 
 const helpText = () => `
@@ -46,6 +71,11 @@ ${pc.cyan('  skillbook scan [path]')}${pc.dim('    Scan and import skills to lib
 ${pc.cyan('  skillbook list')}${pc.dim('           List skills in your library')}
 ${pc.cyan('  skillbook add <source>')}${pc.dim('   Add skill from URL or path')}
 ${pc.cyan('  skillbook upgrade')}${pc.dim('        Upgrade to latest version')}
+
+${pc.bold('OPTIONS')}
+
+${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.skillbook/logs/skillbook.log')}
+${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
 
 ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 `
@@ -108,7 +138,11 @@ const runSubcommand = () => {
 }
 
 const main = () => {
-  const args = process.argv.slice(2)
+  const parsed = parseLogFlags(process.argv.slice(2))
+  initLogger({ logToFile: parsed.logToFile, logToStderr: parsed.logToStderr })
+
+  const args = parsed.filteredArgs
+  process.argv = [process.argv[0], process.argv[1], ...args]
   const firstArg = args[0]
 
   if (args.includes('--version') || args.includes('-v')) {

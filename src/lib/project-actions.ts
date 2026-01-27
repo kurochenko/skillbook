@@ -3,6 +3,8 @@ import { join } from 'path'
 import { detectHarnesses, getEnabledHarnesses } from '@/lib/harness'
 import { getSkillContent, addSkillToLibrary } from '@/lib/library'
 import { SKILL_FILE, TOOLS } from '@/constants'
+import { type ActionResult } from '@/lib/action-result'
+import { isIgnoredFsError, logError } from '@/lib/logger'
 import {
   isSkillbookInitialized,
   initSparseCheckout,
@@ -17,14 +19,15 @@ import {
   convertToSymlink,
 } from '@/lib/symlinks'
 
-export type SkillActionResult =
-  | { success: true }
-  | { success: false; error: string }
+export type SkillActionResult = ActionResult
 
 const readFileSafe = (path: string): string | null => {
   try {
     return readFileSync(path, 'utf-8')
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read file', error, { path })
+    }
     return null
   }
 }
@@ -70,7 +73,7 @@ const findSkillContentInHarnesses = (projectPath: string, skillName: string): st
 export const installSkill = async (
   projectPath: string,
   skillName: string,
-): Promise<SkillActionResult> => {
+): Promise<ActionResult> => {
   const libraryContent = getSkillContent(skillName)
   if (libraryContent === null) {
     return { success: false, error: 'Skill not found in library' }
@@ -91,9 +94,12 @@ export const installSkill = async (
 export const uninstallSkill = async (
   projectPath: string,
   skillName: string,
-): Promise<SkillActionResult> => {
+): Promise<ActionResult> => {
   const allHarnesses = detectHarnesses(projectPath)
-  removeSymlinksForSkill(projectPath, allHarnesses, skillName)
+  const removeResult = removeSymlinksForSkill(projectPath, allHarnesses, skillName)
+  if (!removeResult.success) {
+    return { success: false, error: `Failed to remove symlinks: ${removeResult.error}` }
+  }
 
   if (isSkillbookInitialized(projectPath)) {
     const removeResult = await removeFromSparseCheckout(projectPath, skillName)
@@ -108,7 +114,7 @@ export const uninstallSkill = async (
 export const removeSkill = async (
   projectPath: string,
   skillName: string,
-): Promise<SkillActionResult> => {
+): Promise<ActionResult> => {
   const allHarnesses = detectHarnesses(projectPath)
   const filesResult = removeFilesForSkill(projectPath, allHarnesses, skillName)
   if (!filesResult.success) {
@@ -128,7 +134,7 @@ export const removeSkill = async (
 export const pushSkillToLibrary = async (
   projectPath: string,
   skillName: string,
-): Promise<SkillActionResult> => {
+): Promise<ActionResult> => {
   const content = findSkillContentInHarnesses(projectPath, skillName)
   if (content === null) {
     return { success: false, error: 'Skill content not found in project' }
@@ -145,7 +151,7 @@ export const pushSkillToLibrary = async (
 export const syncSkillFromLibrary = async (
   projectPath: string,
   skillName: string,
-): Promise<SkillActionResult> => {
+): Promise<ActionResult> => {
   const libraryContent = getSkillContent(skillName)
   if (libraryContent === null) {
     return { success: false, error: 'Skill not found in library' }
@@ -156,7 +162,10 @@ export const syncSkillFromLibrary = async (
 
   const harnesses = detectHarnesses(projectPath)
   for (const harnessId of harnesses) {
-    convertToSymlink(projectPath, harnessId, skillName)
+    const result = convertToSymlink(projectPath, harnessId, skillName)
+    if (!result.success) {
+      return { success: false, error: `Failed to sync harness ${harnessId}: ${result.error}` }
+    }
   }
 
   return { success: true }
