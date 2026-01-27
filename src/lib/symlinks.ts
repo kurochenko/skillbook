@@ -2,6 +2,7 @@ import { existsSync, lstatSync, symlinkSync, unlinkSync, readlinkSync, mkdirSync
 import { join, dirname, relative } from 'path'
 import { TOOLS, type ToolId, SKILL_FILE } from '@/constants'
 import { getSkillbookSkillsPath } from '@/lib/sparse-checkout'
+import { isIgnoredFsError, logError } from '@/lib/logger'
 
 export type SymlinkResult =
   | { success: true }
@@ -16,7 +17,10 @@ type PathInfo = {
 const safeLstat = (path: string) => {
   try {
     return lstatSync(path)
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to lstat path', error, { path })
+    }
     return null
   }
 }
@@ -24,7 +28,10 @@ const safeLstat = (path: string) => {
 const safeReadlink = (path: string): string | null => {
   try {
     return readlinkSync(path)
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read symlink', error, { path })
+    }
     return null
   }
 }
@@ -72,9 +79,13 @@ const createSkillSymlink = (
     if (stat.isSymbolicLink()) {
       unlinkSync(symlinkPath)
     } else if (tool.needsDirectory && stat.isDirectory()) {
-      return { success: false, error: `Directory exists and is not a symlink: ${symlinkPath}` }
+      const error = `Directory exists and is not a symlink: ${symlinkPath}`
+      logError('Failed to create symlink', undefined, { symlinkPath, reason: error })
+      return { success: false, error }
     } else if (!tool.needsDirectory && stat.isFile()) {
-      return { success: false, error: `File exists and is not a symlink: ${symlinkPath}` }
+      const error = `File exists and is not a symlink: ${symlinkPath}`
+      logError('Failed to create symlink', undefined, { symlinkPath, reason: error })
+      return { success: false, error }
     }
   }
 
@@ -83,6 +94,7 @@ const createSkillSymlink = (
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    logError('Failed to create symlink', error, { symlinkPath, targetPath })
     return { success: false, error: `Failed to create symlink: ${message}` }
   }
 }
@@ -98,7 +110,9 @@ const removeSkillSymlink = (
   if (!stat) return { success: true }
 
   if (!stat.isSymbolicLink()) {
-    return { success: false, error: `Path is not a symlink: ${symlinkPath}` }
+    const error = `Path is not a symlink: ${symlinkPath}`
+    logError('Failed to remove symlink', undefined, { symlinkPath, reason: error })
+    return { success: false, error }
   }
 
   try {
@@ -106,6 +120,7 @@ const removeSkillSymlink = (
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    logError('Failed to remove symlink', error, { symlinkPath })
     return { success: false, error: `Failed to remove symlink: ${message}` }
   }
 }
@@ -119,7 +134,14 @@ export const convertToSymlink = (
   const { symlinkPath, sourcePath } = getHarnessPaths(projectPath, harnessId, skillName)
 
   if (!existsSync(sourcePath)) {
-    return { success: false, error: `Skill not found in .skillbook: ${skillName}` }
+    const error = `Skill not found in .skillbook: ${skillName}`
+    logError('Failed to convert to symlink', undefined, {
+      projectPath,
+      harnessId,
+      skillName,
+      reason: error,
+    })
+    return { success: false, error }
   }
 
   if (isSymlink(symlinkPath)) {
@@ -186,7 +208,9 @@ const removeSkillFiles = (
   if (!stat) return { success: true }
 
   if (stat.isSymbolicLink()) {
-    return { success: false, error: `Path is a symlink, use uninstall instead: ${symlinkPath}` }
+    const error = `Path is a symlink, use uninstall instead: ${symlinkPath}`
+    logError('Failed to remove files', undefined, { symlinkPath, reason: error })
+    return { success: false, error }
   }
 
   try {
@@ -198,6 +222,7 @@ const removeSkillFiles = (
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    logError('Failed to remove files', error, { symlinkPath })
     return { success: false, error: `Failed to remove files: ${message}` }
   }
 }

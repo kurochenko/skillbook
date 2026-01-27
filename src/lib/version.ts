@@ -10,6 +10,7 @@ import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { clean, gt } from 'semver'
 import { getLibraryPath } from '@/lib/paths'
+import { logWarn } from '@/lib/logger'
 
 // Injected at build time via --define BUILD_VERSION='"x.y.z"'
 // Falls back to 'dev' for local development
@@ -31,7 +32,8 @@ const readCache = (): UpdateCache | null => {
     if (!existsSync(CACHE_FILE)) return null
     const data = readFileSync(CACHE_FILE, 'utf-8')
     return JSON.parse(data)
-  } catch {
+  } catch (error) {
+    logWarn('Failed to read update cache', error, { cacheFile: CACHE_FILE })
     return null
   }
 }
@@ -42,8 +44,8 @@ const writeCache = (cache: UpdateCache): void => {
       mkdirSync(CACHE_DIR, { recursive: true })
     }
     writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2))
-  } catch {
-    // Ignore cache write errors
+  } catch (error) {
+    logWarn('Failed to write update cache', error, { cacheFile: CACHE_FILE })
   }
 }
 
@@ -59,14 +61,21 @@ const fetchLatestTagFromApi = async (): Promise<string | null> => {
       },
     )
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      logWarn('GitHub API returned non-OK response', undefined, {
+        status: response.status,
+        statusText: response.statusText,
+      })
+      return null
+    }
 
     const data = (await response.json()) as { tag_name?: string }
     const tag = data.tag_name
     if (!tag) return null
 
     return tag
-  } catch {
+  } catch (error) {
+    logWarn('Failed to fetch latest tag from GitHub API', error)
     return null
   }
 }
@@ -88,7 +97,8 @@ const fetchLatestTagFromRedirect = async (): Promise<string | null> => {
 
     if (response.url) return extractTagFromUrl(response.url)
     return null
-  } catch {
+  } catch (error) {
+    logWarn('Failed to fetch latest tag from GitHub redirect', error)
     return null
   }
 }

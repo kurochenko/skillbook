@@ -6,6 +6,7 @@ import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from '@/lib/gi
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { DEFAULT_SKILLS } from '@/lib/default-skills'
+import { isIgnoredFsError, logError } from '@/lib/logger'
 
 export type LibraryInitResult =
   | { success: true; path: string; created: boolean }
@@ -68,7 +69,10 @@ const SKILL_PATH_MARKERS = [
 const readFileSafe = (path: string): string | null => {
   try {
     return readFileSync(path, 'utf-8')
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read file', error, { path })
+    }
     return null
   }
 }
@@ -76,7 +80,10 @@ const readFileSafe = (path: string): string | null => {
 const readDirSafe = (path: string) => {
   try {
     return readdirSync(path, { withFileTypes: true })
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read directory', error, { path })
+    }
     return []
   }
 }
@@ -84,7 +91,10 @@ const readDirSafe = (path: string) => {
 const readFileText = async (path: string): Promise<string | null> => {
   try {
     return await Bun.file(path).text()
-  } catch {
+  } catch (error) {
+    if (!isIgnoredFsError(error)) {
+      logError('Failed to read file', error, { path })
+    }
     return null
   }
 }
@@ -242,6 +252,7 @@ export const ensureLibrary = async (): Promise<LibraryInitResult> => {
 
     return { success: true, path: libraryPath, created }
   } catch (error) {
+    logError('Failed to ensure library', error, { libraryPath })
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: message }
   }
@@ -324,6 +335,7 @@ export const addSkillToLibrary = async (
       path: skillFilePath,
     }
   } catch (error) {
+    logError('Failed to add skill to library', error, { skillName })
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: message }
   }

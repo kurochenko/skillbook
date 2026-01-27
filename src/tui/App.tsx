@@ -6,7 +6,6 @@ import {
   removeSkill,
   pushSkillToLibrary,
   syncSkillFromLibrary,
-  type SkillActionResult,
 } from '@/lib/project-actions'
 import type { InstalledSkill, HarnessSkillInfo } from '@/lib/project-scan'
 import {
@@ -14,6 +13,8 @@ import {
   removeHarness,
   detachHarness,
 } from '@/lib/harness'
+import { type ActionResult } from '@/lib/action-result'
+import { logError, logInfo, type LogContext } from '@/lib/logger'
 import { TOOLS } from '@/constants'
 import { HarnessRow } from '@/tui/components/HarnessRow'
 import { HelpBar, type Tab } from '@/tui/components/HelpBar'
@@ -84,31 +85,61 @@ const App = ({ projectPath, inProject }: AppProps) => {
   }
 
   const runAction = async (
-    action: Promise<SkillActionResult>,
+    action: Promise<ActionResult>,
     onSuccess?: () => void,
+    context?: LogContext,
+    onFailure?: () => void,
   ) => {
-    const result = await action
-    if (result.success) {
-      onSuccess?.()
-      return
+    try {
+      const result = await action
+      if (result.success) {
+        onSuccess?.()
+        return
+      }
+      logError('Action failed', result.error, context)
+      showError(result.error)
+      onFailure?.()
+    } catch (error) {
+      logError('Action threw error', error, context)
+      const message = error instanceof Error ? error.message : 'Unexpected error'
+      showError(message)
+      onFailure?.()
     }
-    showError(result.error)
+  }
+
+  const runSyncAction = (
+    action: () => ActionResult,
+    onSuccess?: () => void,
+    context?: LogContext,
+    onFailure?: () => void,
+  ) => {
+    void runAction(Promise.resolve().then(action), onSuccess, context, onFailure)
   }
 
   const runPushThenSync = async (skillName: string) => {
-    const pushResult = await pushSkillToLibrary(projectPath, skillName)
-    if (!pushResult.success) {
-      showError(pushResult.error)
-      return
-    }
+    logInfo('Push then sync requested', { action: 'pushThenSync', skillName, projectPath })
 
-    const syncResult = await syncSkillFromLibrary(projectPath, skillName)
-    if (!syncResult.success) {
-      showError(syncResult.error)
-      return
-    }
+    try {
+      const pushResult = await pushSkillToLibrary(projectPath, skillName)
+      if (!pushResult.success) {
+        logError('Push failed', pushResult.error, { action: 'pushSkillToLibrary', skillName })
+        showError(pushResult.error)
+        return
+      }
 
-    loadData(skillName)
+      const syncResult = await syncSkillFromLibrary(projectPath, skillName)
+      if (!syncResult.success) {
+        logError('Sync failed', syncResult.error, { action: 'syncSkillFromLibrary', skillName })
+        showError(syncResult.error)
+        return
+      }
+
+      loadData(skillName)
+    } catch (error) {
+      logError('Push then sync failed', error, { action: 'pushThenSync', skillName })
+      const message = error instanceof Error ? error.message : 'Unexpected error'
+      showError(message)
+    }
   }
 
   const splitSkillRows = (rows: typeof skillRows) => {
@@ -155,8 +186,18 @@ const App = ({ projectPath, inProject }: AppProps) => {
     switch (input) {
       case 'e':
         if (state === 'partial' || state === 'detached' || state === 'available') {
-          enableHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
-          loadData()
+          logInfo('Enable harness requested', {
+            action: 'enableHarness',
+            harnessId: selectedHarness.id,
+            harnessState: state,
+            projectPath,
+          })
+          runSyncAction(
+            () => enableHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled),
+            () => loadData(),
+            { action: 'enableHarness', harnessId: selectedHarness.id },
+            () => loadData(),
+          )
         }
         break
       case 'r':
@@ -164,16 +205,36 @@ const App = ({ projectPath, inProject }: AppProps) => {
           setConfirmAction({
             message: `Remove "${selectedHarness.name}" harness folder?\nThis will delete all files in the harness folder.`,
             onConfirm: () => {
-              removeHarness(projectPath, selectedHarness.id, currentlyEnabled)
-              loadData()
+              logInfo('Remove harness confirmed', {
+                action: 'removeHarness',
+                harnessId: selectedHarness.id,
+                harnessState: state,
+                projectPath,
+              })
+              runSyncAction(
+                () => removeHarness(projectPath, selectedHarness.id, currentlyEnabled),
+                () => loadData(),
+                { action: 'removeHarness', harnessId: selectedHarness.id },
+                () => loadData(),
+              )
             },
           })
         }
         break
       case 'd':
         if (state === 'enabled' || state === 'partial') {
-          detachHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled)
-          loadData()
+          logInfo('Detach harness requested', {
+            action: 'detachHarness',
+            harnessId: selectedHarness.id,
+            harnessState: state,
+            projectPath,
+          })
+          runSyncAction(
+            () => detachHarness(projectPath, selectedHarness.id, installedSkillNames, currentlyEnabled),
+            () => loadData(),
+            { action: 'detachHarness', harnessId: selectedHarness.id },
+            () => loadData(),
+          )
         }
         break
     }
@@ -181,25 +242,48 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
   const handleInstall = () => {
     if (selectedRow?.type !== 'available-skill') return
-    void runAction(installSkill(projectPath, selectedRow.skill.name), () => loadData())
+    const skillName = selectedRow.skill.name
+    logInfo('Install skill requested', { action: 'installSkill', skillName, projectPath })
+    void runAction(
+      installSkill(projectPath, skillName),
+      () => loadData(),
+      { action: 'installSkill', skillName },
+    )
   }
 
   const handleUninstall = () => {
     if (selectedRow?.type !== 'installed-skill') return
-    void runAction(uninstallSkill(projectPath, selectedRow.skill.name), () => loadData())
+    const skillName = selectedRow.skill.name
+    logInfo('Uninstall skill requested', { action: 'uninstallSkill', skillName, projectPath })
+    void runAction(
+      uninstallSkill(projectPath, skillName),
+      () => loadData(),
+      { action: 'uninstallSkill', skillName },
+    )
   }
 
   const handleRemove = () => {
     if (selectedRow?.type !== 'installed-skill') return
     const { status } = selectedRow.skill
     if (status !== 'detached' && status !== 'conflict') return
-    void runAction(removeSkill(projectPath, selectedRow.skill.name), () => loadData())
+    const skillName = selectedRow.skill.name
+    logInfo('Remove skill requested', { action: 'removeSkill', skillName, projectPath, status })
+    void runAction(
+      removeSkill(projectPath, skillName),
+      () => loadData(),
+      { action: 'removeSkill', skillName },
+    )
   }
 
   const handlePush = () => {
     if (selectedRow?.type !== 'installed-skill' && selectedRow?.type !== 'untracked-skill') return
     const name = selectedRow.skill.name
-    void runAction(pushSkillToLibrary(projectPath, name), () => loadData(name))
+    logInfo('Push skill requested', { action: 'pushSkillToLibrary', skillName: name, projectPath })
+    void runAction(
+      pushSkillToLibrary(projectPath, name),
+      () => loadData(name),
+      { action: 'pushSkillToLibrary', skillName: name },
+    )
   }
 
   const handleSync = () => {
@@ -217,7 +301,16 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
     if (selectedRow.type === 'untracked-harness') {
       const name = selectedRow.skill.name
-      void runAction(pushSkillToLibrary(projectPath, name), () => loadData(name))
+      logInfo('Push untracked harness skill requested', {
+        action: 'pushSkillToLibrary',
+        skillName: name,
+        projectPath,
+      })
+      void runAction(
+        pushSkillToLibrary(projectPath, name),
+        () => loadData(name),
+        { action: 'pushSkillToLibrary', skillName: name },
+      )
     }
   }
 
@@ -227,14 +320,26 @@ const App = ({ projectPath, inProject }: AppProps) => {
     if (!isUnanimous) return
 
     if (status === 'detached' || status === 'behind') {
-      void runAction(syncSkillFromLibrary(projectPath, name), () => loadData(name))
+      logInfo('Sync skill requested', { action: 'syncSkillFromLibrary', skillName: name, status })
+      void runAction(
+        syncSkillFromLibrary(projectPath, name),
+        () => loadData(name),
+        { action: 'syncSkillFromLibrary', skillName: name },
+      )
       return
     }
 
     if (status === 'conflict') {
       setConfirmAction({
         message: `Sync "${name}"? This will overwrite local changes with library version.`,
-        onConfirm: () => void runAction(syncSkillFromLibrary(projectPath, name), () => loadData(name)),
+        onConfirm: () => {
+          logInfo('Sync skill confirmed', { action: 'syncSkillFromLibrary', skillName: name })
+          void runAction(
+            syncSkillFromLibrary(projectPath, name),
+            () => loadData(name),
+            { action: 'syncSkillFromLibrary', skillName: name },
+          )
+        },
       })
     }
   }
@@ -251,10 +356,30 @@ const App = ({ projectPath, inProject }: AppProps) => {
       if (hasConflicts) {
         setConfirmAction({
           message: `Sync other harnesses to ${harnessName} version of "${skillName}"?\nThis will overwrite conflicting changes in other harnesses.`,
-          onConfirm: () => void runAction(syncSkillFromLibrary(projectPath, skillName), () => loadData(skillName)),
+          onConfirm: () => {
+            logInfo('Sync harnesses confirmed', {
+              action: 'syncSkillFromLibrary',
+              skillName,
+              harnessId: harness.harnessId,
+            })
+            void runAction(
+              syncSkillFromLibrary(projectPath, skillName),
+              () => loadData(skillName),
+              { action: 'syncSkillFromLibrary', skillName, harnessId: harness.harnessId },
+            )
+          },
         })
       } else {
-        void runAction(syncSkillFromLibrary(projectPath, skillName), () => loadData(skillName))
+        logInfo('Sync harnesses requested', {
+          action: 'syncSkillFromLibrary',
+          skillName,
+          harnessId: harness.harnessId,
+        })
+        void runAction(
+          syncSkillFromLibrary(projectPath, skillName),
+          () => loadData(skillName),
+          { action: 'syncSkillFromLibrary', skillName, harnessId: harness.harnessId },
+        )
       }
       return
     }
