@@ -13,6 +13,7 @@ import {
 import {
   createSymlinksForSkill,
   removeSymlinksForSkill,
+  removeFilesForSkill,
   convertToSymlink,
 } from '@/lib/symlinks'
 
@@ -93,6 +94,26 @@ export const uninstallSkill = async (
 ): Promise<SkillActionResult> => {
   const allHarnesses = detectHarnesses(projectPath)
   removeSymlinksForSkill(projectPath, allHarnesses, skillName)
+
+  if (isSkillbookInitialized(projectPath)) {
+    const removeResult = await removeFromSparseCheckout(projectPath, skillName)
+    if (!removeResult.success) {
+      return { success: false, error: `Failed to remove from sparse checkout: ${removeResult.error}` }
+    }
+  }
+
+  return { success: true }
+}
+
+export const removeSkill = async (
+  projectPath: string,
+  skillName: string,
+): Promise<SkillActionResult> => {
+  const allHarnesses = detectHarnesses(projectPath)
+  const filesResult = removeFilesForSkill(projectPath, allHarnesses, skillName)
+  if (!filesResult.success) {
+    return { success: false, error: filesResult.error }
+  }
 
   if (isSkillbookInitialized(projectPath)) {
     const removeResult = await removeFromSparseCheckout(projectPath, skillName)

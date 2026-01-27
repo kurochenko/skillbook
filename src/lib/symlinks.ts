@@ -173,3 +173,43 @@ export const removeSymlinksForSkill = (
   }
   return { success: true }
 }
+
+const removeSkillFiles = (
+  projectPath: string,
+  harnessId: ToolId,
+  skillName: string,
+): SymlinkResult => {
+  const tool = TOOLS[harnessId]
+  const { symlinkPath } = getHarnessPaths(projectPath, harnessId, skillName)
+
+  const stat = safeLstat(symlinkPath)
+  if (!stat) return { success: true }
+
+  if (stat.isSymbolicLink()) {
+    return { success: false, error: `Path is a symlink, use uninstall instead: ${symlinkPath}` }
+  }
+
+  try {
+    if (tool.needsDirectory) {
+      rmSync(symlinkPath, { recursive: true, force: true })
+    } else {
+      unlinkSync(symlinkPath)
+    }
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, error: `Failed to remove files: ${message}` }
+  }
+}
+
+export const removeFilesForSkill = (
+  projectPath: string,
+  harnessIds: ToolId[],
+  skillName: string,
+): SymlinkResult => {
+  for (const harnessId of harnessIds) {
+    const result = removeSkillFiles(projectPath, harnessId, skillName)
+    if (!result.success) return result
+  }
+  return { success: true }
+}
