@@ -4,7 +4,7 @@ A CLI tool to manage AI coding assistant skills across projects and teams.
 
 **Install:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/master/install.sh | bash
 ```
 
 <!-- TODO: Add screenshot/demo image here -->
@@ -44,7 +44,7 @@ project-c/.opencode/skill/       # Team-wide consistency
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kurochenko/skillbook/master/install.sh | bash
 ```
 
 Windows is not supported. Use WSL or run on macOS/Linux.
