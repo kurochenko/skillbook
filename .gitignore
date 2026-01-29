@@ -44,6 +44,9 @@ SKILL.md
 # Beads issue tracker
 .beads
 
+# Skillbook library (local symlink)
+.skillbook
+
 # Test fixtures (generated)
 test-fixtures/library
 test-fixtures/project
