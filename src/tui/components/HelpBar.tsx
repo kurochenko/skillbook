@@ -17,6 +17,7 @@ const SKILL_STATUS_ACTIONS: Record<SkillSyncStatus, string[]> = {
   behind: ['[s]ync', '[u]ninstall'],
   detached: ['[s]ync', '[r]emove'],
   conflict: ['[s]ync (use library)', '[p]ush (use local)', '[r]emove'],
+  'library-dirty': ['Library has uncommitted changes', '[u]ninstall'],
 }
 
 const HARNESS_STATE_ACTIONS: Record<HarnessState, string[]> = {

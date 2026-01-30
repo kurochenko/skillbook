@@ -15,7 +15,7 @@ export type UseSkillDataResult = {
   availableSkills: AvailableSkill[]
   harnesses: HarnessInfo[]
   skillRows: SkillRow[]
-  loadData: (selectSkillName?: string) => void
+  loadData: (selectSkillName?: string) => Promise<void>
   selectedIndex: number
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
 }
@@ -34,9 +34,9 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
         (row.type === 'untracked-skill' && row.skill.name === skillName)
     )
 
-  const loadData = useCallback((selectSkillName?: string) => {
-    const { installed, untracked } = getProjectSkills(projectPath)
-    const available = getAvailableSkills(projectPath, installed)
+  const loadData = useCallback(async (selectSkillName?: string) => {
+    const { installed, untracked } = await getProjectSkills(projectPath)
+    const available = await getAvailableSkills(projectPath, installed)
 
     setInstalledSkills(installed)
     setUntrackedSkills(untracked)
@@ -58,7 +58,7 @@ export const useSkillData = (projectPath: string): UseSkillDataResult => {
   }, [projectPath])
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [loadData])
 
   const skillRows = buildSkillRows(installedSkills, untrackedSkills, availableSkills)

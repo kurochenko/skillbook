@@ -7,11 +7,13 @@ import {
   calculateDiff,
   type DiffStats,
 } from '@/lib/library'
-import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
+import { SKILL_FILE, TOOLS, SKILLS_DIR, type ToolId } from '@/constants'
 import { isSkillSymlinked } from '@/lib/symlinks'
 import { isIgnoredFsError, logError } from '@/lib/logger'
+import { runGit } from '@/lib/git'
+import { getLibraryPath } from '@/lib/paths'
 
-export type SkillSyncStatus = 'ok' | 'ahead' | 'behind' | 'detached' | 'conflict'
+export type SkillSyncStatus = 'ok' | 'ahead' | 'behind' | 'detached' | 'conflict' | 'library-dirty'
 export type HarnessSkillStatus = 'ok' | 'detached' | 'conflict'
 
 export type HarnessSkillInfo = {
@@ -171,12 +173,46 @@ const getHarnessSkillStatus = (
   }
 }
 
+const getLibraryDirtySkills = async (skillNames: string[]): Promise<Set<string>> => {
+  if (skillNames.length === 0) return new Set()
+  
+  const libraryPath = getLibraryPath()
+  const skillPaths = skillNames.map(name => `${SKILLS_DIR}/${name}`)
+  const result = await runGit(libraryPath, ['status', '--porcelain', '--', ...skillPaths])
+  
+  if (!result.success || result.output.length === 0) {
+    return new Set()
+  }
+  
+  const dirtySkills = new Set<string>()
+  const lines = result.output.split('\n')
+  
+  for (const line of lines) {
+    if (!line.trim()) continue
+    const match = line.match(/^\s*\S{1,2}\s+(.+)$/)
+    if (match) {
+      const filePath = match[1]!.replace(/^"/, '').replace(/"$/, '')
+      const skillMatch = filePath.match(new RegExp(`${SKILLS_DIR}/([^/]+)`))
+      if (skillMatch) {
+        dirtySkills.add(skillMatch[1]!)
+      }
+    }
+  }
+  
+  return dirtySkills
+}
+
 const deriveSkillStatus = (
   harnesses: HarnessSkillInfo[],
   libraryContent: string,
+  isLibraryDirty: boolean,
 ): { status: SkillSyncStatus; isUnanimous: boolean; diff: DiffStats | null } => {
   if (harnesses.length === 0) {
     return { status: 'ok', isUnanimous: true, diff: null }
+  }
+
+  if (isLibraryDirty) {
+    return { status: 'library-dirty', isUnanimous: true, diff: null }
   }
 
   const statuses = new Set(harnesses.map((h) => h.status))
@@ -219,10 +255,10 @@ const getLibraryContentMap = (skills: ScannedSkill[]): Map<string, string | null
   return map
 }
 
-const partitionScannedSkills = (
+const partitionScannedSkills = async (
   projectPath: string,
   scannedSkills: ScannedSkill[],
-): ProjectSkills => {
+): Promise<ProjectSkills> => {
   const libraryContentMap = getLibraryContentMap(scannedSkills)
   const installedMap = new Map<string, {
     harnesses: HarnessSkillInfo[]
@@ -268,9 +304,13 @@ const partitionScannedSkills = (
     }
   }
 
+  const installedSkillNames = Array.from(installedMap.keys())
+  const dirtySkills = await getLibraryDirtySkills(installedSkillNames)
+  
   const installed: InstalledSkill[] = []
   for (const [name, data] of installedMap) {
-    const { status, isUnanimous, diff } = deriveSkillStatus(data.harnesses, data.libraryContent)
+    const isDirty = dirtySkills.has(name)
+    const { status, isUnanimous, diff } = deriveSkillStatus(data.harnesses, data.libraryContent, isDirty)
     installed.push({
       name,
       status,
@@ -292,25 +332,27 @@ const partitionScannedSkills = (
   }
 }
 
-export const getProjectSkills = (projectPath: string): ProjectSkills => {
+export const getProjectSkills = async (projectPath: string): Promise<ProjectSkills> => {
   const scanned = scanAllHarnesses(projectPath)
   return partitionScannedSkills(projectPath, scanned)
 }
 
-export const getInstalledSkills = (projectPath: string): InstalledSkill[] => {
-  return getProjectSkills(projectPath).installed
+export const getInstalledSkills = async (projectPath: string): Promise<InstalledSkill[]> => {
+  const skills = await getProjectSkills(projectPath)
+  return skills.installed
 }
 
-export const getUntrackedSkills = (projectPath: string): UntrackedSkill[] => {
-  return getProjectSkills(projectPath).untracked
+export const getUntrackedSkills = async (projectPath: string): Promise<UntrackedSkill[]> => {
+  const skills = await getProjectSkills(projectPath)
+  return skills.untracked
 }
 
-export const getAvailableSkills = (
+export const getAvailableSkills = async (
   projectPath: string,
   installedSkills?: InstalledSkill[],
-): AvailableSkill[] => {
+): Promise<AvailableSkill[]> => {
   const librarySkills = listLibrarySkills()
-  const installed = installedSkills ?? getInstalledSkills(projectPath)
+  const installed = installedSkills ?? await getInstalledSkills(projectPath)
   const installedNames = new Set(installed.map((s) => s.name))
 
   return librarySkills

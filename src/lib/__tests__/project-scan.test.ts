@@ -44,7 +44,7 @@ describe('getProjectSkills', () => {
       const content = '# Same content'
       await createSymlinkedSkill('test-skill', content, content)
 
-      const { installed } = getProjectSkills(projectDir)
+      const { installed } = await getProjectSkills(projectDir)
 
       expect(installed).toHaveLength(1)
       expect(installed[0]!.status).toBe('ok')
@@ -55,7 +55,7 @@ describe('getProjectSkills', () => {
       const localContent = '# Original\nNew line added locally'
       await createSymlinkedSkill('test-skill', libraryContent, localContent)
 
-      const { installed } = getProjectSkills(projectDir)
+      const { installed } = await getProjectSkills(projectDir)
 
       expect(installed).toHaveLength(1)
       expect(installed[0]!.status).toBe('ahead')
@@ -67,7 +67,7 @@ describe('getProjectSkills', () => {
       const localContent = '# Original'
       await createSymlinkedSkill('test-skill', libraryContent, localContent)
 
-      const { installed } = getProjectSkills(projectDir)
+      const { installed } = await getProjectSkills(projectDir)
 
       expect(installed).toHaveLength(1)
       expect(installed[0]!.status).toBe('behind')
@@ -79,10 +79,40 @@ describe('getProjectSkills', () => {
       const localContent = '# Version B'
       await createSymlinkedSkill('test-skill', libraryContent, localContent)
 
-      const { installed } = getProjectSkills(projectDir)
+      const { installed } = await getProjectSkills(projectDir)
 
       expect(installed).toHaveLength(1)
       expect(installed[0]!.status).toBe('ahead')
+    })
+  })
+
+  describe('library-dirty status', () => {
+    test('shows "library-dirty" when library has uncommitted changes', async () => {
+      const libraryContent = '# Original content'
+      const localContent = '# Original content'
+      await createSymlinkedSkill('dirty-skill', libraryContent, localContent)
+
+      const skillFilePath = join(libraryDir, 'skills', 'dirty-skill', 'SKILL.md')
+      writeFileSync(skillFilePath, '# Modified content', 'utf-8')
+
+      const { installed } = await getProjectSkills(projectDir)
+
+      expect(installed).toHaveLength(1)
+      expect(installed[0]!.status).toBe('library-dirty')
+    })
+
+    test('shows "library-dirty" even when local content differs', async () => {
+      const libraryContent = '# Original'
+      const localContent = '# Different local content'
+      await createSymlinkedSkill('dirty-skill', libraryContent, localContent)
+
+      const skillFilePath = join(libraryDir, 'skills', 'dirty-skill', 'SKILL.md')
+      writeFileSync(skillFilePath, '# Modified in library', 'utf-8')
+
+      const { installed } = await getProjectSkills(projectDir)
+
+      expect(installed).toHaveLength(1)
+      expect(installed[0]!.status).toBe('library-dirty')
     })
   })
 })
