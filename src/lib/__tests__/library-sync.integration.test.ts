@@ -88,7 +88,7 @@ describe('library sync with origin', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error).toContain('behind origin')
+        expect(result.error).toMatch(/behind origin|diverged/)
       }
     })
   })
@@ -112,7 +112,12 @@ describe('library sync with origin', () => {
       runGit(otherClone, 'commit', '-m', 'Add new remote skill')
       runGit(otherClone, 'push', 'origin', 'master')
 
+      await initSparseCheckout(projectDir)
+
       const result = await syncSkillFromLibrary(projectDir, 'new-remote-skill')
+      if (!result.success) {
+        console.error('Test 3 error:', result.error)
+      }
 
       expect(result.success).toBe(true)
     })
@@ -146,6 +151,9 @@ describe('library sync with origin', () => {
       )
 
       const result = await syncSkillFromLibrary(projectDir, 'test-skill')
+      if (!result.success) {
+        console.error('Test 4 error:', result.error)
+      }
 
       expect(result.success).toBe(true)
       

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join, resolve } from 'path'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
-import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from '@/lib/git'
+import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush, gitPull, gitStashPush, gitStashPop, checkOriginStatus } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { DEFAULT_SKILLS } from '@/lib/default-skills'
@@ -333,6 +333,97 @@ export const addSkillToLibrary = async (
         action: isUpdate ? 'updated' : 'added',
         path: skillFilePath,
         warning: `Skill saved but git commit failed: ${commitResult.error}`,
+      }
+    }
+
+    const originStatus = await checkOriginStatus(libraryPath)
+
+    if (originStatus.status === 'no-origin') {
+      return {
+        success: true,
+        action: isUpdate ? 'updated' : 'added',
+        commitHash: commitResult.commitHash,
+        path: skillFilePath,
+      }
+    }
+
+    if (originStatus.status === 'error') {
+      return {
+        success: true,
+        action: isUpdate ? 'updated' : 'added',
+        commitHash: commitResult.commitHash,
+        path: skillFilePath,
+        warning: `Skill committed but failed to check origin: ${originStatus.error}`,
+      }
+    }
+
+    if (originStatus.status === 'synced' || originStatus.status === 'ahead') {
+      const pushResult = await gitPush(libraryPath)
+      if (!pushResult.success) {
+        return {
+          success: true,
+          action: isUpdate ? 'updated' : 'added',
+          commitHash: commitResult.commitHash,
+          path: skillFilePath,
+          warning: `Skill committed but failed to push to origin: ${pushResult.error}`,
+        }
+      }
+
+      return {
+        success: true,
+        action: isUpdate ? 'updated' : 'added',
+        commitHash: commitResult.commitHash,
+        path: skillFilePath,
+      }
+    }
+
+    if (originStatus.status === 'behind') {
+      const stashResult = await gitStashPush(libraryPath, `Auto-stash before pulling ${skillName}`)
+      const pullResult = await gitPull(libraryPath, true)
+
+      if (!pullResult.success) {
+        if (stashResult.success) {
+          await gitStashPop(libraryPath)
+        }
+        return {
+          success: false,
+          error: `Library is behind origin by ${originStatus.commits} commits and cannot fast-forward. Please resolve manually.`,
+        }
+      }
+
+      if (stashResult.success) {
+        const popResult = await gitStashPop(libraryPath)
+        if (!popResult.success) {
+          return {
+            success: false,
+            error: `Pulled from origin but failed to restore stashed changes: ${popResult.error}. Run 'git stash pop' in ~/.skillbook to recover.`,
+          }
+        }
+      }
+
+      const pushResult = await gitPush(libraryPath)
+      if (!pushResult.success) {
+        return {
+          success: true,
+          action: isUpdate ? 'updated' : 'added',
+          commitHash: commitResult.commitHash,
+          path: skillFilePath,
+          warning: `Skill committed and pulled from origin, but failed to push: ${pushResult.error}`,
+        }
+      }
+
+      return {
+        success: true,
+        action: isUpdate ? 'updated' : 'added',
+        commitHash: commitResult.commitHash,
+        path: skillFilePath,
+      }
+    }
+
+    if (originStatus.status === 'diverged') {
+      return {
+        success: false,
+        error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.skillbook.`,
       }
     }
 
