@@ -34,12 +34,12 @@ describe('library sync with origin', () => {
 
   const setupOrigin = () => {
     mkdirSync(originDir, { recursive: true })
-    runGit(originDir, 'init', '--bare')
+    runGit(originDir, 'init', '--bare', '--initial-branch=master')
   }
 
   const setupLibraryWithOrigin = () => {
     mkdirSync(libraryDir, { recursive: true })
-    runGit(libraryDir, 'init')
+    runGit(libraryDir, 'init', '--initial-branch=master')
     runGit(libraryDir, 'config', 'user.email', 'test@test.com')
     runGit(libraryDir, 'config', 'user.name', 'Test')
     writeFileSync(join(libraryDir, 'README.md'), '# Library')

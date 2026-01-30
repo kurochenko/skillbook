@@ -43,6 +43,12 @@ const refreshSparseCheckout = async (
   skillName: string,
 ): Promise<SparseCheckoutResult> => {
   const skillPath = `${SKILLS_DIR}/${skillName}`
+
+  const skillStatus = await runGit(skillbookPath, ['status', '--porcelain', '--', skillPath])
+  if (skillStatus.success && skillStatus.output.length > 0) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
+  }
+
   const originStatus = await checkOriginStatus(skillbookPath)
 
   if (originStatus.status === 'behind') {
@@ -93,16 +99,26 @@ export const initSparseCheckout = async (projectPath: string): Promise<SparseChe
   }
 
   const originUrl = await getRemoteUrl(libraryPath, 'origin')
-  const cloneSource = originUrl ?? libraryPath
-
-  const cloneResult = await runGit(projectPath, [
+  let cloneResult = await runGit(projectPath, [
     'clone',
     '--filter=blob:none',
     '--sparse',
     '--no-checkout',
-    cloneSource,
+    originUrl || libraryPath,
     SKILLBOOK_DIR,
   ])
+
+  if (!cloneResult.success && originUrl) {
+    cloneResult = await runGit(projectPath, [
+      'clone',
+      '--filter=blob:none',
+      '--sparse',
+      '--no-checkout',
+      libraryPath,
+      SKILLBOOK_DIR,
+    ])
+  }
+
   if (!cloneResult.success) {
     return { success: false, error: `Failed to clone library: ${cloneResult.error}` }
   }

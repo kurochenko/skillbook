@@ -125,6 +125,14 @@ export const getRemoteUrl = async (dir: string, remote: string = 'origin'): Prom
 }
 
 export const getCurrentBranch = async (dir: string): Promise<string | null> => {
+  const upstreamResult = await runGit(dir, ['rev-parse', '--abbrev-ref', '@{u}'])
+  if (upstreamResult.success && upstreamResult.output) {
+    const parts = upstreamResult.output.split('/')
+    if (parts.length >= 2) {
+      return parts.slice(1).join('/')
+    }
+  }
+
   const branchResult = await runGit(dir, ['rev-parse', '--abbrev-ref', 'HEAD'])
   if (branchResult.success && branchResult.output && branchResult.output !== 'HEAD') {
     return branchResult.output

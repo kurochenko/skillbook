@@ -379,10 +379,11 @@ export const addSkillToLibrary = async (
 
     if (originStatus.status === 'behind') {
       const stashResult = await gitStashPush(libraryPath, `Auto-stash before pulling ${skillName}`)
+      const hasStashed = stashResult.success && !stashResult.output.includes('No local changes to save')
       const pullResult = await gitPull(libraryPath, true)
 
       if (!pullResult.success) {
-        if (stashResult.success) {
+        if (hasStashed) {
           await gitStashPop(libraryPath)
         }
         return {
@@ -391,7 +392,7 @@ export const addSkillToLibrary = async (
         }
       }
 
-      if (stashResult.success) {
+      if (hasStashed) {
         const popResult = await gitStashPop(libraryPath)
         if (!popResult.success) {
           return {
