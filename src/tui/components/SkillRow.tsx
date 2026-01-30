@@ -38,6 +38,7 @@ const SKILL_STATUS_BADGE: Record<SkillSyncStatus, BadgeConfig> = {
     text: (diff) => diff ? `[conflict +${diff.additions}/-${diff.deletions}]` : '[conflict]',
     color: 'red',
   },
+  'library-dirty': { text: '[library-dirty]', color: 'magenta' },
 }
 
 const HARNESS_STATUS_BADGE: Record<HarnessSkillStatus, { text: string; color?: string; dim?: boolean }> = {

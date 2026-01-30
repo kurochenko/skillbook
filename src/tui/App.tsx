@@ -78,22 +78,28 @@ const App = ({ projectPath, inProject }: AppProps) => {
 
   const showError = (text: string) => {
     setMessage({ text, color: 'red' })
+    // Error messages persist until next action - no auto-timeout
     if (messageTimeoutRef.current) {
       clearTimeout(messageTimeoutRef.current)
+      messageTimeoutRef.current = null
     }
-    messageTimeoutRef.current = setTimeout(() => setMessage(null), UI.MESSAGE_TIMEOUT_MS)
+  }
+
+  const clearMessage = () => {
+    setMessage(null)
   }
 
   const runAction = async (
     action: Promise<ActionResult>,
-    onSuccess?: () => void,
+    onSuccess?: () => void | Promise<void>,
     context?: LogContext,
     onFailure?: () => void,
   ) => {
     try {
       const result = await action
       if (result.success) {
-        onSuccess?.()
+        clearMessage() // Clear any previous error on success
+        await onSuccess?.()
         return
       }
       logError('Action failed', result.error, context)
@@ -318,6 +324,14 @@ const App = ({ projectPath, inProject }: AppProps) => {
     const { name, status, isUnanimous } = skill
 
     if (!isUnanimous) return
+
+    if (status === 'library-dirty') {
+      showError(
+        `Library has uncommitted changes to "${name}". ` +
+        `Run: cd ~/.skillbook && git status`
+      )
+      return
+    }
 
     if (status === 'detached' || status === 'behind') {
       logInfo('Sync skill requested', { action: 'syncSkillFromLibrary', skillName: name, status })

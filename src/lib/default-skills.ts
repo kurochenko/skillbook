@@ -11,21 +11,40 @@ compatibility: opencode, claude-code, cursor
 
 Manages AI coding assistant skills in one place. Create skills once, reuse them across all projects.
 
-## CRITICAL: Never Touch Git
+## CRITICAL: Never Touch Git or Library Files Directly
 
 **NEVER run git commands on \`.skillbook/\` or \`~/.skillbook/\` folders.**
 
 No \`git pull\`, \`git push\`, \`git commit\`, \`git stash\` - nothing. The skillbook CLI handles all git operations internally.
 
+**NEVER edit files directly in \`~/.skillbook/skills/\` or \`.skillbook/skills/\` folders.**
+
+The central library at \`~/.skillbook/\` should only be modified by the skillbook CLI. Direct edits will cause sync conflicts and show \`[library-dirty]\` status.
+
 ### When Editing Skills
 
-1. **Edit in project folder** - Modify \`.skillbook/skills/<name>/SKILL.md\` in the current project
-2. **Initialize first** - If \`.skillbook/\` doesn't exist, run \`skillbook\` TUI and install a skill
-3. **Use CLI to sync** - After editing, open \`skillbook\` TUI and press \`p\` to push changes
+1. **Edit in project harness folder** - Modify \`.claude/skills/<name>/SKILL.md\`, \`.cursor/rules/<name>.md\`, or \`.opencode/skill/<name>/SKILL.md\` directly
+2. **DO NOT edit in \`.skillbook/skills/\`** - This folder is managed by the CLI only
+3. **Initialize first** - If \`.skillbook/\` doesn't exist, run \`skillbook\` TUI and install a skill
+4. **Use CLI to sync** - After editing, open \`skillbook\` TUI and press \`p\` to push changes to library
 
 ### When Skills Are Outdated
 
 If a skill shows \`[behind]\` status, tell the user to run \`skillbook\` and sync from TUI. Do NOT run git commands yourself.
+
+### Library-Dirty Status
+
+If a skill shows \`[library-dirty]\` status, it means the central library has uncommitted changes. This happens when someone edited files directly in \`~/.skillbook/\`.
+
+**EXCEPTION:** You may use git commands ONLY to fix a dirty library state:
+
+\`\`\`bash
+cd ~/.skillbook
+git status                    # See what changed
+git checkout -- skills/<name> # Discard changes (or commit if needed)
+\`\`\`
+
+This is the ONLY exception to the "never touch git" rule. Use it only for cleanup, never for normal workflows.
 
 ## Quick Reference
 
@@ -70,8 +89,8 @@ Finds all skills across projects. Select which to add to library.
 ### Sync from Library
 
 1. Open TUI: \`skillbook\`
-2. Select skill with \`[behind]\` or \`[conflict]\` status
-3. Press \`s\` to sync
+2. Select skill with \`[behind]\`, \`[conflict]\`, or \`[library-dirty]\` status
+3. Press \`s\` to sync (for \`[library-dirty]\`, fix library first)
 
 ## TUI Keybindings
 
@@ -94,6 +113,7 @@ Finds all skills across projects. Select which to add to library.
 | \`[behind]\` | Library has newer changes |
 | \`[conflict]\` | Both have changes |
 | \`[detached]\` | Not linked to library |
+| \`[library-dirty]\` | Library has uncommitted changes |
 `
 
 export const DEFAULT_SKILLS = [
