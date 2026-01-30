@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { getLibraryPath } from '@/lib/paths'
-import { runGit, gitPull, gitStashPush, gitStashPop, checkOriginStatus, getRemoteUrl } from '@/lib/git'
+import { runGit, gitPull, checkOriginStatus, getRemoteUrl } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '@/constants'
 import { isIgnoredFsError, logError } from '@/lib/logger'
 
@@ -46,35 +46,9 @@ const refreshSparseCheckout = async (
   const originStatus = await checkOriginStatus(skillbookPath)
 
   if (originStatus.status === 'behind') {
-    const statusResult = await runGit(skillbookPath, ['status', '--porcelain'])
-    const isDirty = statusResult.success && statusResult.output.length > 0
-
-    if (isDirty) {
-      const stashResult = await gitStashPush(skillbookPath, `Auto-stash before sync ${skillName}`)
-      const pullResult = await gitPull(skillbookPath, true)
-
-      if (!pullResult.success) {
-        if (stashResult.success) {
-          await gitStashPop(skillbookPath)
-        }
-        return { success: false, error: `Library is behind origin by ${originStatus.commits} commits and cannot fast-forward. Please resolve manually in ~/.skillbook.` }
-      }
-
-      if (stashResult.success) {
-        const popResult = await gitStashPop(skillbookPath)
-        if (!popResult.success) {
-          return { success: false, error: `Pulled from origin but failed to restore stashed changes: ${popResult.error}. Run 'git stash pop' in ~/.skillbook to recover.` }
-        }
-        const checkoutResult = await runGit(skillbookPath, ['checkout', 'HEAD', '--', skillPath])
-        if (!checkoutResult.success) {
-          return { success: false, error: `Failed to apply pulled version: ${checkoutResult.error}` }
-        }
-      }
-    } else {
-      const pullResult = await gitPull(skillbookPath, true)
-      if (!pullResult.success) {
-        return { success: false, error: `Failed to pull from origin: ${pullResult.error}` }
-      }
+    const pullResult = await gitPull(skillbookPath, true)
+    if (!pullResult.success) {
+      return { success: false, error: `Failed to pull from origin: ${pullResult.error}` }
     }
   }
 
@@ -84,14 +58,6 @@ const refreshSparseCheckout = async (
 
   if (originStatus.status === 'error') {
     return { success: false, error: `Failed to check origin status: ${originStatus.error}` }
-  }
-
-  const skillStatus = await runGit(skillbookPath, ['status', '--porcelain', '--', skillPath])
-  if (!skillStatus.success) {
-    return { success: false, error: `Failed to check skill status: ${skillStatus.error}` }
-  }
-  if (skillStatus.output.length > 0) {
-    return { success: false, error: `Local changes in ${skillPath} prevent update` }
   }
 
   const fileExists = existsSync(join(skillbookPath, skillPath, SKILL_FILE))
@@ -126,8 +92,6 @@ export const initSparseCheckout = async (projectPath: string): Promise<SparseChe
     rmSync(skillbookPath, { recursive: true, force: true })
   }
 
-  // If library has an origin remote, clone from origin to track the actual remote
-  // Otherwise, clone from the local library path
   const originUrl = await getRemoteUrl(libraryPath, 'origin')
   const cloneSource = originUrl ?? libraryPath
 
