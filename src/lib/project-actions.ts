@@ -152,13 +152,15 @@ export const syncSkillFromLibrary = async (
   projectPath: string,
   skillName: string,
 ): Promise<ActionResult> => {
-  const libraryContent = getSkillContent(skillName)
-  if (libraryContent === null) {
-    return { success: false, error: 'Skill not found in library' }
-  }
-
   const sparseResult = await ensureSparseSkill(projectPath, skillName)
   if (!sparseResult.success) return sparseResult
+
+  // After ensuring sparse skill, read from project's skillbook checkout
+  // (not from central library, which may be behind origin)
+  const skillContent = getProjectSkillContent(projectPath, skillName)
+  if (skillContent === null) {
+    return { success: false, error: 'Skill not found in library checkout' }
+  }
 
   const harnesses = detectHarnesses(projectPath)
   for (const harnessId of harnesses) {

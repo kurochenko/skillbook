@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { getLibraryPath } from '@/lib/paths'
-import { runGit } from '@/lib/git'
+import { runGit, gitPullWithStash, checkOriginStatus, getRemoteUrl } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '@/constants'
 import { isIgnoredFsError, logError } from '@/lib/logger'
 
@@ -38,64 +38,66 @@ const writeSparsePatterns = async (
   return { success: true }
 }
 
-const getCurrentBranch = async (skillbookPath: string): Promise<string | null> => {
-  const branchResult = await runGit(skillbookPath, ['rev-parse', '--abbrev-ref', 'HEAD'])
-  if (branchResult.success && branchResult.output && branchResult.output !== 'HEAD') {
-    return branchResult.output
-  }
-
-  const originHead = await runGit(skillbookPath, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
-  if (!originHead.success || !originHead.output) return null
-
-  return originHead.output.replace('origin/', '').trim()
-}
-
 const refreshSparseCheckout = async (
   skillbookPath: string,
   skillName: string,
 ): Promise<SparseCheckoutResult> => {
-  const statusResult = await runGit(skillbookPath, ['status', '--porcelain'])
-  if (!statusResult.success) {
-    return { success: false, error: `Failed to check library status: ${statusResult.error}` }
-  }
-
-  const isDirty = statusResult.output.length > 0
-  if (!isDirty) {
-    const pullResult = await runGit(skillbookPath, ['pull', '--ff-only'])
-    if (!pullResult.success) {
-      return { success: false, error: `Failed to update library: ${pullResult.error}` }
-    }
-
-    const checkoutResult = await runGit(skillbookPath, ['checkout'])
-    if (!checkoutResult.success) {
-      return { success: false, error: `Failed to refresh sparse checkout: ${checkoutResult.error}` }
-    }
-
-    return { success: true }
-  }
-
   const skillPath = `${SKILLS_DIR}/${skillName}`
+
   const skillStatus = await runGit(skillbookPath, ['status', '--porcelain', '--', skillPath])
   if (!skillStatus.success) {
     return { success: false, error: `Failed to check skill status: ${skillStatus.error}` }
   }
-  if (skillStatus.output.length > 0) {
-    return { success: false, error: `Local changes in ${skillPath} prevent update` }
+  const hasLocalChanges = skillStatus.output.length > 0
+
+  const originStatus = await checkOriginStatus(skillbookPath)
+
+  if (originStatus.status === 'behind') {
+    const pullResult = await gitPullWithStash(skillbookPath, {
+      message: `Auto-stash before syncing ${skillName}`,
+      shouldStash: hasLocalChanges,
+    })
+
+    if (!pullResult.success) {
+      if (pullResult.step === 'stash') {
+        return { success: false, error: `Failed to stash local changes: ${pullResult.error}` }
+      }
+
+      if (pullResult.step === 'pop') {
+        return { success: false, error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in .skillbook to recover.` }
+      }
+
+      return { success: false, error: `Failed to pull from origin: ${pullResult.error}` }
+    }
   }
 
-  const branch = await getCurrentBranch(skillbookPath)
-  if (!branch) {
-    return { success: false, error: 'Failed to resolve library branch' }
+  if (originStatus.status === 'diverged') {
+    return { success: false, error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.skillbook.` }
   }
 
-  const fetchResult = await runGit(skillbookPath, ['fetch', 'origin'])
-  if (!fetchResult.success) {
-    return { success: false, error: `Failed to fetch library: ${fetchResult.error}` }
+  if (originStatus.status === 'error') {
+    return { success: false, error: `Failed to check origin status: ${originStatus.error}` }
   }
 
-  const checkoutResult = await runGit(skillbookPath, ['checkout', `origin/${branch}`, '--', skillPath])
-  if (!checkoutResult.success) {
-    return { success: false, error: `Failed to refresh skill: ${checkoutResult.error}` }
+  if (originStatus.status === 'no-origin' && hasLocalChanges) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
+  }
+
+  if (originStatus.status !== 'behind' && originStatus.status !== 'no-origin' && hasLocalChanges) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
+  }
+
+  const fileExists = existsSync(join(skillbookPath, skillPath, SKILL_FILE))
+  if (!fileExists) {
+    const reapplyResult = await runGit(skillbookPath, ['sparse-checkout', 'reapply'])
+    if (!reapplyResult.success) {
+      return { success: false, error: `Failed to reapply sparse-checkout: ${reapplyResult.error}` }
+    }
+  }
+
+  const stillMissing = !existsSync(join(skillbookPath, skillPath, SKILL_FILE))
+  if (stillMissing) {
+    return { success: false, error: `Skill not found in library checkout: ${skillName}` }
   }
 
   return { success: true }
@@ -117,14 +119,27 @@ export const initSparseCheckout = async (projectPath: string): Promise<SparseChe
     rmSync(skillbookPath, { recursive: true, force: true })
   }
 
-  const cloneResult = await runGit(projectPath, [
+  const originUrl = await getRemoteUrl(libraryPath, 'origin')
+  let cloneResult = await runGit(projectPath, [
     'clone',
     '--filter=blob:none',
     '--sparse',
     '--no-checkout',
-    libraryPath,
+    originUrl || libraryPath,
     SKILLBOOK_DIR,
   ])
+
+  if (!cloneResult.success && originUrl) {
+    cloneResult = await runGit(projectPath, [
+      'clone',
+      '--filter=blob:none',
+      '--sparse',
+      '--no-checkout',
+      libraryPath,
+      SKILLBOOK_DIR,
+    ])
+  }
+
   if (!cloneResult.success) {
     return { success: false, error: `Failed to clone library: ${cloneResult.error}` }
   }

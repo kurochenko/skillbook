@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join, resolve } from 'path'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
-import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo } from '@/lib/git'
+import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush } from '@/lib/git'
+import { resolveOriginPlan } from '@/lib/library-sync'
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { DEFAULT_SKILLS } from '@/lib/default-skills'
@@ -303,6 +304,14 @@ export const addSkillToLibrary = async (
 
   const existingContent = getSkillContent(skillName)
   const isUpdate = existingContent !== null
+  const action = isUpdate ? 'updated' : 'added'
+  const buildSuccess = (commitHash?: string, warning?: string): AddSkillResult => ({
+    success: true,
+    action,
+    commitHash,
+    path: skillFilePath,
+    warning,
+  })
 
   if (existingContent !== null && existingContent === content) {
     return {
@@ -313,6 +322,11 @@ export const addSkillToLibrary = async (
   }
 
   try {
+    const originPlan = await resolveOriginPlan(libraryPath, skillName)
+    if (originPlan.status === 'error') {
+      return { success: false, error: originPlan.error }
+    }
+
     if (!existsSync(skillDir)) {
       mkdirSync(skillDir, { recursive: true })
     }
@@ -328,20 +342,19 @@ export const addSkillToLibrary = async (
     const commitResult = await gitCommit(libraryPath, commitMessage)
 
     if (!commitResult.success) {
-      return {
-        success: true,
-        action: isUpdate ? 'updated' : 'added',
-        path: skillFilePath,
-        warning: `Skill saved but git commit failed: ${commitResult.error}`,
-      }
+      return buildSuccess(undefined, `Skill saved but git commit failed: ${commitResult.error}`)
     }
 
-    return {
-      success: true,
-      action: isUpdate ? 'updated' : 'added',
-      commitHash: commitResult.commitHash,
-      path: skillFilePath,
+    if (originPlan.status === 'skip') {
+      return buildSuccess(commitResult.commitHash, originPlan.warning)
     }
+
+    const pushResult = await gitPush(libraryPath)
+    if (!pushResult.success) {
+      return buildSuccess(commitResult.commitHash, `Skill committed but failed to push to origin: ${pushResult.error}`)
+    }
+
+    return buildSuccess(commitResult.commitHash)
   } catch (error) {
     logError('Failed to add skill to library', error, { skillName })
     const message = error instanceof Error ? error.message : 'Unknown error'
