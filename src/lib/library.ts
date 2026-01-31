@@ -47,6 +47,14 @@ export type ScanOptions = {
   onSkillFound?: (skill: PartialSkill) => void
 }
 
+const LIBRARY_GITIGNORE_ENTRIES = [
+  '*.local',
+  '.DS_Store',
+  'out-of-date.json',
+  'update-check.json',
+  'locks/',
+]
+
 const IGNORED_DIRS_SET = new Set([
   'node_modules',
   'vendor',
@@ -241,7 +249,7 @@ export const ensureLibrary = async (): Promise<LibraryInitResult> => {
 
       const gitignorePath = join(libraryPath, '.gitignore')
       if (!existsSync(gitignorePath)) {
-        writeFileSync(gitignorePath, '*.local\n.DS_Store\n')
+        writeFileSync(gitignorePath, `${LIBRARY_GITIGNORE_ENTRIES.join('\n')}\n`)
       }
 
       await gitAdd(libraryPath, '.')
