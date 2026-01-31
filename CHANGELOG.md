@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.10](https://github.com/kurochenko/skillbook/compare/v0.1.9...v0.1.10) (2026-01-31)
+
+
+### Bug Fixes
+
+* add library-dirty status detection and improve error handling ([#25](https://github.com/kurochenko/skillbook/issues/25)) ([4da227f](https://github.com/kurochenko/skillbook/commit/4da227fead1446a34a72e38e83e097b691f3a3fa))
+* keep library repo clean of cache/lock files ([#27](https://github.com/kurochenko/skillbook/issues/27)) ([d9253e4](https://github.com/kurochenko/skillbook/commit/d9253e48348339d5e57261fe30c29a66af920c90))
+* library pull/push on sync ([#26](https://github.com/kurochenko/skillbook/issues/26)) ([429e96a](https://github.com/kurochenko/skillbook/commit/429e96ade79ae30973a7dfd5aa9c84a73442e0a9))
+* remove .skillbook submodule from tracking ([#23](https://github.com/kurochenko/skillbook/issues/23)) ([9ac196f](https://github.com/kurochenko/skillbook/commit/9ac196fe5596f7cffdd0abb592a6a90b7c18b271))
+
 ## [0.1.9](https://github.com/kurochenko/skillbook/compare/v0.1.8...v0.1.9) (2026-01-28)
 
 
