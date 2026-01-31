@@ -112,6 +112,49 @@ export const gitStashPop = async (dir: string): Promise<GitResult> => {
   return runGit(dir, ['stash', 'pop'])
 }
 
+export type PullWithStashResult =
+  | { success: true; stashed: boolean }
+  | { success: false; stashed: boolean; step: 'stash' | 'pull' | 'pop'; error: string }
+
+export type PullWithStashOptions = {
+  message: string
+  ffOnly?: boolean
+  shouldStash?: boolean
+}
+
+export const gitPullWithStash = async (
+  dir: string,
+  { message, ffOnly = true, shouldStash = true }: PullWithStashOptions,
+): Promise<PullWithStashResult> => {
+  let stashed = false
+
+  if (shouldStash) {
+    const stashResult = await gitStashPush(dir, message)
+    if (!stashResult.success) {
+      return { success: false, stashed: false, step: 'stash', error: stashResult.error }
+    }
+
+    stashed = !stashResult.output.includes('No local changes to save')
+  }
+
+  const pullResult = await gitPull(dir, ffOnly)
+  if (!pullResult.success) {
+    if (stashed) {
+      await gitStashPop(dir)
+    }
+    return { success: false, stashed, step: 'pull', error: pullResult.error }
+  }
+
+  if (stashed) {
+    const popResult = await gitStashPop(dir)
+    if (!popResult.success) {
+      return { success: false, stashed, step: 'pop', error: popResult.error }
+    }
+  }
+
+  return { success: true, stashed }
+}
+
 export const gitFetch = async (dir: string, remote: string = 'origin'): Promise<GitResult> => {
   return runGit(dir, ['fetch', remote])
 }

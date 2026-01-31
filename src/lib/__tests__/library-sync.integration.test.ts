@@ -2,6 +2,8 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { SKILL_FILE, SKILLS_DIR } from '@/constants'
+import { DEFAULT_SKILLS } from '@/lib/default-skills'
 import { addSkillToLibrary } from '@/lib/library'
 import { syncSkillFromLibrary } from '@/lib/project-actions'
 import { initSparseCheckout } from '@/lib/sparse-checkout'
@@ -42,6 +44,11 @@ describe('library sync with origin', () => {
     runGit(libraryDir, 'init', '--initial-branch=master')
     runGit(libraryDir, 'config', 'user.email', 'test@test.com')
     runGit(libraryDir, 'config', 'user.name', 'Test')
+    for (const skill of DEFAULT_SKILLS) {
+      const skillDir = join(libraryDir, SKILLS_DIR, skill.name)
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, SKILL_FILE), skill.content)
+    }
     writeFileSync(join(libraryDir, 'README.md'), '# Library')
     runGit(libraryDir, 'add', '.')
     runGit(libraryDir, 'commit', '-m', 'Initial commit')
@@ -69,9 +76,41 @@ describe('library sync with origin', () => {
       expect(originCommitsAfter).toBeGreaterThan(originCommitsBefore)
     })
 
-    test('should fail with clear error when library is behind origin', async () => {
+    test('should auto-heal when library is behind origin with clean working tree', async () => {
       setupOrigin()
       setupLibraryWithOrigin()
+
+      runGit(libraryDir, 'clone', originDir, join(tempDir, 'other-clone'))
+      const otherClone = join(tempDir, 'other-clone')
+      runGit(otherClone, 'config', 'user.email', 'other@test.com')
+      runGit(otherClone, 'config', 'user.name', 'Other')
+
+      mkdirSync(join(otherClone, 'skills', 'remote-skill'), { recursive: true })
+      writeFileSync(join(otherClone, 'skills', 'remote-skill', 'SKILL.md'), '# Remote Skill')
+      runGit(otherClone, 'add', '.')
+      runGit(otherClone, 'commit', '-m', 'Add remote skill')
+      runGit(otherClone, 'push', 'origin', 'master')
+
+      runGit(libraryDir, 'fetch', 'origin')
+      const behindResult = runGit(libraryDir, 'rev-list', '--count', 'HEAD..origin/master')
+      expect(parseInt(behindResult.stdout.trim(), 10)).toBeGreaterThan(0)
+
+      const result = await addSkillToLibrary('test-skill', '# Test Skill Content')
+
+      expect(result.success).toBe(true)
+
+      const showResult = runGit(originDir, 'show', 'HEAD:skills/test-skill/SKILL.md')
+      expect(showResult.stdout.trim()).toBe('# Test Skill Content')
+    })
+
+    test('should fail with clear error when library has diverged from origin', async () => {
+      setupOrigin()
+      setupLibraryWithOrigin()
+
+      mkdirSync(join(libraryDir, 'skills', 'local-skill'), { recursive: true })
+      writeFileSync(join(libraryDir, 'skills', 'local-skill', 'SKILL.md'), '# Local Skill')
+      runGit(libraryDir, 'add', '.')
+      runGit(libraryDir, 'commit', '-m', 'Add local skill')
 
       runGit(libraryDir, 'clone', originDir, join(tempDir, 'other-clone'))
       const otherClone = join(tempDir, 'other-clone')
@@ -88,7 +127,7 @@ describe('library sync with origin', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error).toMatch(/behind origin|diverged/)
+        expect(result.error).toMatch(/diverged/)
       }
     })
   })

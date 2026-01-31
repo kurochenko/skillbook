@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { getLibraryPath } from '@/lib/paths'
-import { runGit, gitPull, checkOriginStatus, getRemoteUrl } from '@/lib/git'
+import { runGit, gitPullWithStash, checkOriginStatus, getRemoteUrl } from '@/lib/git'
 import { SKILL_FILE, SKILLS_DIR, SKILLBOOK_DIR } from '@/constants'
 import { isIgnoredFsError, logError } from '@/lib/logger'
 
@@ -45,15 +45,28 @@ const refreshSparseCheckout = async (
   const skillPath = `${SKILLS_DIR}/${skillName}`
 
   const skillStatus = await runGit(skillbookPath, ['status', '--porcelain', '--', skillPath])
-  if (skillStatus.success && skillStatus.output.length > 0) {
-    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
+  if (!skillStatus.success) {
+    return { success: false, error: `Failed to check skill status: ${skillStatus.error}` }
   }
+  const hasLocalChanges = skillStatus.output.length > 0
 
   const originStatus = await checkOriginStatus(skillbookPath)
 
   if (originStatus.status === 'behind') {
-    const pullResult = await gitPull(skillbookPath, true)
+    const pullResult = await gitPullWithStash(skillbookPath, {
+      message: `Auto-stash before syncing ${skillName}`,
+      shouldStash: hasLocalChanges,
+    })
+
     if (!pullResult.success) {
+      if (pullResult.step === 'stash') {
+        return { success: false, error: `Failed to stash local changes: ${pullResult.error}` }
+      }
+
+      if (pullResult.step === 'pop') {
+        return { success: false, error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in .skillbook to recover.` }
+      }
+
       return { success: false, error: `Failed to pull from origin: ${pullResult.error}` }
     }
   }
@@ -64,6 +77,14 @@ const refreshSparseCheckout = async (
 
   if (originStatus.status === 'error') {
     return { success: false, error: `Failed to check origin status: ${originStatus.error}` }
+  }
+
+  if (originStatus.status === 'no-origin' && hasLocalChanges) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
+  }
+
+  if (originStatus.status !== 'behind' && originStatus.status !== 'no-origin' && hasLocalChanges) {
+    return { success: false, error: `Local changes in ${skillPath} prevent update. Commit or discard changes before syncing.` }
   }
 
   const fileExists = existsSync(join(skillbookPath, skillPath, SKILL_FILE))
