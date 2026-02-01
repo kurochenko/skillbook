@@ -13,15 +13,15 @@ Lock-based skill syncing for projects and harnesses.
 
 ## Safety Rules
 
-- Do not edit ~/.SB/ directly. Use skillbook commands.
-- Project canonical location is .SB/skills/<id>/.
+- Do not edit ~/.skillbook/ directly. Use skillbook commands.
+- Project canonical location is .skillbook/skills/<id>/.
 
 ## Quick Reference
 
 | Command | Description |
 |---------|-------------|
-| skillbook init --library | Initialize the library at ~/.SB |
-| skillbook init --project | Initialize .SB in a project |
+| skillbook init --library | Initialize the library at ~/.skillbook |
+| skillbook init --project | Initialize .skillbook in a project |
 | skillbook status | Show project status vs library |
 | skillbook install <id> | Copy library skill into project |
 | skillbook push <id> | Push project changes into library |
@@ -29,7 +29,7 @@ Lock-based skill syncing for projects and harnesses.
 | skillbook resolve <id> --strategy library|project | Resolve diverged skill |
 | skillbook harness sync --id opencode | Sync project skills to harness |
 | skillbook harness import --id opencode | Import harness skills into project |
-| skillbook migrate --library | Migrate legacy ~/.skillbook to ~/.SB |
+| skillbook migrate --library | Create lockfile for ~/.skillbook |
 
 ## Workflows
 
@@ -42,7 +42,7 @@ skillbook init --project
 
 ### Edit Skills
 
-1. Edit in project .SB/skills/<id>/ (preferred).
+1. Edit in project .skillbook/skills/<id>/ (preferred).
 2. If you edited a harness file, run skillbook harness import --id <harness>.
 3. Run skillbook status to see changes.
 

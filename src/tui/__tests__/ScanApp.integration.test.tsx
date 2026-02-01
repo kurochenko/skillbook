@@ -71,7 +71,7 @@ describe('ScanApp TUI Integration', () => {
       unmount()
     })
 
-    test('shows managed project badge for projects with .SB', async () => {
+    test('shows managed project badge for projects with .skillbook', async () => {
       const { lastFrame, unmount } = render(<ScanApp basePath={SCAN_PROJECTS_PATH} />)
 
       await waitForFrame(lastFrame, 'PROJECTS', 5000)

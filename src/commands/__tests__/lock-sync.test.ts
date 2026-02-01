@@ -25,7 +25,7 @@ describe('lock-based sync commands (CLI)', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-lock-sync-'))
-    libraryDir = join(tempDir, '.SB')
+    libraryDir = join(tempDir, '.skillbook')
     projectDir = join(tempDir, 'project')
     mkdirSync(projectDir, { recursive: true })
   })

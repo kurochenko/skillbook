@@ -79,7 +79,7 @@ export default defineCommand({
       defineCommand({
         meta: {
           name: 'sync',
-          description: 'Copy project .SB skills into a harness folder',
+          description: 'Copy project .skillbook skills into a harness folder',
         },
         args: {
           project: {
@@ -113,7 +113,7 @@ export default defineCommand({
       defineCommand({
         meta: {
           name: 'import',
-          description: 'Copy harness skills into project .SB skills',
+          description: 'Copy harness skills into project .skillbook skills',
         },
         args: {
           project: {

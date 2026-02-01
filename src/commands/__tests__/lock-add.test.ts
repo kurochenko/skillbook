@@ -18,7 +18,7 @@ describe('lock-aware add command (CLI)', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-lock-add-'))
-    libraryDir = join(tempDir, '.SB')
+    libraryDir = join(tempDir, '.skillbook')
     fixturesDir = join(tempDir, 'fixtures')
     mkdirSync(fixturesDir, { recursive: true })
   })

@@ -32,9 +32,9 @@ Project vs harness (planned):
 ### Setup and Environment
 
 - `skillbook init --library`
-  - Create or validate `~/.SB/` git repo and `skillbook.lock.json`.
+  - Create or validate `~/.skillbook/` git repo and `skillbook.lock.json`.
 - `skillbook init --project`
-  - Create `<project>/.SB/skills` and project lock file.
+  - Create `<project>/.skillbook/skills` and project lock file.
 - `skillbook doctor`
   - Validate expected folders, lock schema, and git status in library.
 
@@ -83,9 +83,9 @@ Project vs harness (planned):
 ### Migration
 
 - `skillbook migrate [--project <path>]`
-  - Convert sparse-checkout + symlink workflow to lock-based copy in a project.
+  - Write lock entries for project .skillbook skills.
 - `skillbook migrate --library`
-  - Convert legacy `~/.skillbook` library into lock-based `~/.SB` library.
+  - Create lock entries for the legacy `~/.skillbook` library.
 
 ## Shared Flags
 

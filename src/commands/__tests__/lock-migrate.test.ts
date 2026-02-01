@@ -28,7 +28,7 @@ describe('migrate command (CLI)', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-migrate-'))
     projectDir = join(tempDir, 'project')
     legacyLibraryDir = join(tempDir, '.skillbook')
-    lockLibraryDir = join(tempDir, '.SB')
+    lockLibraryDir = join(tempDir, '.skillbook')
     mkdirSync(projectDir, { recursive: true })
   })
 
@@ -44,11 +44,10 @@ describe('migrate command (CLI)', () => {
   }
 
   const env = () => ({
-    SKILLBOOK_LEGACY_LIBRARY: legacyLibraryDir,
     SKILLBOOK_LOCK_LIBRARY: lockLibraryDir,
   })
 
-  test('migrate copies legacy .skillbook skills into .SB and writes lock entries', () => {
+  test('migrate writes lock entries for .skillbook skills', () => {
     const legacyDir = join(projectDir, '.skillbook', 'skills', 'alpha')
     mkdirSync(legacyDir, { recursive: true })
     writeFileSync(join(legacyDir, SKILL_FILE), '# Alpha v1\n', 'utf-8')
@@ -64,7 +63,7 @@ describe('migrate command (CLI)', () => {
     expect(lock.skills.alpha).toEqual({ version: 1, hash: hashSkill('# Alpha v1\n') })
   })
 
-  test('migrate --library copies legacy library into lock-based library', () => {
+  test('migrate --library writes lock entries for library skills', () => {
     const legacyDir = join(legacyLibraryDir, 'skills', 'alpha')
     mkdirSync(legacyDir, { recursive: true })
     writeFileSync(join(legacyDir, SKILL_FILE), '# Alpha v1\n', 'utf-8')

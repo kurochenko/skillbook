@@ -42,7 +42,7 @@ const setupScanLibrary = () => {
 
 const setupProjectA = () => {
   mkdirSync(PROJECT_A_PATH, { recursive: true })
-  const skillbookPath = join(PROJECT_A_PATH, '.SB')
+  const skillbookPath = join(PROJECT_A_PATH, '.skillbook')
   mkdirSync(skillbookPath, { recursive: true })
   initGitRepo(skillbookPath)
   createFile(

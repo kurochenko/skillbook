@@ -16,7 +16,7 @@ export const resolveOriginPlan = async (libraryPath: string, skillName: string):
     case 'diverged':
       return {
         status: 'error',
-        error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.SB.`,
+        error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.skillbook.`,
       }
     case 'behind': {
       const pullResult = await gitPullWithStash(libraryPath, {
@@ -31,7 +31,7 @@ export const resolveOriginPlan = async (libraryPath: string, skillName: string):
         if (pullResult.step === 'pop') {
           return {
             status: 'error',
-            error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in ~/.SB to recover.`,
+            error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in ~/.skillbook to recover.`,
           }
         }
 

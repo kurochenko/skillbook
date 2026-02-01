@@ -18,7 +18,7 @@ export default defineCommand({
   args: {
     project: {
       type: 'string',
-      description: 'Project path (lists .SB/skills)',
+      description: 'Project path (lists .skillbook/skills)',
     },
     json: {
       type: 'boolean',

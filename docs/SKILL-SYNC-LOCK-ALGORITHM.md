@@ -19,7 +19,7 @@ Maintain a lock file in both the library and the project that records a skill's 
 Library (local, git repo):
 
 ```
-~/.SB/
+~/.skillbook/
 ├── skills/
 │   └── <skill-id>/...
 └── skillbook.lock.json
@@ -29,7 +29,7 @@ Project (committed to repo):
 
 ```
 <project>/
-├── .SB/
+├── .skillbook/
 │   ├── skills/
 │   │   └── <skill-id>/...
 │   └── skillbook.lock.json
@@ -67,7 +67,7 @@ Hash is deterministic across machines:
 
 ### Install (Library -> Project)
 
-1. Copy `skills/<id>` from library into project `.SB/skills/<id>`.
+1. Copy `skills/<id>` from library into project `.skillbook/skills/<id>`.
 2. Copy lock entry from library into project lock file.
 3. Result: project lock entry is the base version and base hash.
 
@@ -112,7 +112,7 @@ When both project and library changed:
 4. Push merged result to library as new version (`Vlib + 1`).
 5. Update project lock to the new version and hash.
 
-Note: With only version+hash you can detect divergence but cannot do a true 3-way merge. If we want automatic merges, store a base snapshot in the project (for example `.SB/base/<id>/`) and use it as the third input.
+Note: With only version+hash you can detect divergence but cannot do a true 3-way merge. If we want automatic merges, store a base snapshot in the project (for example `.skillbook/base/<id>/`) and use it as the third input.
 
 ## Status Mapping
 

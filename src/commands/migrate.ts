@@ -5,11 +5,9 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { SKILL_FILE } from '@/constants'
-import { copySkillDir } from '@/lib/lock-copy'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import {
-  getLegacyLibraryPath,
   getLockFilePath,
   getLockLibraryPath,
   getLockSkillsPath,
@@ -24,12 +22,12 @@ const fail = (message: string, exitCode = 1): never => {
 export default defineCommand({
   meta: {
     name: 'migrate',
-    description: 'Migrate legacy .skillbook structure into lock-based .SB',
+    description: 'Create lock entries for existing .skillbook skills',
   },
   args: {
     library: {
       type: 'boolean',
-      description: 'Migrate legacy library (~/.skillbook) into lock-based library (~/.SB)',
+      description: 'Create lockfile for library skills in ~/.skillbook',
       default: false,
     },
     project: {
@@ -42,71 +40,36 @@ export default defineCommand({
       fail('Use either --library or --project, not both.')
     }
 
-    if (args.library) {
-      const legacyLibraryPath = getLegacyLibraryPath()
-      const legacySkillsPath = join(legacyLibraryPath, 'skills')
-      if (!existsSync(legacySkillsPath)) {
-        fail(`Legacy library skills not found at ${legacySkillsPath}`)
-      }
+    const targetRoot = args.library
+      ? getLockLibraryPath()
+      : getProjectLockRoot(args.project ?? process.cwd())
+    const skillsPath = getLockSkillsPath(targetRoot)
+    const lockPath = getLockFilePath(targetRoot)
 
-      const targetRoot = getLockLibraryPath()
-      const targetSkillsPath = getLockSkillsPath(targetRoot)
-      const lockPath = getLockFilePath(targetRoot)
-      let lock = readLockFile(lockPath)
-
-      const entries = readdirSync(legacySkillsPath, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name)
-        .filter((name) => existsSync(join(legacySkillsPath, name, SKILL_FILE)))
-
-      if (entries.length === 0) {
-        p.log.info(pc.dim('No legacy skills found to migrate'))
-        return
-      }
-
-      for (const skillId of entries) {
-        const sourceDir = join(legacySkillsPath, skillId)
-        const targetDir = join(targetSkillsPath, skillId)
-        copySkillDir(sourceDir, targetDir)
-        const hash = await computeSkillHash(targetDir)
-        lock = setLockEntry(lock, skillId, { version: 1, hash })
-        writeLockFile(lockPath, lock)
-      }
-
-      p.log.success(`Migrated ${entries.length} skill${entries.length === 1 ? '' : 's'} to ${targetRoot}`)
-      return
+    if (!existsSync(skillsPath)) {
+      fail(`Skills directory not found at ${skillsPath}`)
     }
 
-    const projectPath = args.project ?? process.cwd()
-    const legacySkillsPath = join(projectPath, '.skillbook', 'skills')
-    if (!existsSync(legacySkillsPath)) {
-      fail(`Legacy skills not found at ${legacySkillsPath}`)
-    }
-
-    const projectRoot = getProjectLockRoot(projectPath)
-    const targetSkillsPath = getLockSkillsPath(projectRoot)
-    const lockPath = getLockFilePath(projectRoot)
     let lock = readLockFile(lockPath)
-
-    const entries = readdirSync(legacySkillsPath, { withFileTypes: true })
+    const entries = readdirSync(skillsPath, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
-      .filter((name) => existsSync(join(legacySkillsPath, name, SKILL_FILE)))
+      .filter((name) => existsSync(join(skillsPath, name, SKILL_FILE)))
 
     if (entries.length === 0) {
-      p.log.info(pc.dim('No legacy skills found to migrate'))
+      p.log.info(pc.dim('No skills found to migrate'))
       return
     }
 
     for (const skillId of entries) {
-      const sourceDir = join(legacySkillsPath, skillId)
-      const targetDir = join(targetSkillsPath, skillId)
-      copySkillDir(sourceDir, targetDir)
-      const hash = await computeSkillHash(targetDir)
-      lock = setLockEntry(lock, skillId, { version: 1, hash })
-      writeLockFile(lockPath, lock)
+      const skillDir = join(skillsPath, skillId)
+      const hash = await computeSkillHash(skillDir)
+      const existing = lock.skills[skillId]
+      const version = existing?.version ?? 1
+      lock = setLockEntry(lock, skillId, { version, hash })
     }
 
-    p.log.success(`Migrated ${entries.length} skill${entries.length === 1 ? '' : 's'} to .SB`)
+    writeLockFile(lockPath, lock)
+    p.log.success(`Wrote lockfile for ${entries.length} skill${entries.length === 1 ? '' : 's'}`)
   },
 })

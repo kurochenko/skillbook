@@ -12,7 +12,7 @@ describe('doctor command (CLI)', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-doctor-'))
-    libraryDir = join(tempDir, '.SB')
+    libraryDir = join(tempDir, '.skillbook')
     projectDir = join(tempDir, 'project')
     mkdirSync(projectDir, { recursive: true })
   })

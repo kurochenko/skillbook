@@ -25,7 +25,7 @@ describe('lock-based workflow (CLI)', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-lock-cli-'))
-    libraryDir = join(tempDir, '.SB')
+    libraryDir = join(tempDir, '.skillbook')
     projectDir = join(tempDir, 'project')
     mkdirSync(projectDir, { recursive: true })
   })
@@ -75,7 +75,7 @@ describe('lock-based workflow (CLI)', () => {
   }
 
   describe('init', () => {
-    test('init --library creates .SB library structure', () => {
+    test('init --library creates .skillbook library structure', () => {
       const result = runCli(['init', '--library'], env())
 
       expect(result.exitCode).toBe(0)
@@ -86,7 +86,7 @@ describe('lock-based workflow (CLI)', () => {
       expect(lock.skills).toEqual({})
     })
 
-    test('init --project creates .SB project structure', () => {
+    test('init --project creates .skillbook project structure', () => {
       const result = runCli(['init', '--project', '--path', projectDir], env())
 
       expect(result.exitCode).toBe(0)

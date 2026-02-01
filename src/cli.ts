@@ -71,8 +71,8 @@ Create skills once, reuse them across all your projects.
 
 ${pc.bold('LOCK-BASED WORKFLOW (IMPLEMENTED)')}
 
-${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.SB (or SKILLBOOK_LOCK_LIBRARY)')}
-${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .SB folder')}
+${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.skillbook (or SKILLBOOK_LOCK_LIBRARY)')}
+${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .skillbook folder')}
 ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
 ${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
@@ -85,8 +85,8 @@ ${pc.cyan('  skillbook resolve <id> --project <path> --strategy <library|project
 ${pc.cyan('  skillbook uninstall <id> [--project <path>]')}${pc.dim(' Remove skill from project')}
 ${pc.cyan('  skillbook doctor --library')}${pc.dim('                 Validate library lock setup')}
 ${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate project lock setup')}
-${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Migrate project .skillbook to .SB')}
-${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Migrate ~/.skillbook to ~/.SB')}
+${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Write lockfile for project .skillbook')}
+${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Write lockfile for ~/.skillbook')}
 ${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
 ${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Sync project skills to harness')}
 ${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Sync harness skills into project')}
@@ -105,14 +105,13 @@ ${pc.dim('  merge strategy for resolve')}
 
 ${pc.bold('OPTIONS')}
 
-${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.SB/logs/skillbook.log')}
+${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.skillbook/logs/skillbook.log')}
 ${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
 
 ${pc.bold('ENV')}
 
-${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.SB)')}
-${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.SB)')}
-${pc.cyan('  SKILLBOOK_LEGACY_LIBRARY')}${pc.dim(' Override legacy library path (default: ~/.skillbook)')}
+${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.skillbook)')}
+${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.skillbook)')}
 
 ${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
 

@@ -75,7 +75,7 @@ const listProjectSkills = (projectSkillsPath: string): string[] => {
 export default defineCommand({
   meta: {
     name: 'status',
-    description: 'Show lock-based status for project skills in .SB',
+    description: 'Show lock-based status for project skills in .skillbook',
   },
   args: {
     project: {

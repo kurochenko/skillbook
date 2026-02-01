@@ -16,7 +16,7 @@ This document describes the legacy TUI and sparse-checkout design. The lock-base
 - Works in project or outside (treats as empty project)
 - **Skills tab:** INSTALLED | UNTRACKED | AVAILABLE
 - **Harnesses tab:** Toggle on/off with auto-detection
-- `.SB/` only created on first action
+- `.skillbook/` only created on first action
 
 ---
 
@@ -25,7 +25,7 @@ This document describes the legacy TUI and sparse-checkout design. The lock-base
 ### 1. Config Module (`src/lib/config.ts`)
 
 ```typescript
-// Project config stored in .SB/config.json
+// Project config stored in .skillbook/config.json
 type ProjectConfig = {
   harnesses: string[]      // enabled harnesses
 }
@@ -34,9 +34,9 @@ type ProjectConfig = {
 
 // Functions:
 readConfig(projectPath): ProjectConfig | null     // returns null if no config
-writeConfig(projectPath, config): void            // creates .SB/ on write
-getConfigPath(projectPath): string                // .SB/config.json
-ensureSkillbookDir(projectPath): void             // creates .SB/ if needed
+writeConfig(projectPath, config): void            // creates .skillbook/ on write
+getConfigPath(projectPath): string                // .skillbook/config.json
+ensureSkillbookDir(projectPath): void             // creates .skillbook/ if needed
 ```
 
 ### 2. Project Module (`src/lib/project.ts`)
@@ -56,11 +56,11 @@ type UntrackedSkill = {
 
 // Functions:
 detectProjectContext(cwd): string | null          // returns project root or null
-getInstalledSkills(projectPath): InstalledSkill[] // from .SB/skills/
+getInstalledSkills(projectPath): InstalledSkill[] // from .skillbook/skills/
 getUntrackedSkills(projectPath): UntrackedSkill[] // local, not in library
-installSkill(projectPath, skillName): void        // library -> .SB/skills/ -> harnesses
+installSkill(projectPath, skillName): void        // library -> .skillbook/skills/ -> harnesses
 uninstallSkill(projectPath, skillName): void      // remove from project + harnesses
-pushSkill(projectPath, skillName): void           // .SB/skills/ -> library
+pushSkill(projectPath, skillName): void           // .skillbook/skills/ -> library
 syncSkill(projectPath, skillName): void           // pull library -> local
 ```
 
@@ -112,18 +112,18 @@ skillbook scan [path]   // scans and adds to library
 ## Data Flow
 
 ```
-Library (~/.SB/skills/)
+Library (~/.skillbook/skills/)
     |
     | installSkill() copies library -> project
     v
-Project (.SB/skills/)       <- source of truth for project
+Project (.skillbook/skills/)       <- source of truth for project
     |
     | syncToHarness() copies to enabled harnesses
     v
 Harnesses (.claude/skills/, .cursor/rules/, etc.)
 ```
 
-**Key insight:** `.SB/skills/` is the canonical location in project.
+**Key insight:** `.skillbook/skills/` is the canonical location in project.
 Harnesses are just output targets that get synced from it.
 
 ---
@@ -171,9 +171,9 @@ src/
 |----------|----------|
 | `skillbook` outside project | Treat as empty project, show AVAILABLE only |
 | `skillbook` in project | Show INSTALLED + UNTRACKED + AVAILABLE |
-| First action (install/toggle) | Create `.SB/` folder |
-| Install skill | Copy: library -> `.SB/skills/` -> enabled harnesses |
+| First action (install/toggle) | Create `.skillbook/` folder |
+| Install skill | Copy: library -> `.skillbook/skills/` -> enabled harnesses |
 | Toggle harness ON | Sync all installed skills to that harness |
 | Toggle harness OFF | Remove all skills from that harness |
-| Push skill | Copy: `.SB/skills/` -> library (git commit) |
-| Sync skill | Copy: library -> `.SB/skills/` -> harnesses |
+| Push skill | Copy: `.skillbook/skills/` -> library (git commit) |
+| Sync skill | Copy: library -> `.skillbook/skills/` -> harnesses |

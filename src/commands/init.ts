@@ -29,17 +29,17 @@ const ensureLockFile = (path: string): boolean => {
 export default defineCommand({
   meta: {
     name: 'init',
-    description: 'Initialize lock-based .SB structure',
+    description: 'Initialize lock-based .skillbook structure',
   },
   args: {
     library: {
       type: 'boolean',
-      description: 'Initialize the lock-based library at ~/.SB or SKILLBOOK_LOCK_LIBRARY',
+      description: 'Initialize the lock-based library at ~/.skillbook or SKILLBOOK_LOCK_LIBRARY',
       default: false,
     },
     project: {
       type: 'boolean',
-      description: 'Initialize the lock-based project folder in <project>/.SB',
+      description: 'Initialize the lock-based project folder in <project>/.skillbook',
       default: false,
     },
     path: {

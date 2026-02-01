@@ -42,7 +42,7 @@ A CLI tool to manage AI coding assistant skills across projects.
 ### Overview
 
 ```
-~/.SB/                     # Library (git repo, ALL skills)
+~/.skillbook/                     # Library (git repo, ALL skills)
 ├── .git/
 ├── skills/
 │   ├── beads/SKILL.md
@@ -52,18 +52,18 @@ A CLI tool to manage AI coding assistant skills across projects.
 └── config.json
 
 project/
-├── .SB/                   # Sparse checkout of library (only project's skills)
+├── .skillbook/                   # Sparse checkout of library (only project's skills)
 │   └── skills/
 │       ├── beads/SKILL.md        ← sparse-checked-out from library
 │       └── typescript-cli/SKILL.md
 ├── .claude/skills/
-│   ├── beads/                    ← directory symlink → .SB/skills/beads/
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
 │   └── typescript-cli/           ← directory symlink
 ├── .opencode/skill/
-│   ├── beads/                    ← directory symlink → .SB/skills/beads/
+│   ├── beads/                    ← directory symlink → .skillbook/skills/beads/
 │   └── typescript-cli/           ← directory symlink
 └── .cursor/rules/
-    ├── beads.md                  ← file symlink → .SB/skills/beads/SKILL.md
+    ├── beads.md                  ← file symlink → .skillbook/skills/beads/SKILL.md
     └── typescript-cli.md         ← file symlink
 ```
 
@@ -71,15 +71,15 @@ project/
 
 | Component | Location | What It Is | Git Status |
 |-----------|----------|------------|------------|
-| **Library** | `~/.SB/` | Git repo with ALL skills | Own git repo |
-| **Project Cache** | `.SB/` | Sparse checkout of library | Part of project git |
-| **Harness Folders** | `.claude/`, `.cursor/`, `.opencode/` | Symlinks to `.SB/` | Part of project git |
+| **Library** | `~/.skillbook/` | Git repo with ALL skills | Own git repo |
+| **Project Cache** | `.skillbook/` | Sparse checkout of library | Part of project git |
+| **Harness Folders** | `.claude/`, `.cursor/`, `.opencode/` | Symlinks to `.skillbook/` | Part of project git |
 
 ### Why This Architecture?
 
 | Problem | Solution |
 |---------|----------|
-| Skills duplicated per harness | Single file in `.SB/`, symlinked to harnesses |
+| Skills duplicated per harness | Single file in `.skillbook/`, symlinked to harnesses |
 | Skills drift between projects | Library is source of truth, sparse checkout syncs |
 | Team members use different tools | Symlinks work for all harnesses from same source |
 | Want to leave skillbook | `eject` converts symlinks to real files |
@@ -92,7 +92,7 @@ project/
 
 | Status | Badge | Color | Meaning | Status |
 |--------|-------|-------|---------|--------|
-| OK | `[✓]` | green | Symlinked to .SB, up to date | ✅ |
+| OK | `[✓]` | green | Symlinked to .skillbook, up to date | ✅ |
 | Ahead | `[ahead]` | yellow | Symlinked, local has unpushed changes | 🔜 Planned |
 | Behind | `[behind]` | cyan | Symlinked, library has updates to pull | 🔜 Planned |
 | Detached | `[detached]` | dim | Real file, same as library (safe to sync) | ✅ |
@@ -105,11 +105,11 @@ These statuses only apply to individual harness entries:
 
 | Status | Badge | Meaning |
 |--------|-------|---------|
-| OK | `[✓]` | Symlinked to .SB |
+| OK | `[✓]` | Symlinked to .skillbook |
 | Detached | `[detached]` | Real file, matches library |
 | Conflict | `[conflict]` | Real file, differs from library |
 
-**Note:** `ahead`/`behind` are skill-level only because symlinks share the same `.SB/` source.
+**Note:** `ahead`/`behind` are skill-level only because symlinks share the same `.skillbook/` source.
 
 ### Sections
 
@@ -241,7 +241,7 @@ HARNESSES
 
 No separate "setup" step required. On first sync/install action:
 
-1. `.SB/` is automatically created as sparse checkout of library
+1. `.skillbook/` is automatically created as sparse checkout of library
 2. Skill is added to sparse checkout
 3. Symlink created in harness folder
 
@@ -249,10 +249,10 @@ No separate "setup" step required. On first sync/install action:
 
 When user presses `[s]ync` on a detached/conflict skill:
 
-1. If `.SB/` doesn't exist → init sparse checkout (lazy init)
+1. If `.skillbook/` doesn't exist → init sparse checkout (lazy init)
 2. Add skill to sparse checkout
 3. Remove real file/folder from harness
-4. Create symlink to `.SB/skills/<name>/`
+4. Create symlink to `.skillbook/skills/<name>/`
 
 For `[conflict]`: sync uses library version (local changes lost)
 
@@ -277,9 +277,9 @@ After setup, installing a skill:
 When user edits a skill (via any harness symlink):
 
 ```
-Changes are in .SB/skills/ (sparse checkout)
+Changes are in .skillbook/skills/ (sparse checkout)
   ↓
-Commit in .SB/ = commit in library
+Commit in .skillbook/ = commit in library
   ↓
 Push to library remote (if configured)
 ```
@@ -287,7 +287,7 @@ Push to library remote (if configured)
 ### Sync / Pull
 
 ```
-git pull in .SB/
+git pull in .skillbook/
   ↓
 Sparse checkout updates automatically
   ↓
@@ -304,7 +304,7 @@ skillbook eject
 Ejecting will:
   1. Copy all skills to harness folders as real files
   2. Remove symlinks
-  3. Remove .SB/ folder
+  3. Remove .skillbook/ folder
 
 You can run 'skillbook' again anytime to re-setup.
 
@@ -318,7 +318,7 @@ Which harnesses to eject to?
 
 After eject:
 - Harness folders have real files (copies)
-- No `.SB/` folder
+- No `.skillbook/` folder
 - Running `skillbook` again shows read-only mode, offers setup
 
 ---
@@ -331,7 +331,7 @@ After eject:
 | `skillbook add <path>` | Add a skill file to the library | ✅ |
 | `skillbook list` | List skills in library | ✅ |
 | `skillbook scan [path]` | Scan for skills, add to library (TUI) | ✅ |
-| `skillbook eject` | Convert symlinks to real files, remove .SB | 🔜 Planned |
+| `skillbook eject` | Convert symlinks to real files, remove .skillbook | 🔜 Planned |
 
 ### Scan Command
 
@@ -423,7 +423,7 @@ Overwrite 'beads' in library? This will replace the existing version.
 
 ## Config
 
-### Project Config (`.SB/config.json`)
+### Project Config (`.skillbook/config.json`)
 
 ```json
 {
@@ -433,7 +433,7 @@ Overwrite 'beads' in library? This will replace the existing version.
 
 Note: No `skills` array - filesystem is source of truth (sparse checkout contents).
 
-### Library Config (`~/.SB/config.json`)
+### Library Config (`~/.skillbook/config.json`)
 
 ```json
 {
@@ -450,7 +450,7 @@ Note: No `skills` array - filesystem is source of truth (sparse checkout content
 - [x] TUI prototype with Ink
 - [x] Harness detection
 - [x] Config module (JSON-based)
-- [x] Sparse checkout for `.SB/`
+- [x] Sparse checkout for `.skillbook/`
 - [x] Symlink management (folder symlinks for directory harnesses)
 - [x] Lazy init on first sync/install
 - [x] Install/uninstall/sync actions
@@ -513,7 +513,7 @@ test-fixtures/
 │       ├── skill-in-lib/SKILL.md
 │       └── skill-available/SKILL.md
 └── project/              # Mock project (git repo)
-    ├── .SB/       # Sparse checkout (git repo)
+    ├── .skillbook/       # Sparse checkout (git repo)
     ├── .claude/skills/   # Various skill states
     └── .opencode/skill/
 ```
