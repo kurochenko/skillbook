@@ -1,0 +1,170 @@
+import { existsSync, readdirSync } from 'fs'
+import { join } from 'path'
+import { defineCommand } from 'citty'
+import pc from 'picocolors'
+import * as p from '@clack/prompts'
+
+import { SKILL_FILE } from '@/constants'
+import { computeSkillHash } from '@/lib/skill-hash'
+import { readLockFile } from '@/lib/lockfile'
+import { resolveLockStatus } from '@/lib/lock-status'
+import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+
+type StatusSkill = {
+  id: string
+  status: string
+  projectHash: string
+  project: { version?: number; hash?: string } | null
+  library: { version?: number; hash?: string } | null
+}
+
+type StatusSummary = {
+  total: number
+  synced: number
+  ahead: number
+  behind: number
+  diverged: number
+  localOnly: number
+}
+
+type StatusOutput = {
+  project: {
+    path: string
+    root: string
+    skillsPath: string
+    lockFile: string
+  }
+  library: {
+    path: string
+    skillsPath: string
+    lockFile: string
+  }
+  summary: StatusSummary
+  skills: StatusSkill[]
+}
+
+const createSummary = (): StatusSummary => ({
+  total: 0,
+  synced: 0,
+  ahead: 0,
+  behind: 0,
+  diverged: 0,
+  localOnly: 0,
+})
+
+const updateSummary = (summary: StatusSummary, status: string): StatusSummary => {
+  const next = { ...summary, total: summary.total + 1 }
+  if (status === 'synced') return { ...next, synced: next.synced + 1 }
+  if (status === 'ahead') return { ...next, ahead: next.ahead + 1 }
+  if (status === 'behind') return { ...next, behind: next.behind + 1 }
+  if (status === 'diverged') return { ...next, diverged: next.diverged + 1 }
+  if (status === 'local-only') return { ...next, localOnly: next.localOnly + 1 }
+  return next
+}
+
+const listProjectSkills = (projectSkillsPath: string): string[] => {
+  if (!existsSync(projectSkillsPath)) return []
+
+  return readdirSync(projectSkillsPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .filter((entry) => existsSync(join(projectSkillsPath, entry.name, SKILL_FILE)))
+    .map((entry) => entry.name)
+    .sort()
+}
+
+export default defineCommand({
+  meta: {
+    name: 'status',
+    description: 'Show lock-based status for project skills in .SB',
+  },
+  args: {
+    project: {
+      type: 'string',
+      description: 'Project path (defaults to current directory)',
+    },
+    json: {
+      type: 'boolean',
+      description: 'Output machine-readable JSON',
+      default: false,
+    },
+  },
+  run: async ({ args }) => {
+    const projectPath = args.project ?? process.cwd()
+    const projectRoot = getProjectLockRoot(projectPath)
+    const projectSkillsPath = getLockSkillsPath(projectRoot)
+
+    const libraryPath = getLockLibraryPath()
+    const libraryLockPath = getLockFilePath(libraryPath)
+    const projectLockPath = getLockFilePath(projectRoot)
+    const librarySkillsPath = getLockSkillsPath(libraryPath)
+
+    const libraryLock = readLockFile(libraryLockPath)
+    const projectLock = readLockFile(projectLockPath)
+
+    const skillNames = listProjectSkills(projectSkillsPath)
+    const skills: StatusSkill[] = []
+    let summary = createSummary()
+
+    for (const skillId of skillNames) {
+      const skillDir = join(projectSkillsPath, skillId)
+      const projectHash = await computeSkillHash(skillDir)
+      const projectEntry = projectLock.skills[skillId] ?? null
+      const libraryEntry = libraryLock.skills[skillId] ?? null
+      const status = resolveLockStatus({ projectHash, projectEntry, libraryEntry })
+
+      skills.push({
+        id: skillId,
+        status,
+        projectHash,
+        project: projectEntry
+          ? { version: projectEntry.version, hash: projectEntry.hash }
+          : null,
+        library: libraryEntry
+          ? { version: libraryEntry.version, hash: libraryEntry.hash }
+          : null,
+      })
+
+      summary = updateSummary(summary, status)
+    }
+
+    const output: StatusOutput = {
+      project: {
+        path: projectPath,
+        root: projectRoot,
+        skillsPath: projectSkillsPath,
+        lockFile: projectLockPath,
+      },
+      library: {
+        path: libraryPath,
+        skillsPath: librarySkillsPath,
+        lockFile: libraryLockPath,
+      },
+      summary,
+      skills,
+    }
+
+    if (args.json) {
+      process.stdout.write(JSON.stringify(output))
+      return
+    }
+
+    if (skills.length === 0) {
+      p.log.info(pc.dim(`Project: ${projectPath}`))
+      p.log.info(pc.dim(`Library: ${libraryPath}`))
+      p.log.info(pc.dim('No skills installed in project'))
+      return
+    }
+
+    p.log.info(pc.dim(`Project: ${projectPath}`))
+    p.log.info(pc.dim(`Library: ${libraryPath}`))
+    p.log.info(
+      pc.dim(
+        `Skills: ${summary.total} (synced ${summary.synced}, ahead ${summary.ahead}, behind ${summary.behind}, diverged ${summary.diverged}, local-only ${summary.localOnly})`,
+      ),
+    )
+
+    for (const skill of skills) {
+      console.log(`${skill.id} ${pc.dim(`[${skill.status}]`)}`)
+    }
+  },
+})

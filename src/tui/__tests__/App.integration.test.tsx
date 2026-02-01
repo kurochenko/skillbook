@@ -444,8 +444,8 @@ describe('App TUI Library Mode', () => {
 })
 
 describe('App TUI Lazy Init', () => {
-  test('install creates .skillbook sparse checkout when missing', async () => {
-    const skillbookPath = join(PROJECT_PATH, '.skillbook')
+  test('install creates .SB sparse checkout when missing', async () => {
+    const skillbookPath = join(PROJECT_PATH, '.SB')
     const skillbookGitPath = join(skillbookPath, '.git')
 
     if (existsSync(skillbookPath)) {

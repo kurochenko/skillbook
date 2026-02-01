@@ -20,7 +20,7 @@ export type ToolId = keyof typeof TOOLS
 
 export const SUPPORTED_TOOLS = Object.keys(TOOLS) as ToolId[]
 
-export const DEFAULT_LIBRARY_PATH = '~/.skillbook'
-export const SKILLBOOK_DIR = '.skillbook'
+export const DEFAULT_LIBRARY_PATH = '~/.SB'
+export const SKILLBOOK_DIR = '.SB'
 export const SKILLS_DIR = 'skills'
 export const SKILL_FILE = 'SKILL.md'

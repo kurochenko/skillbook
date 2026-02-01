@@ -17,7 +17,7 @@ test-fixtures/
 After running `setup.ts`:
 
 ```
-library/                                    # Mock ~/.skillbook
+library/                                    # Mock ~/.SB
 ├── .git/
 └── skills/
     ├── skill-in-lib/SKILL.md              # Installed in project
@@ -28,13 +28,13 @@ library/                                    # Mock ~/.skillbook
 
 project/                                    # Mock project
 ├── .git/
-├── .skillbook/                             # Sparse checkout (--no-cone mode)
+├── .SB/                             # Sparse checkout (--no-cone mode)
 │   ├── .git/
 │   ├── config.json                         # harnesses: ['claude-code']
 │   └── skills/
 │       └── skill-in-lib/SKILL.md
 ├── .claude/skills/                         # Enabled harness
-│   ├── skill-in-lib/                       # Directory symlink -> .skillbook/skills/skill-in-lib
+│   ├── skill-in-lib/                       # Directory symlink -> .SB/skills/skill-in-lib
 │   ├── skill-detached/SKILL.md             # Real file, matches library
 │   ├── skill-local/SKILL.md                # Real file, not in library
 │   └── skill-unanimous-conflict/SKILL.md   # Real file, differs from library
@@ -47,7 +47,7 @@ project/                                    # Mock project
 
 | Skill | Location | State | Expected Display |
 |-------|----------|-------|------------------|
-| skill-in-lib | claude | directory symlink to .skillbook | `[✓]` ok (but mixed due to opencode) |
+| skill-in-lib | claude | directory symlink to .SB | `[✓]` ok (but mixed due to opencode) |
 | skill-in-lib | opencode | real file, differs | `[conflict]` |
 | skill-detached | claude | real file, matches lib | `[detached]` |
 | skill-local | claude | real file, not in lib | LOCAL section |
@@ -65,12 +65,12 @@ For directory-based harnesses (Claude Code, OpenCode), symlinks are at the **dir
 
 The symlink target is relative:
 ```
-../../.skillbook/skills/skill-in-lib
+../../.SB/skills/skill-in-lib
 ```
 
 For flat-file harnesses (Cursor), symlinks are at the file level:
 ```
-.cursor/rules/skill-name.md -> ../.skillbook/skills/skill-name/SKILL.md
+.cursor/rules/skill-name.md -> ../.SB/skills/skill-name/SKILL.md
 ```
 
 ## Usage

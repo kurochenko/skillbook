@@ -6,7 +6,7 @@ import { createFile } from './utils'
 export const FIXTURES_ROOT = dirname(import.meta.path)
 export const LIBRARY_PATH = join(FIXTURES_ROOT, 'library')
 export const PROJECT_PATH = join(FIXTURES_ROOT, 'project')
-export const SKILLBOOK_PATH = join(PROJECT_PATH, '.skillbook')
+export const SKILLBOOK_PATH = join(PROJECT_PATH, '.SB')
 
 const SKILL_CONTENT = {
   'skill-in-lib': '# Skill In Library\n\nThis skill is in the library and installed.',
@@ -54,7 +54,7 @@ const setupLibrary = () => {
 }
 
 const setupSkillbook = () => {
-  runGit(PROJECT_PATH, 'clone', '--filter=blob:none', '--sparse', '--no-checkout', LIBRARY_PATH, '.skillbook')
+  runGit(PROJECT_PATH, 'clone', '--filter=blob:none', '--sparse', '--no-checkout', LIBRARY_PATH, '.SB')
   runGit(SKILLBOOK_PATH, 'sparse-checkout', 'init', '--cone')
   runGit(SKILLBOOK_PATH, 'sparse-checkout', 'set', '--no-cone', '/*', '!/skills', 'skills/skill-in-lib')
   runGit(SKILLBOOK_PATH, 'checkout')
@@ -71,7 +71,7 @@ const setupProject = () => {
 
   mkdirSync(join(PROJECT_PATH, '.claude', 'skills'), { recursive: true })
   symlinkSync(
-    join('..', '..', '.skillbook', 'skills', 'skill-in-lib'),
+    join('..', '..', '.SB', 'skills', 'skill-in-lib'),
     join(PROJECT_PATH, '.claude', 'skills', 'skill-in-lib'),
   )
   createFile(

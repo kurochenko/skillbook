@@ -1,0 +1,5 @@
+export const LOCK_BASE_DIR = '.SB'
+export const LOCK_SKILLS_DIR = 'skills'
+export const LOCK_FILE = 'skillbook.lock.json'
+export const LOCK_LIBRARY_ENV = 'SKILLBOOK_LOCK_LIBRARY'
+export const DEFAULT_LOCK_LIBRARY_PATH = '~/.SB'

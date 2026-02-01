@@ -34,7 +34,7 @@ A single global folder works if you only use Claude Code and you are solo. It br
 **skillbook** is a centralized Git repository that serves as your skill library. Projects link to it via sparse checkouts, keeping skills in sync automatically:
 
 ```
-~/.skillbook/                    # Central library (Git repo)
+~/.SB/                    # Central library (Git repo)
 └── skills/
     ├── typescript/
     ├── review-gitlab/
@@ -149,7 +149,7 @@ Add a skill from your current project to the library.
 
 ```bash
 skillbook add .claude/skills/beads/SKILL.md
-# -> Copies to ~/.skillbook/skills/beads/SKILL.md
+# -> Copies to ~/.SB/skills/beads/SKILL.md
 
 skillbook add .claude/skills/beads/SKILL.md --force  # Overwrite existing
 ```
@@ -173,7 +173,7 @@ skillbook upgrade
 ## Skill Library Structure
 
 ```
-~/.skillbook/
+~/.SB/
 └── skills/
     ├── typescript/
     │   └── SKILL.md

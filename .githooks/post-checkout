@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Post-checkout hook for skillbook repository
+# Automatically sets up symlinks when creating git worktrees
+#
+# To use: Copy or symlink this file to .git/hooks/post-checkout
+# ln -s ../../.githooks/post-checkout .git/hooks/post-checkout
+
+set -euo pipefail
+
+PREV_HEAD=$1
+NEW_HEAD=$2
+CHECKOUT_FLAG=$3
+
+# Only run on branch checkouts (flag=1), not file checkouts
+if [ "$CHECKOUT_FLAG" != "1" ]; then
+    exit 0
+fi
+
+# Detect worktree creation: previous HEAD is null (new worktree)
+if [ "$PREV_HEAD" != "0000000000000000000000000000000000000000" ]; then
+    exit 0
+fi
+
+# Check if we're in a linked worktree (not the main repo)
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+
+# If common dir equals git dir, we're in the main worktree - nothing to do
+if [ "$GIT_COMMON_DIR" = "$GIT_DIR" ]; then
+    exit 0
+fi
+
+# This is a linked worktree - find the main repo path
+MAIN_REPO=$(dirname "$GIT_COMMON_DIR")
+CURRENT_WORKTREE=$(pwd)
+
+echo "Setting up worktree symlinks..."
+
+# Helper function to create relative symlink
+create_relative_symlink() {
+    local target=$1
+    local link_name=$2
+    local rel_path
+
+    if command -v realpath >/dev/null 2>&1; then
+        rel_path=$(realpath --relative-to="$(dirname "$link_name")" "$target" 2>/dev/null) || rel_path="$target"
+    else
+        # Fallback: use absolute path if realpath not available
+        rel_path="$target"
+    fi
+
+    ln -s "$rel_path" "$link_name"
+}
+
+# Helper function to symlink a folder if it exists
+link_folder() {
+    local folder=$1
+    if [ -d "$MAIN_REPO/$folder" ] && [ ! -e "$CURRENT_WORKTREE/$folder" ]; then
+        create_relative_symlink "$MAIN_REPO/$folder" "$CURRENT_WORKTREE/$folder"
+        echo "  Linked $folder"
+    fi
+}
+
+# Symlink .SB (skill library)
+link_folder ".SB"
+
+# Symlink harness folders (Claude Code, Cursor, OpenCode)
+link_folder ".claude"
+link_folder ".cursor"
+link_folder ".opencode"
+
+echo "Worktree setup complete!"
+
+exit 0

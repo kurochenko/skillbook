@@ -6,7 +6,7 @@ import pc from 'picocolors'
 import { VERSION, checkForUpdate } from '@/lib/version'
 import { initLogger, logWarn } from '@/lib/logger'
 
-const SUBCOMMANDS = ['add', 'list', 'scan', 'upgrade']
+const SUBCOMMANDS = ['add', 'init', 'install', 'list', 'pull', 'push', 'scan', 'status', 'upgrade']
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
 const err = (s: string) => process.stderr.write(`${s}\n`)
@@ -53,29 +53,40 @@ ${pc.bold(pc.cyan('skillbook'))}${pc.dim(` v${VERSION}`)}
 Manage AI coding assistant skills in one place.
 Create skills once, reuse them across all your projects.
 
-${pc.bold('GETTING STARTED')}
+${pc.bold('LOCK-BASED WORKFLOW (IMPLEMENTED)')}
 
-${pc.dim('  1.')} Build your skill library by scanning your projects root:
-${pc.cyan('     skillbook scan ~/projects')}
-${pc.dim('     Finds skills across projects and lets you choose which to add.')}
+${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.SB (or SKILLBOOK_LOCK_LIBRARY)')}
+${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .SB folder')}
+${pc.cyan('  skillbook status --project <path>')}${pc.dim('              Show lock-based status for project skills')}
+${pc.cyan('  skillbook status --project <path> --json')}${pc.dim('        JSON output for automation')}
+${pc.cyan('  skillbook install <id> --project <path>')}${pc.dim('      Copy library skill into project')}
+${pc.cyan('  skillbook pull <id> --project <path>')}${pc.dim('         Pull library changes into project')}
+${pc.cyan('  skillbook push <id> --project <path>')}${pc.dim('         Push project changes into library')}
 
-${pc.dim('  2.')} Open the interactive manager in any project:
-${pc.cyan('     cd my-project && skillbook')}
-${pc.dim('     Or specify a path: ')}${pc.cyan('skillbook ~/projects/my-app')}
+${pc.bold('LIBRARY CONTENT (CURRENT)')}
 
-${pc.bold('COMMANDS')}
+${pc.cyan('  skillbook scan [path]')}${pc.dim('              Scan and import skills to library')}
+${pc.cyan('  skillbook list')}${pc.dim('                     List skills in your library')}
+${pc.cyan('  skillbook add <source>')}${pc.dim('             Add skill from URL or path')}
 
-${pc.cyan('  skillbook')}${pc.dim('                Open TUI (in project directory)')}
-${pc.cyan('  skillbook <path>')}${pc.dim('         Open TUI for specific path')}
-${pc.cyan('  skillbook scan [path]')}${pc.dim('    Scan and import skills to library')}
-${pc.cyan('  skillbook list')}${pc.dim('           List skills in your library')}
-${pc.cyan('  skillbook add <source>')}${pc.dim('   Add skill from URL or path')}
-${pc.cyan('  skillbook upgrade')}${pc.dim('        Upgrade to latest version')}
+${pc.bold('LEGACY TUI (SPARSE CHECKOUT + SYMLINKS)')}
+
+${pc.cyan('  skillbook')}${pc.dim('                          Open TUI (legacy)')}
+${pc.cyan('  skillbook <path>')}${pc.dim('                   Open TUI for specific path (legacy)')}
+
+${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
+
+${pc.dim('  resolve, harness sync')}
 
 ${pc.bold('OPTIONS')}
 
-${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.skillbook/logs/skillbook.log')}
+${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.SB/logs/skillbook.log')}
 ${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
+
+${pc.bold('ENV')}
+
+${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.SB)')}
+${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override legacy library path (default: ~/.SB)')}
 
 ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 `
@@ -129,8 +140,13 @@ const runSubcommand = () => {
     },
     subCommands: {
       add: () => import('@/commands/add').then((m) => m.default),
+      init: () => import('@/commands/init').then((m) => m.default),
+      install: () => import('@/commands/install').then((m) => m.default),
       list: () => import('@/commands/list').then((m) => m.default),
+      pull: () => import('@/commands/pull').then((m) => m.default),
+      push: () => import('@/commands/push').then((m) => m.default),
       scan: () => import('@/commands/scan').then((m) => m.default),
+      status: () => import('@/commands/status').then((m) => m.default),
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
   })

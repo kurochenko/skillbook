@@ -59,7 +59,7 @@ type ScannedSkill = {
   harnessId: ToolId
 }
 
-const PROJECT_INDICATORS = ['.git', '.skillbook', '.claude', '.cursor', '.opencode']
+const PROJECT_INDICATORS = ['.git', '.SB', '.claude', '.cursor', '.opencode']
 
 export const detectProjectContext = (startPath: string = process.cwd()): string | null => {
   let current = resolve(startPath)

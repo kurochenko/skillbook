@@ -17,7 +17,7 @@ describe('getProjectSkills', () => {
     libraryDir = join(tempDir, 'library')
     projectDir = join(tempDir, 'project')
     mkdirSync(projectDir, { recursive: true })
-    mkdirSync(join(projectDir, '.skillbook', 'skills'), { recursive: true })
+    mkdirSync(join(projectDir, '.SB', 'skills'), { recursive: true })
 
     restoreEnv = withLibraryEnv(libraryDir)
   })
@@ -30,13 +30,13 @@ describe('getProjectSkills', () => {
   const createSymlinkedSkill = async (name: string, libraryContent: string, localContent: string) => {
     await addSkillToLibrary(name, libraryContent)
 
-    const localSkillDir = join(projectDir, '.skillbook', 'skills', name)
+    const localSkillDir = join(projectDir, '.SB', 'skills', name)
     mkdirSync(localSkillDir, { recursive: true })
     writeFileSync(join(localSkillDir, 'SKILL.md'), localContent)
 
     const harnessSkillDir = join(projectDir, '.opencode', 'skill', name)
     mkdirSync(join(projectDir, '.opencode', 'skill'), { recursive: true })
-    symlinkSync(join('..', '..', '.skillbook', 'skills', name), harnessSkillDir)
+    symlinkSync(join('..', '..', '.SB', 'skills', name), harnessSkillDir)
   }
 
   describe('sync status for symlinked skills', () => {

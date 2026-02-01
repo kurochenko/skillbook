@@ -134,7 +134,7 @@ export const convertToSymlink = (
   const { symlinkPath, sourcePath } = getHarnessPaths(projectPath, harnessId, skillName)
 
   if (!existsSync(sourcePath)) {
-    const error = `Skill not found in .skillbook: ${skillName}`
+    const error = `Skill not found in .SB: ${skillName}`
     logError('Failed to convert to symlink', undefined, {
       projectPath,
       harnessId,
@@ -169,7 +169,7 @@ export const isSkillSymlinked = (
   if (!isSymlink(symlinkPath)) return false
 
   const target = safeReadlink(symlinkPath)
-  return target !== null && target.includes('.skillbook')
+  return target !== null && target.includes('.SB')
 }
 
 export const createSymlinksForSkill = (

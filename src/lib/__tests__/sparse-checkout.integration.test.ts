@@ -49,7 +49,7 @@ describe('sparse-checkout', () => {
   })
 
   describe('initSparseCheckout', () => {
-    test('initializes .skillbook as sparse checkout', async () => {
+    test('initializes .SB as sparse checkout', async () => {
       initLibraryRepo(libraryPath)
       createSkill(libraryPath, 'skill-a', '# Skill A')
       runGit(libraryPath, 'add', '.')
@@ -139,7 +139,7 @@ describe('sparse-checkout', () => {
       await initSparseCheckout(projectPath)
       await addToSparseCheckout(projectPath, 'skill-a')
 
-      const dirtyPath = join(projectPath, '.skillbook', 'skills', 'skill-a', 'SKILL.md')
+      const dirtyPath = join(projectPath, '.SB', 'skills', 'skill-a', 'SKILL.md')
       writeFileSync(dirtyPath, '# Skill A (local edit)')
 
       createSkill(libraryPath, 'skill-new', '# Skill New')

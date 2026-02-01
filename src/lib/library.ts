@@ -72,7 +72,7 @@ const SKILL_PATH_MARKERS = [
   { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}` },
   { marker: '/.cursor/rules/', suffix: '.md' },
   { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}` },
-  { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}` },
+  { marker: '/.SB/skills/', suffix: `/${SKILL_FILE}` },
 ]
 
 const readFileSafe = (path: string): string | null => {

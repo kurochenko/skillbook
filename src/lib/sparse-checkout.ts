@@ -64,7 +64,7 @@ const refreshSparseCheckout = async (
       }
 
       if (pullResult.step === 'pop') {
-        return { success: false, error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in .skillbook to recover.` }
+        return { success: false, error: `Pulled from origin but failed to restore stashed changes: ${pullResult.error}. Run 'git stash pop' in .SB to recover.` }
       }
 
       return { success: false, error: `Failed to pull from origin: ${pullResult.error}` }
@@ -72,7 +72,7 @@ const refreshSparseCheckout = async (
   }
 
   if (originStatus.status === 'diverged') {
-    return { success: false, error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.skillbook.` }
+    return { success: false, error: `Library has diverged from origin (${originStatus.ahead} ahead, ${originStatus.behind} behind). Manual merge required in ~/.SB.` }
   }
 
   if (originStatus.status === 'error') {

@@ -178,11 +178,11 @@ describe('library sync with origin', () => {
       runGit(otherClone, 'commit', '-m', 'Update skill remotely')
       runGit(otherClone, 'push', 'origin', 'master')
 
-      const localSkillDir = join(projectDir, '.skillbook', 'skills', 'test-skill')
+      const localSkillDir = join(projectDir, '.SB', 'skills', 'test-skill')
       mkdirSync(localSkillDir, { recursive: true })
       writeFileSync(join(localSkillDir, 'SKILL.md'), '# Version 1')
       symlinkSync(
-        join('..', '..', '.skillbook', 'skills', 'test-skill'),
+        join('..', '..', '.SB', 'skills', 'test-skill'),
         join(projectDir, '.opencode', 'skill', 'test-skill')
       )
 

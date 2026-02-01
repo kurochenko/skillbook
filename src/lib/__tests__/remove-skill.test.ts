@@ -35,13 +35,13 @@ describe('removeFilesForSkill', () => {
   }
 
   const createSymlinkedSkill = (name: string) => {
-    const skillbookDir = join(projectDir, '.skillbook', 'skills', name)
+    const skillbookDir = join(projectDir, '.SB', 'skills', name)
     mkdirSync(skillbookDir, { recursive: true })
     writeFileSync(join(skillbookDir, 'SKILL.md'), '# Test')
 
     const harnessDir = join(projectDir, '.opencode', 'skill')
     mkdirSync(harnessDir, { recursive: true })
-    symlinkSync(join('..', '..', '.skillbook', 'skills', name), join(harnessDir, name))
+    symlinkSync(join('..', '..', '.SB', 'skills', name), join(harnessDir, name))
     return join(harnessDir, name)
   }
 

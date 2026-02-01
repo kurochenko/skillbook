@@ -328,7 +328,7 @@ const App = ({ projectPath, inProject }: AppProps) => {
     if (status === 'library-dirty') {
       showError(
         `Library has uncommitted changes to "${name}". ` +
-        `Run: cd ~/.skillbook && git status`
+        `Run: cd ~/.SB && git status`
       )
       return
     }
