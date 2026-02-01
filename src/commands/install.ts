@@ -73,7 +73,5 @@ export default defineCommand({
     writeLockFile(projectLockPath, updated)
 
     p.log.success(`Installed skill '${pc.bold(skill)}'`)
-    p.log.info(pc.dim(`Project: ${projectPath}`))
-    p.log.info(pc.dim(`Library: ${libraryPath}`))
   },
 })

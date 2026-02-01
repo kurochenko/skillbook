@@ -165,4 +165,21 @@ describe('lock-based sync commands (CLI)', () => {
     const libraryLock = readLockFile(libraryDir)
     expect(libraryLock.skills.alpha).toEqual({ version: 2, hash: remoteHash })
   })
+
+  test('push creates library entry for local-only skill', () => {
+    runInit()
+    const files = { [SKILL_FILE]: '# Alpha v1\n' }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+    writeLockFile(libraryDir, {})
+
+    const result = runCli(['push', 'alpha', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(files[SKILL_FILE])
+    const libraryLock = readLockFile(libraryDir)
+    expect(libraryLock.skills.alpha).toEqual({ version: 1, hash })
+  })
 })

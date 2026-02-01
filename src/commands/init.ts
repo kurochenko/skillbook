@@ -62,7 +62,6 @@ export default defineCommand({
       const createdLock = ensureLockFile(getLockFilePath(libraryPath))
 
       p.log.success(createdLibrary ? 'Library initialized' : 'Library ready')
-      p.log.info(pc.dim(`Path: ${libraryPath}`))
       p.log.info(pc.dim(`Skills: ${getLockSkillsPath(libraryPath)}`))
       p.log.info(pc.dim(`Lock file: ${getLockFilePath(libraryPath)}`))
 
@@ -79,8 +78,6 @@ export default defineCommand({
       const createdLock = ensureLockFile(getLockFilePath(projectRoot))
 
       p.log.success(createdRoot ? 'Project initialized' : 'Project ready')
-      p.log.info(pc.dim(`Project: ${projectPath}`))
-      p.log.info(pc.dim(`Lock root: ${projectRoot}`))
       p.log.info(pc.dim(`Skills: ${getLockSkillsPath(projectRoot)}`))
       p.log.info(pc.dim(`Lock file: ${getLockFilePath(projectRoot)}`))
 

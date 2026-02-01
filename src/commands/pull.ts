@@ -99,7 +99,5 @@ export default defineCommand({
     writeLockFile(projectLockPath, updated)
 
     p.log.success(`Pulled skill '${pc.bold(skill)}'`)
-    p.log.info(pc.dim(`Project: ${projectPath}`))
-    p.log.info(pc.dim(`Library: ${libraryPath}`))
   },
 })

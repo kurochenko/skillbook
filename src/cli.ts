@@ -87,7 +87,8 @@ ${pc.cyan('  skillbook resolve <id> --project <path> --strategy <library|project
 ${pc.cyan('  skillbook uninstall <id> [--project <path>]')}${pc.dim(' Remove skill from project')}
 ${pc.cyan('  skillbook doctor --library')}${pc.dim('                 Validate library lock setup')}
 ${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate project lock setup')}
-${pc.cyan('  skillbook migrate --from legacy --project <path>')}${pc.dim('   Migrate .skillbook to .SB')}
+${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Migrate project .skillbook to .SB')}
+${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Migrate ~/.skillbook to ~/.SB')}
 ${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
 ${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Sync project skills to harness')}
 ${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Sync harness skills into project')}

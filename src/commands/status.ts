@@ -149,22 +149,37 @@ export default defineCommand({
     }
 
     if (skills.length === 0) {
-      p.log.info(pc.dim(`Project: ${projectPath}`))
-      p.log.info(pc.dim(`Library: ${libraryPath}`))
       p.log.info(pc.dim('No skills installed in project'))
       return
     }
-
-    p.log.info(pc.dim(`Project: ${projectPath}`))
-    p.log.info(pc.dim(`Library: ${libraryPath}`))
     p.log.info(
       pc.dim(
         `Skills: ${summary.total} (synced ${summary.synced}, ahead ${summary.ahead}, behind ${summary.behind}, diverged ${summary.diverged}, local-only ${summary.localOnly})`,
       ),
     )
 
+    const statusColor = (status: string) => {
+      if (status === 'synced') return pc.green
+      if (status === 'ahead') return pc.yellow
+      if (status === 'behind') return pc.cyan
+      if (status === 'diverged') return pc.red
+      if (status === 'local-only') return pc.magenta
+      return pc.dim
+    }
+
+    const headerSkill = 'Skill'
+    const headerStatus = 'Status'
+    const skillWidth = Math.max(
+      headerSkill.length,
+      ...skills.map((skill) => skill.id.length),
+    )
+
+    const pad = (value: string, width: number) => value.padEnd(width)
+
+    console.log(`${pc.bold(pad(headerSkill, skillWidth))}  ${pc.bold(headerStatus)}`)
     for (const skill of skills) {
-      console.log(`${skill.id} ${pc.dim(`[${skill.status}]`)}`)
+      const colorize = statusColor(skill.status)
+      console.log(`${pad(skill.id, skillWidth)}  ${colorize(`[${skill.status}]`)}`)
     }
   },
 })

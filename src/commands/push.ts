@@ -58,12 +58,28 @@ export default defineCommand({
       fail(`Skill '${skill}' exists in library but has no project lock entry. Install first.`, 2)
     }
 
+    const projectChanged = projectEntry ? projectHash !== projectEntry.hash : true
+
+    if (!libraryEntry) {
+      const baseVersion = projectEntry?.version ?? 0
+      const nextVersion = projectEntry
+        ? projectChanged
+          ? baseVersion + 1
+          : Math.max(baseVersion, 1)
+        : 1
+      const nextEntry = { version: nextVersion, hash: projectHash }
+
+      copySkillDir(projectSkillDir, librarySkillDir)
+      writeLockFile(libraryLockPath, setLockEntry(libraryLock, skill, nextEntry))
+      writeLockFile(projectLockPath, setLockEntry(projectLock, skill, nextEntry))
+
+      p.log.success(`Pushed skill '${pc.bold(skill)}' to library`)
+      return
+    }
+
     if (projectEntry) {
-      const projectChanged = projectHash !== projectEntry.hash
       const libraryAdvanced =
-        libraryEntry
-          ? libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
-          : false
+        libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
 
       if (projectChanged && libraryAdvanced) {
         fail(`Skill '${skill}' has diverged. Resolve conflicts before pushing.`, 2)
@@ -79,7 +95,7 @@ export default defineCommand({
       }
     }
 
-    const nextVersion = libraryEntry ? libraryEntry.version + 1 : 1
+    const nextVersion = libraryEntry.version + 1
     const nextEntry = { version: nextVersion, hash: projectHash }
 
     copySkillDir(projectSkillDir, librarySkillDir)
@@ -91,7 +107,5 @@ export default defineCommand({
     writeLockFile(projectLockPath, updatedProjectLock)
 
     p.log.success(`Pushed skill '${pc.bold(skill)}' to library`)
-    p.log.info(pc.dim(`Project: ${projectPath}`))
-    p.log.info(pc.dim(`Library: ${libraryPath}`))
   },
 })

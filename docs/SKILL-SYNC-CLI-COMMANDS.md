@@ -82,8 +82,10 @@ Project vs harness (planned):
 
 ### Migration
 
-- `skillbook migrate --from legacy`
-  - Convert sparse-checkout + symlink workflow to lock-based copy.
+- `skillbook migrate [--project <path>]`
+  - Convert sparse-checkout + symlink workflow to lock-based copy in a project.
+- `skillbook migrate --library`
+  - Convert legacy `~/.skillbook` library into lock-based `~/.SB` library.
 
 ## Shared Flags
 

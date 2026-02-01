@@ -21,10 +21,14 @@ type LockFile = {
 describe('migrate command (CLI)', () => {
   let tempDir: string
   let projectDir: string
+  let legacyLibraryDir: string
+  let lockLibraryDir: string
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'skillbook-migrate-'))
     projectDir = join(tempDir, 'project')
+    legacyLibraryDir = join(tempDir, '.skillbook')
+    lockLibraryDir = join(tempDir, '.SB')
     mkdirSync(projectDir, { recursive: true })
   })
 
@@ -39,12 +43,17 @@ describe('migrate command (CLI)', () => {
     return `sha256:${hash.digest('hex')}`
   }
 
+  const env = () => ({
+    SKILLBOOK_LEGACY_LIBRARY: legacyLibraryDir,
+    SKILLBOOK_LOCK_LIBRARY: lockLibraryDir,
+  })
+
   test('migrate copies legacy .skillbook skills into .SB and writes lock entries', () => {
     const legacyDir = join(projectDir, '.skillbook', 'skills', 'alpha')
     mkdirSync(legacyDir, { recursive: true })
     writeFileSync(join(legacyDir, SKILL_FILE), '# Alpha v1\n', 'utf-8')
 
-    const result = runCli(['migrate', '--from', 'legacy', '--project', projectDir])
+    const result = runCli(['migrate', '--project', projectDir])
 
     expect(result.exitCode).toBe(0)
     const projectRoot = getProjectLockRoot(projectDir)
@@ -52,6 +61,21 @@ describe('migrate command (CLI)', () => {
     expect(existsSync(migratedSkill)).toBe(true)
 
     const lock = JSON.parse(readFileSync(getLockFilePath(projectRoot), 'utf-8')) as LockFile
+    expect(lock.skills.alpha).toEqual({ version: 1, hash: hashSkill('# Alpha v1\n') })
+  })
+
+  test('migrate --library copies legacy library into lock-based library', () => {
+    const legacyDir = join(legacyLibraryDir, 'skills', 'alpha')
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, SKILL_FILE), '# Alpha v1\n', 'utf-8')
+
+    const result = runCli(['migrate', '--library'], env())
+
+    expect(result.exitCode).toBe(0)
+    const migratedSkill = join(getLockSkillsPath(lockLibraryDir), 'alpha', SKILL_FILE)
+    expect(existsSync(migratedSkill)).toBe(true)
+
+    const lock = JSON.parse(readFileSync(getLockFilePath(lockLibraryDir), 'utf-8')) as LockFile
     expect(lock.skills.alpha).toEqual({ version: 1, hash: hashSkill('# Alpha v1\n') })
   })
 })
