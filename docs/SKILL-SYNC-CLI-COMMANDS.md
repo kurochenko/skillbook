@@ -65,12 +65,12 @@ Project vs harness:
 ### Project <-> Harness Sync
 
 - `skillbook harness list`
-  - Show harnesses and their state.
+  - List available harness ids.
 - `skillbook harness enable <id>` / `skillbook harness disable <id>`
   - Update project config for enabled harnesses.
-- `skillbook harness sync [--harness <id>|--all]`
-  - Copy project canonical skills -> harnesses.
-- `skillbook harness import [--harness <id>|--all]`
+- `skillbook harness sync [--id <harness>]`
+  - Copy project canonical skills -> harness.
+- `skillbook harness import [--id <harness>]`
   - Copy harness changes -> project, marking skill as ahead.
 
 ### Ingestion and Discovery

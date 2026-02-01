@@ -3,10 +3,11 @@ import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineCommand, runMain } from 'citty'
 import pc from 'picocolors'
+import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
 import { VERSION, checkForUpdate } from '@/lib/version'
 import { initLogger, logWarn } from '@/lib/logger'
 
-const SUBCOMMANDS = ['add', 'init', 'install', 'list', 'pull', 'push', 'scan', 'status', 'upgrade']
+const SUBCOMMANDS = ['add', 'harness', 'init', 'install', 'list', 'pull', 'push', 'scan', 'status', 'upgrade']
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
 const err = (s: string) => process.stderr.write(`${s}\n`)
@@ -57,11 +58,14 @@ ${pc.bold('LOCK-BASED WORKFLOW (IMPLEMENTED)')}
 
 ${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.SB (or SKILLBOOK_LOCK_LIBRARY)')}
 ${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .SB folder')}
-${pc.cyan('  skillbook status --project <path>')}${pc.dim('              Show lock-based status for project skills')}
-${pc.cyan('  skillbook status --project <path> --json')}${pc.dim('        JSON output for automation')}
-${pc.cyan('  skillbook install <id> --project <path>')}${pc.dim('      Copy library skill into project')}
-${pc.cyan('  skillbook pull <id> --project <path>')}${pc.dim('         Pull library changes into project')}
-${pc.cyan('  skillbook push <id> --project <path>')}${pc.dim('         Push project changes into library')}
+${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
+${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
+${pc.cyan('  skillbook install <id> [--project <path>]')}${pc.dim(' Copy library skill into project')}
+${pc.cyan('  skillbook pull <id> [--project <path>]')}${pc.dim('    Pull library changes into project')}
+${pc.cyan('  skillbook push <id> [--project <path>]')}${pc.dim('    Push project changes into library')}
+${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
+${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Sync project skills to harness')}
+${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Sync harness skills into project')}
 
 ${pc.bold('LIBRARY CONTENT (CURRENT)')}
 
@@ -76,7 +80,7 @@ ${pc.cyan('  skillbook <path>')}${pc.dim('                   Open TUI for specif
 
 ${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
 
-${pc.dim('  resolve, harness sync')}
+${pc.dim('  resolve')}
 
 ${pc.bold('OPTIONS')}
 
@@ -87,6 +91,12 @@ ${pc.bold('ENV')}
 
 ${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.SB)')}
 ${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override legacy library path (default: ~/.SB)')}
+
+${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
+
+${pc.bold('HARNESS IDS')}
+
+${SUPPORTED_TOOLS.map((id) => `  ${pc.cyan(id)}${pc.dim(` (${TOOLS[id].name})`)}`).join('\n')}
 
 ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 `
@@ -140,6 +150,7 @@ const runSubcommand = () => {
     },
     subCommands: {
       add: () => import('@/commands/add').then((m) => m.default),
+      harness: () => import('@/commands/harness').then((m) => m.default),
       init: () => import('@/commands/init').then((m) => m.default),
       install: () => import('@/commands/install').then((m) => m.default),
       list: () => import('@/commands/list').then((m) => m.default),
