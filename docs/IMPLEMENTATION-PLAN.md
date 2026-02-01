@@ -1,6 +1,6 @@
-# Implementation Plan: Skillbook MVP
+# Implementation Plan: Skillbook MVP (Deprecated)
 
-> **Goal:** Two commands - `skillbook scan` for discovery, `skillbook` for interactive TUI
+This document describes the legacy TUI and sparse-checkout design. The lock-based copy workflow is now canonical. See `docs/SKILL-SYNC-LOCK-ALGORITHM.md` and `docs/SKILL-SYNC-CLI-COMMANDS.md`.
 
 ---
 

@@ -31,18 +31,17 @@ A single global folder works if you only use Claude Code and you are solo. It br
 
 ## The Solution
 
-**skillbook** is a centralized Git repository that serves as your skill library. Projects link to it via sparse checkouts, keeping skills in sync automatically:
+**skillbook** uses a lock-based copy workflow. The library and each project keep their own copies of skills, tracked with `skillbook.lock.json` for safe sync.
 
 ```
-~/.SB/                    # Central library (Git repo)
+~/.SB/                           # Central library (Git repo)
 └── skills/
     ├── typescript/
     ├── review-gitlab/
     └── beads/
 
-project-a/.claude/skills/        # Sparse checkout from library
-project-b/.cursor/rules/         # Same skills, always in sync
-project-c/.opencode/skill/       # Team-wide consistency
+project-a/.SB/skills/             # Project copy (committed in repo)
+project-a/.opencode/skill/        # Harness copies synced from .SB
 ```
 
 **Share with your team.** Push your library to a shared Git remote. Team members clone it. When you update a skill and push, they pull. Everyone stays in sync.
@@ -76,7 +75,7 @@ bun install
 bun link
 ```
 
-Once installed, run `skillbook` to see how to get started.
+Once installed, run `skillbook --help` to see available commands.
 
 ## Updating
 
@@ -93,8 +92,14 @@ It also checks for updates automatically and notifies you when a new version is 
 ### Initialize Your Library
 
 ```bash
-# Create the central library
-skillbook init
+skillbook init --library
+```
+
+### Initialize a Project
+
+```bash
+cd my-project
+skillbook init --project
 ```
 
 ### Find Skills Across Projects
@@ -108,55 +113,87 @@ skillbook scan
 
 This finds all skills in subdirectories and lets you add them to your library interactively.
 
-### Project View
-
-Run `skillbook` without arguments inside a project folder:
+### Project Workflow
 
 ```bash
-cd my-project
-skillbook
+# Install a skill from the library
+skillbook install typescript-cli
+
+# See status against the library
+skillbook status
+
+# Push local changes into the library
+skillbook push typescript-cli
+
+# Pull library updates into the project
+skillbook pull typescript-cli
+
+# Sync project skills into a harness
+skillbook harness sync --id opencode
 ```
-
-**Skills tab** shows:
-- Installed skills in the current project
-- Available skills from your library
-- Differences between installed and library versions
-
-**Harness tab** lets you:
-- See which harnesses are installed (Claude Code, Cursor, OpenCode)
-- Install a harness to start syncing skills to it
-- Eject a harness to stop syncing
 
 ### Commands
 
-#### `skillbook` (no args)
+#### `skillbook status`
 
-Interactive project view. Shows installed vs available skills and their sync status.
+Show project skill status vs library.
+
+```bash
+skillbook status
+```
+
+#### `skillbook install <id>`
+
+Copy a library skill into the project.
+
+```bash
+skillbook install typescript-cli
+```
+
+#### `skillbook push <id>`
+
+Push local project changes into the library.
+
+```bash
+skillbook push typescript-cli
+```
+
+#### `skillbook pull <id>`
+
+Pull library updates into the project.
+
+```bash
+skillbook pull typescript-cli
+```
+
+#### `skillbook harness sync --id <harness>`
+
+Sync project skills into a harness folder.
+
+```bash
+skillbook harness sync --id opencode
+```
 
 #### `skillbook scan`
 
-Scan for skills in subdirectories. Run from a parent folder containing multiple projects.
+Scan for skills in subdirectories (interactive).
 
 ```bash
 cd ~/projects
 skillbook scan
-# Finds skills in project-a/.claude/skills/, project-b/.cursor/rules/, etc.
 ```
 
 #### `skillbook add <path>`
 
-Add a skill from your current project to the library.
+Add a skill file to the library.
 
 ```bash
 skillbook add .claude/skills/beads/SKILL.md
-# -> Copies to ~/.SB/skills/beads/SKILL.md
-
-skillbook add .claude/skills/beads/SKILL.md --force  # Overwrite existing
 ```
 
 #### `skillbook list`
 
-Show all skills in your library.
+Show skills in the library and supported harness ids.
 
 ```bash
 skillbook list
@@ -170,7 +207,7 @@ Update skillbook to the latest version.
 skillbook upgrade
 ```
 
-## Skill Library Structure
+## Skill Structure
 
 ```
 ~/.SB/
@@ -181,9 +218,15 @@ skillbook upgrade
     │   └── SKILL.md
     └── review-gitlab/
         └── SKILL.md
+
+project/
+└── .SB/
+    └── skills/
+        └── typescript/
+            └── SKILL.md
 ```
 
-Each skill is a folder containing a `SKILL.md` file. The folder name is the skill name.
+Each skill is a folder containing a `SKILL.md` file. The folder name is the skill id.
 
 ## Supported Tools
 

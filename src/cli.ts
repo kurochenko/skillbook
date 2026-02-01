@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-import { existsSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { defineCommand, runMain } from 'citty'
 import pc from 'picocolors'
 import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
@@ -101,11 +99,6 @@ ${pc.cyan('  skillbook scan [path]')}${pc.dim('              Scan and import ski
 ${pc.cyan('  skillbook list')}${pc.dim('                     List skills in your library')}
 ${pc.cyan('  skillbook add <source>')}${pc.dim('             Add skill from URL or path')}
 
-${pc.bold('LEGACY TUI (SPARSE CHECKOUT + SYMLINKS)')}
-
-${pc.cyan('  skillbook')}${pc.dim('                          Open TUI (legacy)')}
-${pc.cyan('  skillbook <path>')}${pc.dim('                   Open TUI for specific path (legacy)')}
-
 ${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
 
 ${pc.dim('  merge strategy for resolve')}
@@ -118,7 +111,8 @@ ${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
 ${pc.bold('ENV')}
 
 ${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.SB)')}
-${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override legacy library path (default: ~/.SB)')}
+${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.SB)')}
+${pc.cyan('  SKILLBOOK_LEGACY_LIBRARY')}${pc.dim(' Override legacy library path (default: ~/.skillbook)')}
 
 ${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
 
@@ -130,44 +124,6 @@ ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 `
 
 const showHelp = () => out(helpText())
-
-const validatePath = (pathArg: string): string => {
-  const resolved = resolve(pathArg)
-  if (!existsSync(resolved)) {
-    err(pc.red(`Error: Path does not exist: ${resolved}`))
-    process.exit(1)
-  }
-  if (!statSync(resolved).isDirectory()) {
-    err(pc.red(`Error: Path is not a directory: ${resolved}`))
-    process.exit(1)
-  }
-  return resolved
-}
-
-const openTUI = async (pathArg?: string) => {
-  const { runTUI } = await import('@/tui/App')
-  const { detectProjectContext } = await import('@/lib/project-scan')
-
-  if (!process.stdin.isTTY) {
-    err('Error: skillbook TUI requires an interactive terminal.')
-    err('Run a subcommand instead: skillbook --help')
-    process.exit(1)
-  }
-
-  if (pathArg) {
-    void showUpdateBanner()
-    runTUI(validatePath(pathArg), true)
-    return
-  }
-
-  const detected = detectProjectContext()
-  if (detected) {
-    void showUpdateBanner()
-    runTUI(detected, true)
-  } else {
-    showHelp()
-  }
-}
 
 const runSubcommand = () => {
   const main = defineCommand({
@@ -213,16 +169,18 @@ const main = () => {
 
   const isHelp = args.includes('--help') || args.includes('-h')
   const isSubcommand = firstArg && SUBCOMMANDS.includes(firstArg)
-  const isPath = firstArg && !firstArg.startsWith('-') && !isSubcommand
 
   if (isHelp && !isSubcommand) {
     showHelp()
   } else if (isSubcommand) {
     runSubcommand()
-  } else if (isPath) {
-    void openTUI(firstArg)
   } else {
-    void openTUI()
+    if (firstArg) {
+      err(pc.red(`Unknown command: ${firstArg}`))
+      showHelp()
+      process.exit(1)
+    }
+    showHelp()
   }
 }
 

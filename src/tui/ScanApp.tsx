@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { render, Box, Text } from 'ink'
-import { resolve, dirname } from 'path'
+import { resolve, dirname, join } from 'path'
+import { existsSync } from 'fs'
 import {
   addSkillToLibrary,
   scanProjectSkills,
   type ScannedSkill,
   type ScanSkillStatus,
 } from '@/lib/library'
-import { isSkillbookInitialized } from '@/lib/sparse-checkout'
+import { getProjectLockRoot } from '@/lib/lock-paths'
 import { useListNavigation } from '@/tui/hooks/useListNavigation'
 import { UI, SECTION_LABELS } from '@/tui/constants'
 
@@ -192,7 +193,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     for (const name of sortedNames) {
       const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
       const path = projectPaths.get(name) ?? ''
-      const isManaged = path ? isSkillbookInitialized(path) : false
+      const isManaged = path ? existsSync(getProjectLockRoot(path)) : false
       projectInfos.push({ name, path, isManaged, skills: projectSkills })
     }
 
