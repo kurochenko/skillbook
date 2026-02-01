@@ -1,9 +1,19 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, readFileSync, existsSync } from 'fs'
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  readFileSync,
+  existsSync,
+  writeFileSync,
+  lstatSync,
+  readlinkSync,
+} from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, dirname, relative } from 'path'
 import { runCli } from '@/test-utils/cli'
-import { getLockFilePath, getProjectLockRoot } from '@/lib/lock-paths'
+import { SKILL_FILE } from '@/constants'
+import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 
 type LockFile = {
   schema: 1
@@ -31,6 +41,17 @@ describe('lock-based harness enable/disable (CLI)', () => {
     return JSON.parse(content) as LockFile
   }
 
+  const writeProjectSkill = (id: string, content: string) => {
+    const skillDir = join(getLockSkillsPath(getProjectLockRoot(projectDir)), id)
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(join(skillDir, SKILL_FILE), content, 'utf-8')
+  }
+
+  const expectSymlink = (path: string, target: string) => {
+    expect(lstatSync(path).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(path)).toBe(relative(dirname(path), target))
+  }
+
   test('harness list prints supported ids', () => {
     const result = runCli(['harness', 'list'])
 
@@ -42,17 +63,21 @@ describe('lock-based harness enable/disable (CLI)', () => {
 
   test('harness enable writes harnesses to project lock file', () => {
     runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
 
     const result = runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
 
     expect(result.exitCode).toBe(0)
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual(['opencode'])
-    expect(existsSync(join(projectDir, '.opencode', 'skill'))).toBe(true)
+    const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
+    const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
+    expectSymlink(symlinkPath, targetPath)
   })
 
   test('harness disable removes harness from project lock file', () => {
     runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
     runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
     runCli(['harness', 'enable', '--id', 'cursor', '--project', projectDir])
 
@@ -61,11 +86,13 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(result.exitCode).toBe(0)
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual(['cursor'])
-    expect(existsSync(join(projectDir, '.opencode', 'skill'))).toBe(true)
+    const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
+    expect(existsSync(symlinkPath)).toBe(false)
   })
 
   test('harness enable is idempotent', () => {
     runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
     runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
 
     const result = runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
@@ -73,6 +100,9 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(result.exitCode).toBe(0)
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual(['opencode'])
+    const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
+    const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
+    expectSymlink(symlinkPath, targetPath)
   })
 
   test('harness disable --remove deletes harness folder', () => {

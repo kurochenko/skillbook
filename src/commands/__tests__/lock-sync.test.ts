@@ -1,7 +1,16 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  lstatSync,
+  readlinkSync,
+} from 'fs'
 import { tmpdir } from 'os'
-import { join, dirname } from 'path'
+import { join, dirname, relative } from 'path'
 import { createHash } from 'crypto'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
@@ -89,6 +98,8 @@ describe('lock-based sync commands (CLI)', () => {
     writeSkillFiles(libraryDir, 'alpha', files)
     writeLockFile(libraryDir, { alpha: { version: 1, hash } })
 
+    runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+
     const result = runCli(['install', 'alpha', '--project', projectDir], env())
     expect(result.exitCode).toBe(0)
 
@@ -97,6 +108,11 @@ describe('lock-based sync commands (CLI)', () => {
 
     const projectLock = readLockFile(projectRoot())
     expect(projectLock.skills.alpha).toEqual({ version: 1, hash })
+
+    const harnessLink = join(projectDir, '.opencode', 'skill', 'alpha')
+    expect(lstatSync(harnessLink).isSymbolicLink()).toBe(true)
+    const target = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expect(readlinkSync(harnessLink)).toBe(relative(dirname(harnessLink), target))
   })
 
   test('pull updates project when behind', () => {

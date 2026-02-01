@@ -3,8 +3,8 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { SUPPORTED_TOOLS, TOOLS, type ToolId } from '@/constants'
-import { existsSync, mkdirSync, rmSync } from 'fs'
-import { importHarnessSkills, syncHarnessSkills } from '@/lib/lock-harness'
+import { existsSync, rmSync } from 'fs'
+import { importHarnessSkills, syncHarnessSkills, removeHarnessSymlinks } from '@/lib/lock-harness'
 import { getHarnessBaseDir } from '@/lib/harness'
 import { getLockFilePath, getProjectLockRoot } from '@/lib/lock-paths'
 import { createEmptyLockFile, readLockFile, writeLockFile } from '@/lib/lockfile'
@@ -31,11 +31,6 @@ const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => 
 const resolveHarnessArg = (args: { id?: string; harness?: string }) =>
   args.id ?? args.harness
 
-const ensureDir = (path: string) => {
-  if (!existsSync(path)) {
-    mkdirSync(path, { recursive: true })
-  }
-}
 
 const updateLockHarnesses = (
   projectPath: string,
@@ -79,7 +74,7 @@ export default defineCommand({
       defineCommand({
         meta: {
           name: 'sync',
-          description: 'Copy project .skillbook skills into a harness folder',
+          description: 'Link project .skillbook skills into a harness folder',
         },
         args: {
           project: {
@@ -100,11 +95,18 @@ export default defineCommand({
           const harnesses = parseHarness(resolveHarnessArg(args))
 
           for (const harnessId of harnesses) {
-            const count = syncHarnessSkills(projectPath, harnessId)
-            if (count === 0) {
+            const result = syncHarnessSkills(projectPath, harnessId)
+            if (result.total === 0) {
               p.log.info(pc.dim(`No project skills to sync for ${harnessId}`))
             } else {
-              p.log.success(`Synced ${count} skill${count === 1 ? '' : 's'} to ${harnessId}`)
+              p.log.success(`Linked ${result.linked} skill${result.linked === 1 ? '' : 's'} to ${harnessId}`)
+              if (result.conflicts > 0) {
+                p.log.warn(
+                  pc.yellow(
+                    `${result.conflicts} skill${result.conflicts === 1 ? '' : 's'} could not be linked (existing non-symlink).`,
+                  ),
+                )
+              }
             }
           }
         },
@@ -113,7 +115,7 @@ export default defineCommand({
       defineCommand({
         meta: {
           name: 'import',
-          description: 'Copy harness skills into project .skillbook skills',
+          description: 'Import harness skills into project .skillbook skills',
         },
         args: {
           project: {
@@ -134,11 +136,14 @@ export default defineCommand({
           const harnesses = parseHarness(resolveHarnessArg(args))
 
           for (const harnessId of harnesses) {
-            const count = importHarnessSkills(projectPath, harnessId)
-            if (count === 0) {
+            const result = importHarnessSkills(projectPath, harnessId)
+            if (result.total === 0) {
               p.log.info(pc.dim(`No harness skills found for ${harnessId}`))
             } else {
-              p.log.success(`Imported ${count} skill${count === 1 ? '' : 's'} from ${harnessId}`)
+              p.log.success(`Imported ${result.imported} skill${result.imported === 1 ? '' : 's'} from ${harnessId}`)
+              if (result.linked > 0) {
+                p.log.info(pc.dim(`Linked ${result.linked} skill${result.linked === 1 ? '' : 's'} to ${harnessId}`))
+              }
             }
           }
         },
@@ -168,9 +173,19 @@ export default defineCommand({
           const harnessId = parseHarness(resolveHarnessArg(args))[0]
 
           const nextHarnesses = updateLockHarnesses(projectPath, harnessId, true)
-          ensureDir(getHarnessBaseDir(projectPath, harnessId))
+          const result = syncHarnessSkills(projectPath, harnessId)
 
           p.log.success(`Enabled harness '${harnessId}'`)
+          if (result.total > 0) {
+            p.log.info(pc.dim(`Linked ${result.linked} skill${result.linked === 1 ? '' : 's'}`))
+            if (result.conflicts > 0) {
+              p.log.warn(
+                pc.yellow(
+                  `${result.conflicts} skill${result.conflicts === 1 ? '' : 's'} could not be linked (existing non-symlink).`,
+                ),
+              )
+            }
+          }
           p.log.info(pc.dim(`Enabled: ${nextHarnesses.join(', ') || 'none'}`))
         },
       }),
@@ -204,6 +219,7 @@ export default defineCommand({
           const harnessId = parseHarness(resolveHarnessArg(args))[0]
 
           const nextHarnesses = updateLockHarnesses(projectPath, harnessId, false)
+          const removed = removeHarnessSymlinks(projectPath, harnessId)
 
           if (args.remove) {
             const baseDir = getHarnessBaseDir(projectPath, harnessId)
@@ -213,6 +229,9 @@ export default defineCommand({
           }
 
           p.log.success(`Disabled harness '${harnessId}'`)
+          if (removed > 0) {
+            p.log.info(pc.dim(`Removed ${removed} symlink${removed === 1 ? '' : 's'}`))
+          }
           p.log.info(pc.dim(`Enabled: ${nextHarnesses.join(', ') || 'none'}`))
         },
       }),

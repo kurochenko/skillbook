@@ -1,7 +1,16 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs'
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+  lstatSync,
+  readlinkSync,
+} from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, dirname, relative } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
 import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
@@ -51,25 +60,26 @@ describe('uninstall command (CLI)', () => {
     expect(lock.skills.alpha).toBeUndefined()
   })
 
-  test('uninstall removes harness copies', () => {
+  test('uninstall unlinks enabled harnesses only', () => {
+    runCli(['init', '--project', '--path', projectDir])
     writeProjectSkill('alpha', '# Alpha\n')
     writeLockFile({ alpha: { version: 1, hash: 'sha256:alpha' } })
 
-    const claudeDir = join(projectDir, '.claude', 'skills', 'alpha')
+    runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
+
     const cursorDir = join(projectDir, '.cursor', 'rules')
-    const opencodeDir = join(projectDir, '.opencode', 'skill', 'alpha')
-    mkdirSync(claudeDir, { recursive: true })
     mkdirSync(cursorDir, { recursive: true })
-    mkdirSync(opencodeDir, { recursive: true })
-    writeFileSync(join(claudeDir, SKILL_FILE), '# Alpha\n', 'utf-8')
     writeFileSync(join(cursorDir, 'alpha.md'), '# Alpha\n', 'utf-8')
-    writeFileSync(join(opencodeDir, SKILL_FILE), '# Alpha\n', 'utf-8')
+
+    const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
+    const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expect(lstatSync(symlinkPath).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(symlinkPath)).toBe(relative(dirname(symlinkPath), targetDir))
 
     const result = runCli(['uninstall', 'alpha', '--project', projectDir])
 
     expect(result.exitCode).toBe(0)
-    expect(existsSync(claudeDir)).toBe(false)
-    expect(existsSync(join(cursorDir, 'alpha.md'))).toBe(false)
-    expect(existsSync(opencodeDir)).toBe(false)
+    expect(existsSync(symlinkPath)).toBe(false)
+    expect(existsSync(join(cursorDir, 'alpha.md'))).toBe(true)
   })
 })

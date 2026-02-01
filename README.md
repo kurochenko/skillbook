@@ -41,7 +41,7 @@ A single global folder works if you only use Claude Code and you are solo. It br
     └── beads/
 
 project-a/.skillbook/skills/      # Project copy (committed in repo)
-project-a/.opencode/skill/        # Harness copies synced from .skillbook
+project-a/.opencode/skill/        # Harness symlinks to .skillbook
 ```
 
 **Share with your team.** Push your library to a shared Git remote. Team members clone it. When you update a skill and push, they pull. Everyone stays in sync.

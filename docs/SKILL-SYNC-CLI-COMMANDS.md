@@ -69,9 +69,9 @@ Project vs harness (planned):
 - `skillbook harness enable <id>` / `skillbook harness disable <id>`
   - Update project lock file with enabled harness ids (optionally create/remove folders).
 - `skillbook harness sync --id <harness>`
-  - Copy project canonical skills -> harness.
+  - Link project skills into the harness via symlinks.
 - `skillbook harness import --id <harness>`
-  - Copy harness changes -> project, marking skill as ahead.
+  - Import harness changes into project and replace with symlinks.
 
 ### Ingestion and Discovery
 

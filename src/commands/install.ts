@@ -5,6 +5,8 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
+import { type ToolId } from '@/constants'
+import { linkSkillToHarness } from '@/lib/lock-harness'
 import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 
@@ -72,6 +74,22 @@ export default defineCommand({
     })
     writeLockFile(projectLockPath, updated)
 
+    const harnesses = (updated.harnesses ?? [])
+      .filter((h): h is ToolId => ['claude-code', 'cursor', 'opencode'].includes(h))
+
+    let conflicts = 0
+    for (const harnessId of harnesses) {
+      const result = linkSkillToHarness(projectPath, harnessId, skill)
+      if (result.conflict) conflicts += 1
+    }
+
     p.log.success(`Installed skill '${pc.bold(skill)}'`)
+    if (conflicts > 0) {
+      p.log.warn(
+        pc.yellow(
+          `${conflicts} harness link${conflicts === 1 ? '' : 's'} skipped (existing non-symlink).`,
+        ),
+      )
+    }
   },
 })

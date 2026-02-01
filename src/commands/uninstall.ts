@@ -4,9 +4,10 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE } from '@/constants'
+import { SKILL_FILE, type ToolId } from '@/constants'
 import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { readLockFile, writeLockFile } from '@/lib/lockfile'
+import { unlinkSkillFromHarness } from '@/lib/lock-harness'
 
 const fail = (message: string, exitCode = 1): never => {
   p.log.error(pc.red(message))
@@ -54,9 +55,12 @@ export default defineCommand({
       writeLockFile(lockPath, { ...lock, skills: rest })
     }
 
-    removeIfExists(join(projectPath, '.claude', 'skills', skill))
-    removeIfExists(join(projectPath, '.opencode', 'skill', skill))
-    removeIfExists(join(projectPath, '.cursor', 'rules', `${skill}.md`))
+    const harnesses = (lock.harnesses ?? [])
+      .filter((h): h is ToolId => ['claude-code', 'cursor', 'opencode'].includes(h))
+
+    for (const harnessId of harnesses) {
+      unlinkSkillFromHarness(projectPath, harnessId, skill)
+    }
 
     p.log.success(`Uninstalled skill '${pc.bold(skill)}'`)
   },

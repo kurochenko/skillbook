@@ -88,8 +88,8 @@ ${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate pr
 ${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Write lockfile for project .skillbook')}
 ${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Write lockfile for ~/.skillbook')}
 ${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
-${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Sync project skills to harness')}
-${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Sync harness skills into project')}
+${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Link project skills to harness')}
+${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Import harness skills into project')}
 ${pc.cyan('  skillbook harness enable [--project <path>] --id <harness>')}${pc.dim(' Enable harness in project lock file')}
 ${pc.cyan('  skillbook harness disable [--project <path>] --id <harness>')}${pc.dim(' Disable harness in project lock file')}
 
