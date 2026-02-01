@@ -7,7 +7,24 @@ import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
 import { VERSION, checkForUpdate } from '@/lib/version'
 import { initLogger, logWarn } from '@/lib/logger'
 
-const SUBCOMMANDS = ['add', 'harness', 'init', 'install', 'list', 'pull', 'push', 'scan', 'status', 'upgrade']
+const SUBCOMMANDS = [
+  'add',
+  'diff',
+  'doctor',
+  'harness',
+  'init',
+  'install',
+  'list',
+  'migrate',
+  'pull',
+  'push',
+  'resolve',
+  'scan',
+  'show',
+  'status',
+  'uninstall',
+  'upgrade',
+]
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
 const err = (s: string) => process.stderr.write(`${s}\n`)
@@ -60,12 +77,22 @@ ${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library 
 ${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .SB folder')}
 ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
+${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
+${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
+${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
 ${pc.cyan('  skillbook install <id> [--project <path>]')}${pc.dim(' Copy library skill into project')}
 ${pc.cyan('  skillbook pull <id> [--project <path>]')}${pc.dim('    Pull library changes into project')}
 ${pc.cyan('  skillbook push <id> [--project <path>]')}${pc.dim('    Push project changes into library')}
+${pc.cyan('  skillbook resolve <id> --project <path> --strategy <library|project>')}${pc.dim(' Resolve diverged skill')}
+${pc.cyan('  skillbook uninstall <id> [--project <path>]')}${pc.dim(' Remove skill from project')}
+${pc.cyan('  skillbook doctor --library')}${pc.dim('                 Validate library lock setup')}
+${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate project lock setup')}
+${pc.cyan('  skillbook migrate --from legacy --project <path>')}${pc.dim('   Migrate .skillbook to .SB')}
 ${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
 ${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Sync project skills to harness')}
 ${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Sync harness skills into project')}
+${pc.cyan('  skillbook harness enable [--project <path>] --id <harness>')}${pc.dim(' Enable harness in project lock file')}
+${pc.cyan('  skillbook harness disable [--project <path>] --id <harness>')}${pc.dim(' Disable harness in project lock file')}
 
 ${pc.bold('LIBRARY CONTENT (CURRENT)')}
 
@@ -80,7 +107,7 @@ ${pc.cyan('  skillbook <path>')}${pc.dim('                   Open TUI for specif
 
 ${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
 
-${pc.dim('  resolve')}
+${pc.dim('  merge strategy for resolve')}
 
 ${pc.bold('OPTIONS')}
 
@@ -150,14 +177,20 @@ const runSubcommand = () => {
     },
     subCommands: {
       add: () => import('@/commands/add').then((m) => m.default),
+      diff: () => import('@/commands/diff').then((m) => m.default),
+      doctor: () => import('@/commands/doctor').then((m) => m.default),
       harness: () => import('@/commands/harness').then((m) => m.default),
       init: () => import('@/commands/init').then((m) => m.default),
       install: () => import('@/commands/install').then((m) => m.default),
       list: () => import('@/commands/list').then((m) => m.default),
+      migrate: () => import('@/commands/migrate').then((m) => m.default),
       pull: () => import('@/commands/pull').then((m) => m.default),
       push: () => import('@/commands/push').then((m) => m.default),
+      resolve: () => import('@/commands/resolve').then((m) => m.default),
       scan: () => import('@/commands/scan').then((m) => m.default),
+      show: () => import('@/commands/show').then((m) => m.default),
       status: () => import('@/commands/status').then((m) => m.default),
+      uninstall: () => import('@/commands/uninstall').then((m) => m.default),
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
   })

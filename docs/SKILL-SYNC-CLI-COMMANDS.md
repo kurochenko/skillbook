@@ -20,9 +20,9 @@ Project vs library:
 - `behind`: project hash matches lock, library version advanced.
 - `diverged`: project hash differs and library version advanced.
 - `local-only`: skill exists in project but not in library.
-- `library-only`: skill exists in library but not in project.
+- `library-only`: skill exists in library but not in project (not reported by `status`).
 
-Project vs harness:
+Project vs harness (planned):
 
 - `harness-synced`: harness content matches project canonical copy.
 - `harness-drifted`: harness differs from project canonical copy.
@@ -40,14 +40,14 @@ Project vs harness:
 
 ### Listing and Inspection
 
-- `skillbook list --library|--project`
-  - Enumerate skills with id, version, and hash.
-- `skillbook show <skill> --library|--project`
+- `skillbook list --library|--project [--json]`
+  - Enumerate skills in library or project; JSON for automation.
+- `skillbook show <skill> --library|--project [--json]`
   - Show lock entry and computed hash for one skill.
-- `skillbook status [<skill>]`
-  - Compute sync status for project vs library and project vs harness.
-- `skillbook diff <skill> --from library --to project`
-  - Show content diff to aid decisions.
+- `skillbook status [<skill>] [--json]`
+  - Compute sync status for project vs library.
+- `skillbook diff <skill> --from library --to project [--json]`
+  - Show content diff stats to aid decisions.
 
 ### Library <-> Project Sync
 
@@ -67,10 +67,10 @@ Project vs harness:
 - `skillbook harness list`
   - List available harness ids.
 - `skillbook harness enable <id>` / `skillbook harness disable <id>`
-  - Update project config for enabled harnesses.
-- `skillbook harness sync [--id <harness>]`
+  - Update project lock file with enabled harness ids (optionally create/remove folders).
+- `skillbook harness sync --id <harness>`
   - Copy project canonical skills -> harness.
-- `skillbook harness import [--id <harness>]`
+- `skillbook harness import --id <harness>`
   - Copy harness changes -> project, marking skill as ahead.
 
 ### Ingestion and Discovery

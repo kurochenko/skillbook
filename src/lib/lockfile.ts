@@ -10,11 +10,13 @@ export type LockEntry = {
 export type LockFile = {
   schema: 1
   skills: Record<string, LockEntry>
+  harnesses?: string[]
 }
 
 export const createEmptyLockFile = (): LockFile => ({
   schema: 1,
   skills: {},
+  harnesses: [],
 })
 
 export const readLockFile = (path: string): LockFile => {
@@ -24,10 +26,14 @@ export const readLockFile = (path: string): LockFile => {
 
   const content = readFileSync(path, 'utf-8')
   const parsed = JSON.parse(content) as Partial<LockFile>
+  const harnesses = Array.isArray(parsed.harnesses)
+    ? parsed.harnesses.filter((h): h is string => typeof h === 'string')
+    : []
 
   return {
     schema: parsed.schema === 1 ? 1 : 1,
     skills: parsed.skills ?? {},
+    harnesses,
   }
 }
 
@@ -40,6 +46,7 @@ export const writeLockFile = (path: string, lockFile: LockFile): void => {
   const normalized: LockFile = {
     schema: 1,
     skills: lockFile.skills ?? {},
+    harnesses: lockFile.harnesses ?? [],
   }
 
   writeFileSync(path, JSON.stringify(normalized, null, 2) + '\n', 'utf-8')
@@ -55,4 +62,5 @@ export const setLockEntry = (
     ...lockFile.skills,
     [skillId]: entry,
   },
+  harnesses: lockFile.harnesses ?? [],
 })
