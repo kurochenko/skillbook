@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "skills": {
+    "typescript-cli": {
+      "version": 1,
+      "hash": "sha256:975668b2a5a57be2dd167e4829996bbe0da201c87b253724bbb84d686bf7fa53"
+    }
+  },
+  "harnesses": []
+}
