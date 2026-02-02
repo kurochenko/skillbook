@@ -1,20 +1,16 @@
 import { existsSync, rmSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE, SUPPORTED_TOOLS, type ToolId } from '@/constants'
-import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { readLockFile, writeLockFile } from '@/lib/lockfile'
 import { unlinkSkillFromHarness } from '@/lib/lock-harness'
+import { getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
-
-const removeIfExists = (path: string) => {
+const removeIfExists = (path: string): void => {
   if (existsSync(path)) {
     rmSync(path, { recursive: true, force: true })
   }
@@ -39,16 +35,16 @@ export default defineCommand({
   run: async ({ args }) => {
     const projectPath = args.project ?? process.cwd()
     const skill = args.skill
-    const projectRoot = getProjectLockRoot(projectPath)
+    const projectContext = getProjectLockContext(projectPath)
 
-    const skillDir = join(getLockSkillsPath(projectRoot), skill)
+    const skillDir = getSkillDir(projectContext.skillsPath, skill)
     if (!existsSync(skillDir)) {
       fail(`Skill not found in project: ${skill}`)
     }
 
     removeIfExists(skillDir)
 
-    const lockPath = getLockFilePath(projectRoot)
+    const lockPath = projectContext.lockFilePath
     const lock = readLockFile(lockPath)
     if (lock.skills[skill]) {
       const { [skill]: _removed, ...rest } = lock.skills

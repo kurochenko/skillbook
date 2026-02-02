@@ -1,10 +1,8 @@
-import { existsSync, readdirSync } from 'fs'
-import { join } from 'path'
+import { existsSync } from 'fs'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE } from '@/constants'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import {
@@ -13,11 +11,8 @@ import {
   getLockSkillsPath,
   getProjectLockRoot,
 } from '@/lib/lock-paths'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -51,10 +46,7 @@ export default defineCommand({
     }
 
     let lock = readLockFile(lockPath)
-    const entries = readdirSync(skillsPath, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .filter((name) => existsSync(join(skillsPath, name, SKILL_FILE)))
+    const entries = listSkillIds(skillsPath)
 
     if (entries.length === 0) {
       p.log.info(pc.dim('No skills found to migrate'))
@@ -62,7 +54,7 @@ export default defineCommand({
     }
 
     for (const skillId of entries) {
-      const skillDir = join(skillsPath, skillId)
+      const skillDir = getSkillDir(skillsPath, skillId)
       const hash = await computeSkillHash(skillDir)
       const existing = lock.skills[skillId]
       const version = existing?.version ?? 1

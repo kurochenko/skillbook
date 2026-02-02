@@ -1,5 +1,4 @@
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
@@ -7,12 +6,9 @@ import pc from 'picocolors'
 import { copySkillDir } from '@/lib/lock-copy'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 type Strategy = 'library' | 'project' | 'merge'
 
@@ -39,8 +35,8 @@ export default defineCommand({
   },
   run: async ({ args }) => {
     const projectPath = args.project ?? process.cwd()
-    const projectRoot = getProjectLockRoot(projectPath)
-    const libraryPath = getLockLibraryPath()
+    const projectContext = getProjectLockContext(projectPath)
+    const libraryContext = getLibraryLockContext()
     const skill = args.skill
     const strategy = args.strategy as Strategy
 
@@ -48,17 +44,15 @@ export default defineCommand({
       fail('Invalid strategy. Use library, project, or merge.')
     }
 
-    const projectSkillDir = join(getLockSkillsPath(projectRoot), skill)
-    const librarySkillDir = join(getLockSkillsPath(libraryPath), skill)
+    const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
+    const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
     if (!existsSync(projectSkillDir) || !existsSync(librarySkillDir)) {
       fail(`Skill must exist in both project and library to resolve: ${skill}`)
     }
 
-    const projectLockPath = getLockFilePath(projectRoot)
-    const libraryLockPath = getLockFilePath(libraryPath)
-    const projectLock = readLockFile(projectLockPath)
-    const libraryLock = readLockFile(libraryLockPath)
+    const projectLock = readLockFile(projectContext.lockFilePath)
+    const libraryLock = readLockFile(libraryContext.lockFilePath)
     const libraryEntry = libraryLock.skills[skill]
 
     if (!libraryEntry) {
@@ -76,7 +70,7 @@ export default defineCommand({
         hash: libraryEntry.hash,
         updatedAt: libraryEntry.updatedAt,
       })
-      writeLockFile(projectLockPath, updatedProjectLock)
+      writeLockFile(projectContext.lockFilePath, updatedProjectLock)
       p.log.success(`Resolved '${skill}' using library version`)
       return
     }
@@ -86,8 +80,8 @@ export default defineCommand({
     const nextEntry = { version: nextVersion, hash: projectHash }
 
     copySkillDir(projectSkillDir, librarySkillDir)
-    writeLockFile(libraryLockPath, setLockEntry(libraryLock, skill, nextEntry))
-    writeLockFile(projectLockPath, setLockEntry(projectLock, skill, nextEntry))
+    writeLockFile(libraryContext.lockFilePath, setLockEntry(libraryLock, skill, nextEntry))
+    writeLockFile(projectContext.lockFilePath, setLockEntry(projectLock, skill, nextEntry))
     p.log.success(`Resolved '${skill}' using project version`)
   },
 })

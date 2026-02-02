@@ -15,14 +15,15 @@ import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import { copySkillDir } from '@/lib/lock-copy'
 import { getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { getHarnessBaseDir } from '@/lib/harness'
+import { getSkillDir, getSkillFilePath, listSkillIds } from '@/lib/skill-fs'
 
-const ensureDir = (path: string) => {
+const ensureDir = (path: string): void => {
   if (!existsSync(path)) {
     mkdirSync(path, { recursive: true })
   }
 }
 
-const isSymlink = (path: string) => {
+const isSymlink = (path: string): boolean => {
   try {
     return lstatSync(path).isSymbolicLink()
   } catch {
@@ -30,7 +31,7 @@ const isSymlink = (path: string) => {
   }
 }
 
-const readSymlinkTarget = (path: string) => {
+const readSymlinkTarget = (path: string): string | null => {
   try {
     return readlinkSync(path)
   } catch {
@@ -38,7 +39,7 @@ const readSymlinkTarget = (path: string) => {
   }
 }
 
-const removePath = (path: string) => {
+const removePath = (path: string): void => {
   if (!existsSync(path)) return
   if (isSymlink(path)) {
     unlinkSync(path)
@@ -47,17 +48,25 @@ const removePath = (path: string) => {
   rmSync(path, { recursive: true, force: true })
 }
 
-const getHarnessSymlinkPath = (projectPath: string, harnessId: ToolId, skillId: string) => {
+const getHarnessSymlinkPath = (
+  projectPath: string,
+  harnessId: ToolId,
+  skillId: string,
+): string => {
   const tool = TOOLS[harnessId]
   const skillPath = join(projectPath, tool.skillPath(skillId))
   return tool.needsDirectory ? dirname(skillPath) : skillPath
 }
 
-const getHarnessTargetPath = (projectSkillsPath: string, harnessId: ToolId, skillId: string) => {
+const getHarnessTargetPath = (
+  projectSkillsPath: string,
+  harnessId: ToolId,
+  skillId: string,
+): string => {
   const tool = TOOLS[harnessId]
   return tool.needsDirectory
-    ? join(projectSkillsPath, skillId)
-    : join(projectSkillsPath, skillId, SKILL_FILE)
+    ? getSkillDir(projectSkillsPath, skillId)
+    : getSkillFilePath(projectSkillsPath, skillId)
 }
 
 const ensureSymlink = (
@@ -112,26 +121,12 @@ export const unlinkSkillFromHarness = (
   return true
 }
 
-const listProjectSkills = (projectSkillsPath: string): string[] => {
-  if (!existsSync(projectSkillsPath)) return []
-
-  return readdirSync(projectSkillsPath, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .filter((entry) => existsSync(join(projectSkillsPath, entry.name, SKILL_FILE)))
-    .map((entry) => entry.name)
-    .sort()
-}
-
 const listHarnessSkills = (projectPath: string, harnessId: ToolId): string[] => {
   const baseDir = getHarnessBaseDir(projectPath, harnessId)
   if (!existsSync(baseDir)) return []
 
   if (TOOLS[harnessId].needsDirectory) {
-    return readdirSync(baseDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .filter((entry) => existsSync(join(baseDir, entry.name, SKILL_FILE)))
-      .map((entry) => entry.name)
-      .sort()
+    return listSkillIds(baseDir)
   }
 
   return readdirSync(baseDir, { withFileTypes: true })
@@ -152,7 +147,7 @@ export const syncHarnessSkills = (
   harnessId: ToolId,
 ): HarnessSyncResult => {
   const projectSkillsPath = getLockSkillsPath(getProjectLockRoot(projectPath))
-  const skillIds = listProjectSkills(projectSkillsPath)
+  const skillIds = listSkillIds(projectSkillsPath)
 
   if (skillIds.length === 0) return { total: 0, linked: 0, conflicts: 0 }
 
@@ -205,7 +200,7 @@ export const importHarnessSkills = (
 
     if (tool.needsDirectory) {
       const sourceDir = join(baseDir, skillId)
-      const targetDir = join(projectSkillsPath, skillId)
+      const targetDir = getSkillDir(projectSkillsPath, skillId)
       copySkillDir(sourceDir, targetDir)
       imported += 1
       removePath(sourceDir)
@@ -219,7 +214,7 @@ export const importHarnessSkills = (
     if (!existsSync(sourceFile)) continue
 
     const content = readFileSync(sourceFile, 'utf-8')
-    const targetDir = join(projectSkillsPath, skillId)
+    const targetDir = getSkillDir(projectSkillsPath, skillId)
     ensureDir(targetDir)
     writeFileSync(join(targetDir, SKILL_FILE), content, 'utf-8')
     imported += 1
@@ -234,7 +229,7 @@ export const importHarnessSkills = (
 
 export const removeHarnessSymlinks = (projectPath: string, harnessId: ToolId): number => {
   const projectSkillsPath = getLockSkillsPath(getProjectLockRoot(projectPath))
-  const skillIds = listProjectSkills(projectSkillsPath)
+  const skillIds = listSkillIds(projectSkillsPath)
   if (skillIds.length === 0) return 0
 
   let removed = 0

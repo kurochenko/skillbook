@@ -1,14 +1,14 @@
-import { existsSync, readdirSync } from 'fs'
-import { join } from 'path'
+import { existsSync } from 'fs'
 
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { listSkills } from '@/lib/library'
-import { SUPPORTED_TOOLS, TOOLS, SKILL_FILE } from '@/constants'
+import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
 import { getLibraryPath, getSkillsPath } from '@/lib/paths'
-import { getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getProjectLockContext } from '@/lib/lock-context'
+import { listSkillIds } from '@/lib/skill-fs'
 
 export default defineCommand({
   meta: {
@@ -31,15 +31,9 @@ export default defineCommand({
     const isJson = args.json
 
     if (projectPath) {
-      const projectRoot = getProjectLockRoot(projectPath)
-      const skillsPath = getLockSkillsPath(projectRoot)
-      const skills = existsSync(skillsPath)
-        ? readdirSync(skillsPath, { withFileTypes: true })
-            .filter((entry) => entry.isDirectory())
-            .filter((entry) => existsSync(join(skillsPath, entry.name, SKILL_FILE)))
-            .map((entry) => entry.name)
-            .sort()
-        : []
+      const projectContext = getProjectLockContext(projectPath)
+      const skillsPath = projectContext.skillsPath
+      const skills = listSkillIds(skillsPath)
 
       if (isJson) {
         process.stdout.write(JSON.stringify({ scope: 'project', path: projectPath, skills }))

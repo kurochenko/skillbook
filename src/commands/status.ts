@@ -1,18 +1,16 @@
-import { existsSync, readdirSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import pc from 'picocolors'
 import * as p from '@clack/prompts'
 
-import { SKILL_FILE } from '@/constants'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { readLockFile } from '@/lib/lockfile'
-import { resolveLockStatus } from '@/lib/lock-status'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { resolveLockStatus, type LockStatus } from '@/lib/lock-status'
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
 
 type StatusSkill = {
   id: string
-  status: string
+  status: LockStatus
   projectHash: string
   project: { version?: number; hash?: string } | null
   library: { version?: number; hash?: string } | null
@@ -52,7 +50,7 @@ const createSummary = (): StatusSummary => ({
   localOnly: 0,
 })
 
-const updateSummary = (summary: StatusSummary, status: string): StatusSummary => {
+const updateSummary = (summary: StatusSummary, status: LockStatus): StatusSummary => {
   const next = { ...summary, total: summary.total + 1 }
   if (status === 'synced') return { ...next, synced: next.synced + 1 }
   if (status === 'ahead') return { ...next, ahead: next.ahead + 1 }
@@ -60,16 +58,6 @@ const updateSummary = (summary: StatusSummary, status: string): StatusSummary =>
   if (status === 'diverged') return { ...next, diverged: next.diverged + 1 }
   if (status === 'local-only') return { ...next, localOnly: next.localOnly + 1 }
   return next
-}
-
-const listProjectSkills = (projectSkillsPath: string): string[] => {
-  if (!existsSync(projectSkillsPath)) return []
-
-  return readdirSync(projectSkillsPath, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .filter((entry) => existsSync(join(projectSkillsPath, entry.name, SKILL_FILE)))
-    .map((entry) => entry.name)
-    .sort()
 }
 
 export default defineCommand({
@@ -90,23 +78,18 @@ export default defineCommand({
   },
   run: async ({ args }) => {
     const projectPath = args.project ?? process.cwd()
-    const projectRoot = getProjectLockRoot(projectPath)
-    const projectSkillsPath = getLockSkillsPath(projectRoot)
+    const projectContext = getProjectLockContext(projectPath)
+    const libraryContext = getLibraryLockContext()
 
-    const libraryPath = getLockLibraryPath()
-    const libraryLockPath = getLockFilePath(libraryPath)
-    const projectLockPath = getLockFilePath(projectRoot)
-    const librarySkillsPath = getLockSkillsPath(libraryPath)
+    const libraryLock = readLockFile(libraryContext.lockFilePath)
+    const projectLock = readLockFile(projectContext.lockFilePath)
 
-    const libraryLock = readLockFile(libraryLockPath)
-    const projectLock = readLockFile(projectLockPath)
-
-    const skillNames = listProjectSkills(projectSkillsPath)
+    const skillNames = listSkillIds(projectContext.skillsPath)
     const skills: StatusSkill[] = []
     let summary = createSummary()
 
     for (const skillId of skillNames) {
-      const skillDir = join(projectSkillsPath, skillId)
+      const skillDir = getSkillDir(projectContext.skillsPath, skillId)
       const projectHash = await computeSkillHash(skillDir)
       const projectEntry = projectLock.skills[skillId] ?? null
       const libraryEntry = libraryLock.skills[skillId] ?? null
@@ -130,14 +113,14 @@ export default defineCommand({
     const output: StatusOutput = {
       project: {
         path: projectPath,
-        root: projectRoot,
-        skillsPath: projectSkillsPath,
-        lockFile: projectLockPath,
+        root: projectContext.root,
+        skillsPath: projectContext.skillsPath,
+        lockFile: projectContext.lockFilePath,
       },
       library: {
-        path: libraryPath,
-        skillsPath: librarySkillsPath,
-        lockFile: libraryLockPath,
+        path: libraryContext.root,
+        skillsPath: libraryContext.skillsPath,
+        lockFile: libraryContext.lockFilePath,
       },
       summary,
       skills,
@@ -158,7 +141,7 @@ export default defineCommand({
       ),
     )
 
-    const statusColor = (status: string) => {
+    const statusColor = (status: LockStatus): ((value: string) => string) => {
       if (status === 'synced') return pc.green
       if (status === 'ahead') return pc.yellow
       if (status === 'behind') return pc.cyan

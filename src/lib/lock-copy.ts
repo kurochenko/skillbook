@@ -1,13 +1,13 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
-const ensureDir = (path: string) => {
+const ensureDir = (path: string): void => {
   if (!existsSync(path)) {
     mkdirSync(path, { recursive: true })
   }
 }
 
-const copyDirRecursive = (source: string, destination: string) => {
+const copyDirRecursive = (source: string, destination: string): void => {
   ensureDir(destination)
   const entries = readdirSync(source, { withFileTypes: true })
 
@@ -26,7 +26,7 @@ const copyDirRecursive = (source: string, destination: string) => {
   }
 }
 
-export const copySkillDir = (source: string, destination: string) => {
+export const copySkillDir = (source: string, destination: string): void => {
   if (existsSync(destination)) {
     rmSync(destination, { recursive: true, force: true })
   }

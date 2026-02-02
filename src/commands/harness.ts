@@ -8,11 +8,7 @@ import { importHarnessSkills, syncHarnessSkills, removeHarnessSymlinks } from '@
 import { getHarnessBaseDir } from '@/lib/harness'
 import { getLockFilePath, getProjectLockRoot } from '@/lib/lock-paths'
 import { createEmptyLockFile, readLockFile, writeLockFile } from '@/lib/lockfile'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { fail } from '@/commands/utils'
 
 const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => {
   if (allowAll && value === 'all') return SUPPORTED_TOOLS
@@ -30,7 +26,6 @@ const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => 
 
 const resolveHarnessArg = (args: { id?: string; harness?: string }) =>
   args.id ?? args.harness
-
 
 const updateLockHarnesses = (
   projectPath: string,

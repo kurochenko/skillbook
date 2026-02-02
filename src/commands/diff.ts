@@ -1,22 +1,17 @@
 import { existsSync, readFileSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE } from '@/constants'
 import { calculateDiff } from '@/lib/library'
-import { getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
+import { getSkillFilePath } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 type DiffScope = 'library' | 'project'
 
-const resolveScopeRoot = (scope: DiffScope, projectPath: string) =>
-  scope === 'library' ? getLockLibraryPath() : getProjectLockRoot(projectPath)
+const resolveScopeContext = (scope: DiffScope, projectPath: string): LockContext =>
+  scope === 'library' ? getLibraryLockContext() : getProjectLockContext(projectPath)
 
 export default defineCommand({
   meta: {
@@ -59,10 +54,10 @@ export default defineCommand({
       fail('Invalid --from/--to. Use library or project.')
     }
 
-    const fromRoot = resolveScopeRoot(from, projectPath)
-    const toRoot = resolveScopeRoot(to, projectPath)
-    const fromFile = join(getLockSkillsPath(fromRoot), skill, SKILL_FILE)
-    const toFile = join(getLockSkillsPath(toRoot), skill, SKILL_FILE)
+    const fromContext = resolveScopeContext(from, projectPath)
+    const toContext = resolveScopeContext(to, projectPath)
+    const fromFile = getSkillFilePath(fromContext.skillsPath, skill)
+    const toFile = getSkillFilePath(toContext.skillsPath, skill)
 
     if (!existsSync(fromFile)) {
       fail(`Skill not found in ${from}: ${skill}`)

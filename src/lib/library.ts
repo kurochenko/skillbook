@@ -318,23 +318,23 @@ export const addSkillToLibrary = async (
     warning,
   })
 
-   const lockFilePath = getLockFilePath(lockLibraryPath)
-   const lock = readLockFile(lockFilePath)
-   const existingEntry = lock.skills[skillName]
+  const lockFilePath = getLockFilePath(lockLibraryPath)
+  const lock = readLockFile(lockFilePath)
+  const existingEntry = lock.skills[skillName]
 
-   if (existingContent !== null && existingContent === content) {
-     if (!existingEntry) {
-       const hash = await computeSkillHash(skillDir)
-       const updated = setLockEntry(lock, skillName, { version: 1, hash })
-       writeLockFile(lockFilePath, updated)
-     }
+  if (existingContent !== null && existingContent === content) {
+    if (!existingEntry) {
+      const hash = await computeSkillHash(skillDir)
+      const updated = setLockEntry(lock, skillName, { version: 1, hash })
+      writeLockFile(lockFilePath, updated)
+    }
 
-     return {
-       success: true,
-       action: 'skipped',
-       path: skillFilePath,
-     }
-   }
+    return {
+      success: true,
+      action: 'skipped',
+      path: skillFilePath,
+    }
+  }
 
   try {
     const originPlan = await resolveOriginPlan(libraryPath, skillName)

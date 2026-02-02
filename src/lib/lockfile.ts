@@ -19,6 +19,18 @@ export const createEmptyLockFile = (): LockFile => ({
   harnesses: [],
 })
 
+const normalizeLockFile = (lockFile: Partial<LockFile>): LockFile => {
+  const harnesses = Array.isArray(lockFile.harnesses)
+    ? lockFile.harnesses.filter((h): h is string => typeof h === 'string')
+    : []
+
+  return {
+    schema: 1,
+    skills: lockFile.skills ?? {},
+    harnesses,
+  }
+}
+
 export const readLockFile = (path: string): LockFile => {
   if (!existsSync(path)) {
     return createEmptyLockFile()
@@ -26,15 +38,7 @@ export const readLockFile = (path: string): LockFile => {
 
   const content = readFileSync(path, 'utf-8')
   const parsed = JSON.parse(content) as Partial<LockFile>
-  const harnesses = Array.isArray(parsed.harnesses)
-    ? parsed.harnesses.filter((h): h is string => typeof h === 'string')
-    : []
-
-  return {
-    schema: parsed.schema === 1 ? 1 : 1,
-    skills: parsed.skills ?? {},
-    harnesses,
-  }
+  return normalizeLockFile(parsed)
 }
 
 export const writeLockFile = (path: string, lockFile: LockFile): void => {
@@ -43,11 +47,7 @@ export const writeLockFile = (path: string, lockFile: LockFile): void => {
     mkdirSync(dir, { recursive: true })
   }
 
-  const normalized: LockFile = {
-    schema: 1,
-    skills: lockFile.skills ?? {},
-    harnesses: lockFile.harnesses ?? [],
-  }
+  const normalized = normalizeLockFile(lockFile)
 
   writeFileSync(path, JSON.stringify(normalized, null, 2) + '\n', 'utf-8')
 }
@@ -56,11 +56,11 @@ export const setLockEntry = (
   lockFile: LockFile,
   skillId: string,
   entry: LockEntry,
-): LockFile => ({
-  schema: 1,
-  skills: {
-    ...lockFile.skills,
-    [skillId]: entry,
-  },
-  harnesses: lockFile.harnesses ?? [],
-})
+): LockFile =>
+  normalizeLockFile({
+    ...lockFile,
+    skills: {
+      ...lockFile.skills,
+      [skillId]: entry,
+    },
+  })

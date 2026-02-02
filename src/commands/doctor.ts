@@ -5,7 +5,7 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
 
 const checkGitStatus = (rootPath: string) => {
   const gitDir = join(rootPath, '.git')
@@ -26,9 +26,9 @@ const checkGitStatus = (rootPath: string) => {
   return { ok: true, dirty }
 }
 
-const checkPaths = (label: string, rootPath: string, checkGit: boolean) => {
-  const lockFile = getLockFilePath(rootPath)
-  const skillsPath = getLockSkillsPath(rootPath)
+const checkPaths = (label: string, context: LockContext, checkGit: boolean) => {
+  const lockFile = context.lockFilePath
+  const skillsPath = context.skillsPath
   const errors: string[] = []
   const warnings: string[] = []
 
@@ -49,7 +49,7 @@ const checkPaths = (label: string, rootPath: string, checkGit: boolean) => {
   }
 
   if (checkGit) {
-    const gitStatus = checkGitStatus(rootPath)
+    const gitStatus = checkGitStatus(context.root)
     if (!gitStatus.ok) {
       p.log.error(pc.red(`- ${gitStatus.error}`))
       return { ok: false, dirty: false }
@@ -86,24 +86,24 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const checks: { label: string; path: string }[] = []
+    const checks: Array<{ label: string; context: LockContext }> = []
 
     if (args.library) {
-      checks.push({ label: 'Library', path: getLockLibraryPath() })
+      checks.push({ label: 'Library', context: getLibraryLockContext() })
     }
 
     if (args.project) {
-      checks.push({ label: 'Project', path: getProjectLockRoot(args.project) })
+      checks.push({ label: 'Project', context: getProjectLockContext(args.project) })
     }
 
     if (checks.length === 0) {
-      checks.push({ label: 'Library', path: getLockLibraryPath() })
+      checks.push({ label: 'Library', context: getLibraryLockContext() })
     }
 
     let ok = true
     let dirty = false
     for (const check of checks) {
-      const result = checkPaths(check.label, check.path, check.label === 'Library')
+      const result = checkPaths(check.label, check.context, check.label === 'Library')
       if (!result.ok) ok = false
       if (result.dirty) dirty = true
     }

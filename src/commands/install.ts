@@ -1,5 +1,4 @@
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
@@ -7,13 +6,10 @@ import pc from 'picocolors'
 import { copySkillDir } from '@/lib/lock-copy'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { linkSkillToHarness } from '@/lib/lock-harness'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -39,13 +35,10 @@ export default defineCommand({
   run: async ({ args }) => {
     const { skill, project, force } = args
     const projectPath = project ?? process.cwd()
-    const projectRoot = getProjectLockRoot(projectPath)
-    const projectSkillsPath = getLockSkillsPath(projectRoot)
-    const projectSkillDir = join(projectSkillsPath, skill)
-
-    const libraryPath = getLockLibraryPath()
-    const librarySkillsPath = getLockSkillsPath(libraryPath)
-    const librarySkillDir = join(librarySkillsPath, skill)
+    const projectContext = getProjectLockContext(projectPath)
+    const libraryContext = getLibraryLockContext()
+    const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
+    const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
     if (!existsSync(librarySkillDir)) {
       fail(`Skill not found in library: ${skill}`)
@@ -55,9 +48,7 @@ export default defineCommand({
       fail(`Skill already exists in project: ${skill}. Use --force to overwrite.`)
     }
 
-    const libraryLockPath = getLockFilePath(libraryPath)
-    const projectLockPath = getLockFilePath(projectRoot)
-    const libraryLock = readLockFile(libraryLockPath)
+    const libraryLock = readLockFile(libraryContext.lockFilePath)
     const entry = libraryLock.skills[skill]
 
     if (!entry) {
@@ -66,13 +57,13 @@ export default defineCommand({
 
     copySkillDir(librarySkillDir, projectSkillDir)
 
-    const projectLock = readLockFile(projectLockPath)
+    const projectLock = readLockFile(projectContext.lockFilePath)
     const updated = setLockEntry(projectLock, skill, {
       version: entry.version,
       hash: entry.hash,
       updatedAt: entry.updatedAt,
     })
-    writeLockFile(projectLockPath, updated)
+    writeLockFile(projectContext.lockFilePath, updated)
 
     const harnesses = (updated.harnesses ?? [])
       .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))

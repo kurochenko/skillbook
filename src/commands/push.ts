@@ -1,18 +1,14 @@
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -33,22 +29,18 @@ export default defineCommand({
   run: async ({ args }) => {
     const { skill, project } = args
     const projectPath = project ?? process.cwd()
-    const projectRoot = getProjectLockRoot(projectPath)
-    const projectSkillsPath = getLockSkillsPath(projectRoot)
-    const projectSkillDir = join(projectSkillsPath, skill)
+    const projectContext = getProjectLockContext(projectPath)
+    const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
 
     if (!existsSync(projectSkillDir)) {
       fail(`Skill not found in project: ${skill}`)
     }
 
-    const libraryPath = getLockLibraryPath()
-    const librarySkillsPath = getLockSkillsPath(libraryPath)
-    const librarySkillDir = join(librarySkillsPath, skill)
+    const libraryContext = getLibraryLockContext()
+    const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
-    const libraryLockPath = getLockFilePath(libraryPath)
-    const projectLockPath = getLockFilePath(projectRoot)
-    const libraryLock = readLockFile(libraryLockPath)
-    const projectLock = readLockFile(projectLockPath)
+    const libraryLock = readLockFile(libraryContext.lockFilePath)
+    const projectLock = readLockFile(projectContext.lockFilePath)
     const projectEntry = projectLock.skills[skill]
     const libraryEntry = libraryLock.skills[skill]
 
@@ -70,8 +62,8 @@ export default defineCommand({
       const nextEntry = { version: nextVersion, hash: projectHash }
 
       copySkillDir(projectSkillDir, librarySkillDir)
-      writeLockFile(libraryLockPath, setLockEntry(libraryLock, skill, nextEntry))
-      writeLockFile(projectLockPath, setLockEntry(projectLock, skill, nextEntry))
+      writeLockFile(libraryContext.lockFilePath, setLockEntry(libraryLock, skill, nextEntry))
+      writeLockFile(projectContext.lockFilePath, setLockEntry(projectLock, skill, nextEntry))
 
       p.log.success(`Pushed skill '${pc.bold(skill)}' to library`)
       return
@@ -101,10 +93,10 @@ export default defineCommand({
     copySkillDir(projectSkillDir, librarySkillDir)
 
     const updatedLibraryLock = setLockEntry(libraryLock, skill, nextEntry)
-    writeLockFile(libraryLockPath, updatedLibraryLock)
+    writeLockFile(libraryContext.lockFilePath, updatedLibraryLock)
 
     const updatedProjectLock = setLockEntry(projectLock, skill, nextEntry)
-    writeLockFile(projectLockPath, updatedProjectLock)
+    writeLockFile(projectContext.lockFilePath, updatedProjectLock)
 
     p.log.success(`Pushed skill '${pc.bold(skill)}' to library`)
   },

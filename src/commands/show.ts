@@ -1,18 +1,13 @@
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE } from '@/constants'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { readLockFile } from '@/lib/lockfile'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { getSkillDir, getSkillFilePath } from '@/lib/skill-fs'
+import { fail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -44,16 +39,17 @@ export default defineCommand({
     const { skill, project, library, json } = args
 
     const scope = library ? 'library' : 'project'
-    const rootPath = library ? getLockLibraryPath() : getProjectLockRoot(project ?? process.cwd())
-    const skillsPath = getLockSkillsPath(rootPath)
-    const skillDir = join(skillsPath, skill)
-    const skillFile = join(skillDir, SKILL_FILE)
+    const context = library
+      ? getLibraryLockContext()
+      : getProjectLockContext(project ?? process.cwd())
+    const skillDir = getSkillDir(context.skillsPath, skill)
+    const skillFile = getSkillFilePath(context.skillsPath, skill)
 
     if (!existsSync(skillFile)) {
       fail(`Skill not found in ${scope}: ${skill}`)
     }
 
-    const lock = readLockFile(getLockFilePath(rootPath))
+    const lock = readLockFile(context.lockFilePath)
     const entry = lock.skills[skill] ?? null
     const hash = await computeSkillHash(skillDir)
 
@@ -62,7 +58,7 @@ export default defineCommand({
       return
     }
 
-    p.log.info(pc.dim(`${scope}: ${rootPath}`))
+    p.log.info(pc.dim(`${scope}: ${context.root}`))
     p.log.info(`Skill: ${pc.bold(skill)}`)
     p.log.info(pc.dim(`Hash: ${hash}`))
     if (entry) {

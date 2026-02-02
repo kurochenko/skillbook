@@ -53,6 +53,33 @@ const getProjectPath = (skillPath: string, projectName: string): string => {
   return dirname(dirname(dirname(skillPath)))
 }
 
+const buildProjectInfo = (skills: ScannedSkill[]): ProjectInfo[] => {
+  const projectMap = new Map<string, ScannedSkill[]>()
+  const projectPaths = new Map<string, string>()
+
+  for (const skill of skills) {
+    const projectSkills = projectMap.get(skill.project) ?? []
+    projectSkills.push(skill)
+    projectMap.set(skill.project, projectSkills)
+
+    if (!projectPaths.has(skill.project)) {
+      projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
+    }
+  }
+
+  const projectInfos: ProjectInfo[] = []
+  const sortedNames = Array.from(projectMap.keys()).sort()
+
+  for (const name of sortedNames) {
+    const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
+    const path = projectPaths.get(name) ?? ''
+    const isManaged = path ? existsSync(getProjectLockRoot(path)) : false
+    projectInfos.push({ name, path, isManaged, skills: projectSkills })
+  }
+
+  return projectInfos
+}
+
 const SkillStatusBadge = ({ skill }: { skill: ScannedSkill }) => {
   const badge = SCAN_STATUS_BADGE[skill.status]
   return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
@@ -172,33 +199,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       }
     }
   }, [])
-
-  const buildProjectInfo = (skills: ScannedSkill[]): ProjectInfo[] => {
-    const projectMap = new Map<string, ScannedSkill[]>()
-    const projectPaths = new Map<string, string>()
-
-    for (const skill of skills) {
-      const projectSkills = projectMap.get(skill.project) ?? []
-      projectSkills.push(skill)
-      projectMap.set(skill.project, projectSkills)
-
-      if (!projectPaths.has(skill.project)) {
-        projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
-      }
-    }
-
-    const projectInfos: ProjectInfo[] = []
-    const sortedNames = Array.from(projectMap.keys()).sort()
-
-    for (const name of sortedNames) {
-      const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
-      const path = projectPaths.get(name) ?? ''
-      const isManaged = path ? existsSync(getProjectLockRoot(path)) : false
-      projectInfos.push({ name, path, isManaged, skills: projectSkills })
-    }
-
-    return projectInfos
-  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
