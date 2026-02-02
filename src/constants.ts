@@ -4,6 +4,11 @@ export const TOOLS = {
     skillPath: (name: string) => `.claude/skills/${name}/SKILL.md`,
     needsDirectory: true,
   },
+  codex: {
+    name: 'Codex',
+    skillPath: (name: string) => `.codex/skills/${name}/SKILL.md`,
+    needsDirectory: true,
+  },
   cursor: {
     name: 'Cursor',
     skillPath: (name: string) => `.cursor/rules/${name}.md`,

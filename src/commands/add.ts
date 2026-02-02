@@ -7,11 +7,7 @@ import pc from 'picocolors'
 
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { addSkillToLibrary, getSkillContent } from '@/lib/library'
-
-const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
-  process.exit(exitCode)
-}
+import { fail } from '@/commands/utils'
 
 const readFileSafe = (filePath: string): string => {
   try {

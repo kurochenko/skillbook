@@ -2,6 +2,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join, resolve } from 'path'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
+import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
+import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import { computeSkillHash } from '@/lib/skill-hash'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush } from '@/lib/git'
 import { resolveOriginPlan } from '@/lib/library-sync'
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
@@ -70,6 +73,7 @@ const IGNORED_DIRS_SET = new Set([
 
 const SKILL_PATH_MARKERS = [
   { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}` },
+  { marker: '/.codex/skills/', suffix: `/${SKILL_FILE}` },
   { marker: '/.cursor/rules/', suffix: '.md' },
   { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}` },
   { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}` },
@@ -293,6 +297,7 @@ export const addSkillToLibrary = async (
   content: string,
 ): Promise<AddSkillResult> => {
   const libraryPath = getLibraryPath()
+  const lockLibraryPath = getLockLibraryPath()
   const skillDir = getSkillPath(skillName)
   const skillFilePath = join(skillDir, SKILL_FILE)
   const relativeSkillPath = `${SKILLS_DIR}/${skillName}/${SKILL_FILE}`
@@ -313,7 +318,17 @@ export const addSkillToLibrary = async (
     warning,
   })
 
+  const lockFilePath = getLockFilePath(lockLibraryPath)
+  const lock = readLockFile(lockFilePath)
+  const existingEntry = lock.skills[skillName]
+
   if (existingContent !== null && existingContent === content) {
+    if (!existingEntry) {
+      const hash = await computeSkillHash(skillDir)
+      const updated = setLockEntry(lock, skillName, { version: 1, hash })
+      writeLockFile(lockFilePath, updated)
+    }
+
     return {
       success: true,
       action: 'skipped',
@@ -332,6 +347,10 @@ export const addSkillToLibrary = async (
     }
 
     writeFileSync(skillFilePath, content, 'utf-8')
+    const hash = await computeSkillHash(skillDir)
+    const nextVersion = existingEntry ? existingEntry.version + 1 : 1
+    const updatedLock = setLockEntry(lock, skillName, { version: nextVersion, hash })
+    writeLockFile(lockFilePath, updatedLock)
 
     const addResult = await gitAdd(libraryPath, relativeSkillPath)
     if (!addResult.success) {

@@ -23,8 +23,25 @@ Load relevant skills for the current task:
 | Skill | Use When |
 |-------|----------|
 | `typescript-cli` | Writing code, implementing features, code review |
-| `git-workflow` | Creating branches, commits, merge requests |
+| `git` | Creating branches, commits, merge requests |
 | `beads` | Multi-session work, task tracking |
+
+### Installed Skills Index
+
+All skills available in this project:
+
+| Skill | Description |
+|-------|-------------|
+| `apify` | Apify CLI commands for web scraping, data extraction, and Actor management |
+| `beads` | Git-backed issue tracker for multi-session work with dependencies and persistent memory across conversation compaction |
+| `code-review` | Comprehensive code reviewer for TypeScript CLI tools focusing on best practices, clean code, and maintainability |
+| `code-review-general` | General code review checklist focused on correctness, security, readability, and maintainability across languages |
+| `coding` | Best practices guide for writing code in React 19, TanStack, Convex, Zod, and Better Auth stack |
+| `coding-general` | General coding best practices for clarity, correctness, and maintainability across languages |
+| `git` | General git safety and workflow guidance for branches, commits, rebases, and merges |
+| `skillbook` | Manages AI coding assistant skills across projects with skillbook CLI |
+| `typescript-cli` | Best practices for writing TypeScript CLI tools with Bun, citty, and @clack/prompts |
+| `writing-skills` | Best practices for authoring Agent Skills that Claude can discover and use effectively |
 
 ## Commands
 
@@ -33,6 +50,11 @@ bun run src/cli.ts        # Run the CLI (during development)
 bun run build             # Build for distribution
 bun test                  # Run tests
 ```
+
+## Skill Sync Docs
+
+- `docs/SKILL-SYNC-LOCK-ALGORITHM.md` is the canonical sync spec (lock-based copy workflow, no shared upstream)
+- `docs/SKILL-SYNC-VISION.md` is deprecated legacy architecture (sparse checkout + symlinks), kept for historical context
 
 ## Code Style
 
@@ -69,4 +91,3 @@ bd sync               # Sync with git
    git status  # MUST show "up to date with origin"
    ```
 5. **Hand off** - Provide context for next session
-

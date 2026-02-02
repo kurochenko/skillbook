@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { render, Box, Text } from 'ink'
-import { resolve, dirname } from 'path'
+import { resolve, dirname, join } from 'path'
+import { existsSync } from 'fs'
 import {
   addSkillToLibrary,
   scanProjectSkills,
   type ScannedSkill,
   type ScanSkillStatus,
 } from '@/lib/library'
-import { isSkillbookInitialized } from '@/lib/sparse-checkout'
+import { getProjectLockRoot } from '@/lib/lock-paths'
 import { useListNavigation } from '@/tui/hooks/useListNavigation'
 import { UI, SECTION_LABELS } from '@/tui/constants'
 
@@ -50,6 +51,33 @@ const getProjectPath = (skillPath: string, projectName: string): string => {
     return skillPath.slice(0, idx + projectName.length + 1)
   }
   return dirname(dirname(dirname(skillPath)))
+}
+
+const buildProjectInfo = (skills: ScannedSkill[]): ProjectInfo[] => {
+  const projectMap = new Map<string, ScannedSkill[]>()
+  const projectPaths = new Map<string, string>()
+
+  for (const skill of skills) {
+    const projectSkills = projectMap.get(skill.project) ?? []
+    projectSkills.push(skill)
+    projectMap.set(skill.project, projectSkills)
+
+    if (!projectPaths.has(skill.project)) {
+      projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
+    }
+  }
+
+  const projectInfos: ProjectInfo[] = []
+  const sortedNames = Array.from(projectMap.keys()).sort()
+
+  for (const name of sortedNames) {
+    const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
+    const path = projectPaths.get(name) ?? ''
+    const isManaged = path ? existsSync(getProjectLockRoot(path)) : false
+    projectInfos.push({ name, path, isManaged, skills: projectSkills })
+  }
+
+  return projectInfos
 }
 
 const SkillStatusBadge = ({ skill }: { skill: ScannedSkill }) => {
@@ -171,33 +199,6 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       }
     }
   }, [])
-
-  const buildProjectInfo = (skills: ScannedSkill[]): ProjectInfo[] => {
-    const projectMap = new Map<string, ScannedSkill[]>()
-    const projectPaths = new Map<string, string>()
-
-    for (const skill of skills) {
-      const projectSkills = projectMap.get(skill.project) ?? []
-      projectSkills.push(skill)
-      projectMap.set(skill.project, projectSkills)
-
-      if (!projectPaths.has(skill.project)) {
-        projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
-      }
-    }
-
-    const projectInfos: ProjectInfo[] = []
-    const sortedNames = Array.from(projectMap.keys()).sort()
-
-    for (const name of sortedNames) {
-      const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
-      const path = projectPaths.get(name) ?? ''
-      const isManaged = path ? isSkillbookInitialized(path) : false
-      projectInfos.push({ name, path, isManaged, skills: projectSkills })
-    }
-
-    return projectInfos
-  }
 
   const loadData = useCallback(async () => {
     setLoading(true)

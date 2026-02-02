@@ -20,7 +20,10 @@ describe('add command', () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  const env = () => ({ SKILLBOOK_LIBRARY: libraryDir })
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
 
   const createSkillFile = (path: string, content: string) => {
     const fullPath = join(fixturesDir, path)

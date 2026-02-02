@@ -1,12 +1,28 @@
 #!/usr/bin/env bun
-import { existsSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { defineCommand, runMain } from 'citty'
 import pc from 'picocolors'
+import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
 import { VERSION, checkForUpdate } from '@/lib/version'
 import { initLogger, logWarn } from '@/lib/logger'
 
-const SUBCOMMANDS = ['add', 'list', 'scan', 'upgrade']
+const SUBCOMMANDS = [
+  'add',
+  'diff',
+  'doctor',
+  'harness',
+  'init',
+  'install',
+  'list',
+  'migrate',
+  'pull',
+  'push',
+  'resolve',
+  'scan',
+  'show',
+  'status',
+  'uninstall',
+  'upgrade',
+]
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
 const err = (s: string) => process.stderr.write(`${s}\n`)
@@ -53,72 +69,60 @@ ${pc.bold(pc.cyan('skillbook'))}${pc.dim(` v${VERSION}`)}
 Manage AI coding assistant skills in one place.
 Create skills once, reuse them across all your projects.
 
-${pc.bold('GETTING STARTED')}
+${pc.bold('LOCK-BASED WORKFLOW (IMPLEMENTED)')}
 
-${pc.dim('  1.')} Build your skill library by scanning your projects root:
-${pc.cyan('     skillbook scan ~/projects')}
-${pc.dim('     Finds skills across projects and lets you choose which to add.')}
+${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.skillbook (or SKILLBOOK_LOCK_LIBRARY)')}
+${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .skillbook folder')}
+${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
+${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
+${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
+${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
+${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
+${pc.cyan('  skillbook install <id> [--project <path>]')}${pc.dim(' Copy library skill into project')}
+${pc.cyan('  skillbook pull <id> [--project <path>]')}${pc.dim('    Pull library changes into project')}
+${pc.cyan('  skillbook push <id> [--project <path>]')}${pc.dim('    Push project changes into library')}
+${pc.cyan('  skillbook resolve <id> --project <path> --strategy <library|project>')}${pc.dim(' Resolve diverged skill')}
+${pc.cyan('  skillbook uninstall <id> [--project <path>]')}${pc.dim(' Remove skill from project')}
+${pc.cyan('  skillbook doctor --library')}${pc.dim('                 Validate library lock setup')}
+${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate project lock setup')}
+${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Write lockfile for project .skillbook')}
+${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Write lockfile for ~/.skillbook')}
+${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
+${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Link project skills to harness')}
+${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Import harness skills into project')}
+${pc.cyan('  skillbook harness enable [--project <path>] --id <harness>')}${pc.dim(' Enable harness in project lock file')}
+${pc.cyan('  skillbook harness disable [--project <path>] --id <harness>')}${pc.dim(' Disable harness in project lock file')}
 
-${pc.dim('  2.')} Open the interactive manager in any project:
-${pc.cyan('     cd my-project && skillbook')}
-${pc.dim('     Or specify a path: ')}${pc.cyan('skillbook ~/projects/my-app')}
+${pc.bold('LIBRARY CONTENT (CURRENT)')}
 
-${pc.bold('COMMANDS')}
+${pc.cyan('  skillbook scan [path]')}${pc.dim('              Scan and import skills to library')}
+${pc.cyan('  skillbook list')}${pc.dim('                     List skills in your library')}
+${pc.cyan('  skillbook add <source>')}${pc.dim('             Add skill from URL or path')}
 
-${pc.cyan('  skillbook')}${pc.dim('                Open TUI (in project directory)')}
-${pc.cyan('  skillbook <path>')}${pc.dim('         Open TUI for specific path')}
-${pc.cyan('  skillbook scan [path]')}${pc.dim('    Scan and import skills to library')}
-${pc.cyan('  skillbook list')}${pc.dim('           List skills in your library')}
-${pc.cyan('  skillbook add <source>')}${pc.dim('   Add skill from URL or path')}
-${pc.cyan('  skillbook upgrade')}${pc.dim('        Upgrade to latest version')}
+${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
+
+${pc.dim('  merge strategy for resolve')}
 
 ${pc.bold('OPTIONS')}
 
 ${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.skillbook/logs/skillbook.log')}
 ${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
 
+${pc.bold('ENV')}
+
+${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.skillbook)')}
+${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.skillbook)')}
+
+${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
+
+${pc.bold('HARNESS IDS')}
+
+${SUPPORTED_TOOLS.map((id) => `  ${pc.cyan(id)}${pc.dim(` (${TOOLS[id].name})`)}`).join('\n')}
+
 ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 `
 
 const showHelp = () => out(helpText())
-
-const validatePath = (pathArg: string): string => {
-  const resolved = resolve(pathArg)
-  if (!existsSync(resolved)) {
-    err(pc.red(`Error: Path does not exist: ${resolved}`))
-    process.exit(1)
-  }
-  if (!statSync(resolved).isDirectory()) {
-    err(pc.red(`Error: Path is not a directory: ${resolved}`))
-    process.exit(1)
-  }
-  return resolved
-}
-
-const openTUI = async (pathArg?: string) => {
-  const { runTUI } = await import('@/tui/App')
-  const { detectProjectContext } = await import('@/lib/project-scan')
-
-  if (!process.stdin.isTTY) {
-    err('Error: skillbook TUI requires an interactive terminal.')
-    err('Run a subcommand instead: skillbook --help')
-    process.exit(1)
-  }
-
-  if (pathArg) {
-    void showUpdateBanner()
-    runTUI(validatePath(pathArg), true)
-    return
-  }
-
-  const detected = detectProjectContext()
-  if (detected) {
-    void showUpdateBanner()
-    runTUI(detected, true)
-  } else {
-    showHelp()
-  }
-}
 
 const runSubcommand = () => {
   const main = defineCommand({
@@ -129,8 +133,20 @@ const runSubcommand = () => {
     },
     subCommands: {
       add: () => import('@/commands/add').then((m) => m.default),
+      diff: () => import('@/commands/diff').then((m) => m.default),
+      doctor: () => import('@/commands/doctor').then((m) => m.default),
+      harness: () => import('@/commands/harness').then((m) => m.default),
+      init: () => import('@/commands/init').then((m) => m.default),
+      install: () => import('@/commands/install').then((m) => m.default),
       list: () => import('@/commands/list').then((m) => m.default),
+      migrate: () => import('@/commands/migrate').then((m) => m.default),
+      pull: () => import('@/commands/pull').then((m) => m.default),
+      push: () => import('@/commands/push').then((m) => m.default),
+      resolve: () => import('@/commands/resolve').then((m) => m.default),
       scan: () => import('@/commands/scan').then((m) => m.default),
+      show: () => import('@/commands/show').then((m) => m.default),
+      status: () => import('@/commands/status').then((m) => m.default),
+      uninstall: () => import('@/commands/uninstall').then((m) => m.default),
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
   })
@@ -152,16 +168,18 @@ const main = () => {
 
   const isHelp = args.includes('--help') || args.includes('-h')
   const isSubcommand = firstArg && SUBCOMMANDS.includes(firstArg)
-  const isPath = firstArg && !firstArg.startsWith('-') && !isSubcommand
 
   if (isHelp && !isSubcommand) {
     showHelp()
   } else if (isSubcommand) {
     runSubcommand()
-  } else if (isPath) {
-    void openTUI(firstArg)
   } else {
-    void openTUI()
+    if (firstArg) {
+      err(pc.red(`Unknown command: ${firstArg}`))
+      showHelp()
+      process.exit(1)
+    }
+    showHelp()
   }
 }
 
