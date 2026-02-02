@@ -32,11 +32,11 @@ Project vs harness (planned):
 ### Setup and Environment
 
 - `skillbook init --library`
-  - Create or validate `~/.skillbook/` git repo and `skillbook.lock.json`.
+  - Create or validate `~/.skillbook/` and `skillbook.lock.json`.
 - `skillbook init --project`
   - Create `<project>/.skillbook/skills` and project lock file.
 - `skillbook doctor`
-  - Validate expected folders, lock schema, and git status in library.
+  - Validate expected folders and lock file. If the library is a git repo, report dirty status (exit code 2).
 
 ### Listing and Inspection
 
@@ -65,9 +65,9 @@ Project vs harness (planned):
 ### Project <-> Harness Sync
 
 - `skillbook harness list`
-  - List available harness ids.
+  - List available harness ids (claude-code, codex, cursor, opencode).
 - `skillbook harness enable <id>` / `skillbook harness disable <id>`
-  - Update project lock file with enabled harness ids (optionally create/remove folders).
+  - Update project lock file with enabled harness ids, and link/unlink harness symlinks.
 - `skillbook harness sync --id <harness>`
   - Link project skills into the harness via symlinks.
 - `skillbook harness import --id <harness>`

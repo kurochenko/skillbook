@@ -4,7 +4,7 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { SKILL_FILE, type ToolId } from '@/constants'
+import { SKILL_FILE, SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
 import { readLockFile, writeLockFile } from '@/lib/lockfile'
 import { unlinkSkillFromHarness } from '@/lib/lock-harness'
@@ -56,7 +56,7 @@ export default defineCommand({
     }
 
     const harnesses = (lock.harnesses ?? [])
-      .filter((h): h is ToolId => ['claude-code', 'cursor', 'opencode'].includes(h))
+      .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
 
     for (const harnessId of harnesses) {
       unlinkSkillFromHarness(projectPath, harnessId, skill)

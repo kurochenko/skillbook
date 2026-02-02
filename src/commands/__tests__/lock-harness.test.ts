@@ -150,6 +150,28 @@ describe('lock-based harness sync (CLI)', () => {
     expectSymlink(harnessDir, targetDir)
   })
 
+  test('harness sync links project skills into codex harness', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+      'notes.md': 'Notes v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'codex'],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+
+    const harnessDir = join(projectDir, '.codex', 'skills', 'alpha')
+    const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expectSymlink(harnessDir, targetDir)
+  })
+
   test('harness import copies claude-code skill into project and links harness', () => {
     runInit()
     const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }
@@ -219,6 +241,30 @@ describe('lock-based harness sync (CLI)', () => {
 
     const projectSkill = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
     expect(readFileSync(projectSkill, 'utf-8')).toBe('# Alpha v2 from opencode\n')
+    const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expectSymlink(harnessPath, targetDir)
+  })
+
+  test('harness import copies codex skill into project and links harness', () => {
+    runInit()
+    const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }
+    const baseHash = hashSkill(baseFiles)
+
+    writeSkillFiles(projectRoot(), 'alpha', baseFiles)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
+
+    const harnessPath = join(projectDir, '.codex', 'skills', 'alpha')
+    mkdirSync(harnessPath, { recursive: true })
+    writeFileSync(join(harnessPath, SKILL_FILE), '# Alpha v2 from codex\n', 'utf-8')
+
+    const result = runCli(
+      ['harness', 'import', '--project', projectDir, '--id', 'codex'],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+
+    const projectSkill = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
+    expect(readFileSync(projectSkill, 'utf-8')).toBe('# Alpha v2 from codex\n')
     const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
     expectSymlink(harnessPath, targetDir)
   })

@@ -4,7 +4,7 @@ description: >
   Manages AI coding assistant skills across projects with skillbook CLI.
   Use when installing, syncing, or managing skills in the library or projects.
 license: MIT
-compatibility: opencode, claude-code, cursor
+compatibility: opencode, claude-code, codex, cursor
 ---
 
 # Skillbook - Skill Library Manager

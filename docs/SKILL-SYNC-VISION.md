@@ -73,7 +73,7 @@ project/
 |-----------|----------|------------|------------|
 | **Library** | `~/.skillbook/` | Git repo with ALL skills | Own git repo |
 | **Project Cache** | `.skillbook/` | Sparse checkout of library | Part of project git |
-| **Harness Folders** | `.claude/`, `.cursor/`, `.opencode/` | Symlinks to `.skillbook/` | Part of project git |
+| **Harness Folders** | `.claude/`, `.codex/`, `.cursor/`, `.opencode/` | Symlinks to `.skillbook/` | Part of project git |
 
 ### Why This Architecture?
 

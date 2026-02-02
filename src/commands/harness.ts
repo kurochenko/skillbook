@@ -83,7 +83,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, cursor, opencode)',
+            description: 'Harness id (claude-code, codex, cursor, opencode)',
           },
           harness: {
             type: 'string',
@@ -124,7 +124,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, cursor, opencode)',
+            description: 'Harness id (claude-code, codex, cursor, opencode)',
           },
           harness: {
             type: 'string',
@@ -161,7 +161,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, cursor, opencode)',
+            description: 'Harness id (claude-code, codex, cursor, opencode)',
           },
           harness: {
             type: 'string',
@@ -202,7 +202,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, cursor, opencode)',
+            description: 'Harness id (claude-code, codex, cursor, opencode)',
           },
           harness: {
             type: 'string',

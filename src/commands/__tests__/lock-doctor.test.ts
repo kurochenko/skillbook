@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { runCli } from '@/test-utils/cli'
+import { initGitRepo } from '@/test-utils/git'
 import { getLockFilePath, getProjectLockRoot, getLockSkillsPath } from '@/lib/lock-paths'
 
 describe('doctor command (CLI)', () => {
@@ -26,6 +27,7 @@ describe('doctor command (CLI)', () => {
   test('doctor --library succeeds with lock file and skills dir', () => {
     mkdirSync(getLockSkillsPath(libraryDir), { recursive: true })
     writeFileSync(getLockFilePath(libraryDir), JSON.stringify({ schema: 1, skills: {} }, null, 2))
+    initGitRepo(libraryDir)
 
     const result = runCli(['doctor', '--library'], env())
 
@@ -51,5 +53,18 @@ describe('doctor command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     expect(result.output).toContain('Project OK')
+  })
+
+  test('doctor --library returns exit code 2 when git is dirty', () => {
+    mkdirSync(getLockSkillsPath(libraryDir), { recursive: true })
+    writeFileSync(getLockFilePath(libraryDir), JSON.stringify({ schema: 1, skills: {} }, null, 2))
+    initGitRepo(libraryDir)
+
+    writeFileSync(getLockFilePath(libraryDir), JSON.stringify({ schema: 1, skills: { a: { version: 1, hash: 'x' } } }, null, 2))
+
+    const result = runCli(['doctor', '--library'], env())
+
+    expect(result.exitCode).toBe(2)
+    expect(result.output).toContain('uncommitted changes')
   })
 })
