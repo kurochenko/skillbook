@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/kurochenko/skillbook/compare/v0.1.10...v0.1.11) (2026-02-02)
+
+
+### Features
+
+* switch from git based to lock file based  ([#28](https://github.com/kurochenko/skillbook/issues/28)) ([5768d43](https://github.com/kurochenko/skillbook/commit/5768d439a579075a9b716eb4e6036dcb6e9b8827))
+
 ## [0.1.10](https://github.com/kurochenko/skillbook/compare/v0.1.9...v0.1.10) (2026-01-31)
 
 
