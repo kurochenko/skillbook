@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs'
-import { join, resolve } from 'path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, realpathSync, lstatSync } from 'fs'
+import { join, resolve, basename, dirname } from 'path'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
 import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
@@ -36,6 +36,7 @@ export type ScannedSkill = {
   hasConflict: boolean
   conflictCount: number
   project: string
+  projectPath: string
 }
 
 type PartialSkill = {
@@ -45,6 +46,7 @@ type PartialSkill = {
   status: ScanSkillStatus
   diff: DiffStats | null
   project: string
+  projectPath: string
 }
 
 export type ScanOptions = {
@@ -121,14 +123,19 @@ const isSkillFile = (path: string): boolean => {
   )
 }
 
-const extractProjectFromPath = (filePath: string): string => {
+const extractProjectPath = (filePath: string): string => {
   const normalized = normalizePath(filePath)
   const match = SKILL_PATH_MARKERS.find(({ marker }) => normalized.includes(marker))
-  if (!match) return 'unknown'
+  if (!match) return dirname(dirname(dirname(filePath)))
 
   const idx = normalized.indexOf(match.marker)
-  const projectPath = normalized.slice(0, idx)
-  return projectPath.split('/').pop() ?? projectPath
+  return filePath.slice(0, idx)
+}
+
+const extractProjectFromPath = (filePath: string): string => {
+  const projectPath = extractProjectPath(filePath)
+  if (!projectPath) return 'unknown'
+  return basename(projectPath) || 'unknown'
 }
 
 const countLines = (text: string): Map<string, number> => {
@@ -157,14 +164,48 @@ export const calculateDiff = (base: string, current: string): DiffStats => {
   return { additions, deletions }
 }
 
-const getSkillFiles = async (basePath: string): Promise<string[]> =>
-  new fdir()
+const isSymlinkPath = (path: string): boolean => {
+  try {
+    return lstatSync(path).isSymbolicLink() || lstatSync(dirname(path)).isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+const resolveRealPath = (path: string): string | null => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return null
+  }
+}
+
+const deduplicateSkillFiles = (paths: string[]): string[] => {
+  const seen = new Map<string, string>()
+
+  for (const path of paths) {
+    const realPath = resolveRealPath(path) ?? path
+    const existing = seen.get(realPath)
+
+    if (!existing || (!isSymlinkPath(path) && isSymlinkPath(existing))) {
+      seen.set(realPath, path)
+    }
+  }
+
+  return [...seen.values()]
+}
+
+const getSkillFiles = async (basePath: string): Promise<string[]> => {
+  const allPaths = await new fdir()
     .withFullPaths()
     .withSymlinks()
     .exclude((dirName) => IGNORED_DIRS_SET.has(dirName))
     .filter((path) => isSkillFile(path))
     .crawl(basePath)
     .withPromise()
+
+  return deduplicateSkillFiles(allPaths)
+}
 
 const getScanStatus = (content: string, libraryContent: string | null) => {
   if (libraryContent === null) {
@@ -410,10 +451,11 @@ export const scanProjectSkills = async (
     if (content === null) continue
 
     const libraryContent = getLibraryContent(name)
-    const project = extractProjectFromPath(file)
+    const projectPath = extractProjectPath(file)
+    const project = projectPath ? basename(projectPath) : extractProjectFromPath(file)
     const { status, diff } = getScanStatus(content, libraryContent)
 
-    const skill: PartialSkill = { name, path: file, content, status, diff, project }
+    const skill: PartialSkill = { name, path: file, content, status, diff, project, projectPath }
     skills.push(skill)
 
     const existing = skillsByName.get(name) ?? []

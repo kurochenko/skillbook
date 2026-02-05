@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { render, Box, Text } from 'ink'
-import { resolve, dirname, join } from 'path'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
+import { render, Box, Text, useStdout } from 'ink'
+import { resolve, relative } from 'path'
 import { existsSync } from 'fs'
 import {
   addSkillToLibrary,
@@ -11,6 +11,7 @@ import {
 import { getProjectLockRoot } from '@/lib/lock-paths'
 import { useListNavigation } from '@/tui/hooks/useListNavigation'
 import { UI, SECTION_LABELS } from '@/tui/constants'
+import { getStickyWindowStart } from '@/tui/window'
 
 type ProjectInfo = {
   name: string
@@ -30,6 +31,9 @@ const SCAN_HELP_ACTIONS: Partial<Record<ScanSkillStatus, string>> = {
   ahead: '[o]verwrite library',
 }
 
+const SCAN_BASE_ROWS = 16
+const SCAN_HEIGHT_BUFFER = 1
+
 type ScanRow =
   | { type: 'project'; project: ProjectInfo }
   | { type: 'skill'; skill: ScannedSkill; project: ProjectInfo }
@@ -45,52 +49,64 @@ const buildScanRows = (projects: ProjectInfo[]): ScanRow[] => {
   return rows
 }
 
-const getProjectPath = (skillPath: string, projectName: string): string => {
-  const idx = skillPath.lastIndexOf(`/${projectName}/`)
-  if (idx !== -1) {
-    return skillPath.slice(0, idx + projectName.length + 1)
+const getDisplayName = (projectPath: string, fallback: string, basePath: string) => {
+  if (!projectPath) return fallback
+  const relativePath = relative(basePath, projectPath)
+  if (!relativePath || relativePath === '.' || relativePath.startsWith('..')) {
+    return fallback
   }
-  return dirname(dirname(dirname(skillPath)))
+  return relativePath
 }
 
-const buildProjectInfo = (skills: ScannedSkill[]): ProjectInfo[] => {
+const buildProjectInfo = (skills: ScannedSkill[], basePath: string): ProjectInfo[] => {
   const projectMap = new Map<string, ScannedSkill[]>()
   const projectPaths = new Map<string, string>()
+  const projectNames = new Map<string, string>()
 
   for (const skill of skills) {
-    const projectSkills = projectMap.get(skill.project) ?? []
+    const key = skill.projectPath || skill.project
+    const projectSkills = projectMap.get(key) ?? []
     projectSkills.push(skill)
-    projectMap.set(skill.project, projectSkills)
+    projectMap.set(key, projectSkills)
 
-    if (!projectPaths.has(skill.project)) {
-      projectPaths.set(skill.project, getProjectPath(skill.path, skill.project))
+    if (!projectPaths.has(key)) {
+      projectPaths.set(key, skill.projectPath)
+    }
+
+    if (!projectNames.has(key)) {
+      projectNames.set(key, skill.project)
     }
   }
 
   const projectInfos: ProjectInfo[] = []
-  const sortedNames = Array.from(projectMap.keys()).sort()
 
-  for (const name of sortedNames) {
-    const projectSkills = projectMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name))
-    const path = projectPaths.get(name) ?? ''
+  for (const [key, projectSkills] of projectMap.entries()) {
+    const path = projectPaths.get(key) ?? ''
+    const fallbackName = projectNames.get(key) ?? key
+    const name = getDisplayName(path, fallbackName, basePath)
     const isManaged = path ? existsSync(getProjectLockRoot(path)) : false
-    projectInfos.push({ name, path, isManaged, skills: projectSkills })
+    projectInfos.push({
+      name,
+      path,
+      isManaged,
+      skills: projectSkills.sort((a, b) => a.name.localeCompare(b.name)),
+    })
   }
 
-  return projectInfos
+  return projectInfos.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-const SkillStatusBadge = ({ skill }: { skill: ScannedSkill }) => {
+const SkillStatusBadge = memo(({ skill }: { skill: ScannedSkill }) => {
   const badge = SCAN_STATUS_BADGE[skill.status]
   return <Text color={badge.color} dimColor={badge.dim}>{badge.text}</Text>
-}
+})
 
-const VariantWarning = ({ skill }: { skill: ScannedSkill }) => {
+const VariantWarning = memo(({ skill }: { skill: ScannedSkill }) => {
   if (!skill.hasConflict) return null
-  return <Text color="red"> ⚠ 1 of {skill.conflictCount} variants</Text>
-}
+  return <Text color="red" wrap="truncate"> ⚠ 1 of {skill.conflictCount} variants</Text>
+})
 
-const ProjectRow = ({ project, selected }: { project: ProjectInfo; selected: boolean }) => {
+const ProjectRow = memo(({ project, selected }: { project: ProjectInfo; selected: boolean }) => {
   const cursor = selected ? '>' : ' '
   const color = selected ? UI.SELECTED_COLOR : undefined
 
@@ -98,13 +114,15 @@ const ProjectRow = ({ project, selected }: { project: ProjectInfo; selected: boo
     <Box>
       <Text color={color} bold={selected}>{cursor} </Text>
       {project.isManaged && <Text color="green">[✓ skillbook] </Text>}
-      <Text color={color} bold={selected}>{project.name}</Text>
-      <Text dimColor> ({project.skills.length})</Text>
+      <Box flexGrow={1}>
+        <Text color={color} bold={selected} wrap="truncate">{project.name}</Text>
+      </Box>
+      <Text dimColor wrap="truncate"> ({project.skills.length})</Text>
     </Box>
   )
-}
+})
 
-const SkillRow = ({ skill, selected, isLast }: { skill: ScannedSkill; selected: boolean; isLast: boolean }) => {
+const SkillRow = memo(({ skill, selected, isLast }: { skill: ScannedSkill; selected: boolean; isLast: boolean }) => {
   const cursor = selected ? '>' : ' '
   const color = selected ? UI.SELECTED_COLOR : undefined
   const prefix = isLast ? '└─' : '├─'
@@ -112,26 +130,24 @@ const SkillRow = ({ skill, selected, isLast }: { skill: ScannedSkill; selected: 
   return (
     <Box>
       <Text color={color} bold={selected}>{cursor}   {prefix} </Text>
-      <Text color={color} bold={selected}>{skill.name}</Text>
-      <Text> </Text>
+      <Box flexGrow={1}>
+        <Text color={color} bold={selected} wrap="truncate">{skill.name}</Text>
+      </Box>
+      <Text wrap="truncate"> </Text>
       <SkillStatusBadge skill={skill} />
       <VariantWarning skill={skill} />
     </Box>
   )
-}
+})
 
-const RowDisplay = ({ row, selected, isLastSkill }: { row: ScanRow; selected: boolean; isLastSkill: boolean }) => {
+const RowDisplay = memo(({ row, selected, isLastSkill }: { row: ScanRow; selected: boolean; isLastSkill: boolean }) => {
   if (row.type === 'project') {
     return <ProjectRow project={row.project} selected={selected} />
   }
   return <SkillRow skill={row.skill} selected={selected} isLast={isLastSkill} />
-}
+})
 
-const HelpBar = ({ selectedRow }: { selectedRow: ScanRow | null }) => {
-  const action = selectedRow?.type === 'skill'
-    ? SCAN_HELP_ACTIONS[selectedRow.skill.status]
-    : undefined
-
+const HelpBar = memo(({ action }: { action?: string }) => {
   const parts = action ? [action, '[q]uit'] : ['[q]uit']
 
   return (
@@ -139,7 +155,7 @@ const HelpBar = ({ selectedRow }: { selectedRow: ScanRow | null }) => {
       <Text dimColor wrap="truncate">{parts.join('  ')}</Text>
     </Box>
   )
-}
+})
 
 const getLegendCounts = (skills: ScannedSkill[]) => {
   let localCount = 0
@@ -155,7 +171,7 @@ const getLegendCounts = (skills: ScannedSkill[]) => {
   return { localCount, matchesCount, differsCount }
 }
 
-const Legend = ({ skills }: { skills: ScannedSkill[] }) => {
+const Legend = memo(({ skills }: { skills: ScannedSkill[] }) => {
   const { localCount, matchesCount, differsCount } = getLegendCounts(skills)
 
   return (
@@ -175,7 +191,7 @@ const Legend = ({ skills }: { skills: ScannedSkill[] }) => {
       )}
     </Box>
   )
-}
+})
 
 type MessageColor = 'green' | 'yellow' | 'red' | 'cyan'
 type Message = { text: string; color: MessageColor }
@@ -191,6 +207,8 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   const [message, setMessage] = useState<Message | null>(null)
   const [pendingConfirm, setPendingConfirm] = useState<ScannedSkill | null>(null)
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const windowStartRef = useRef(0)
+  const { stdout } = useStdout()
 
   useEffect(() => {
     return () => {
@@ -204,7 +222,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     setLoading(true)
     const skills = await scanProjectSkills(basePath)
     setAllSkills(skills)
-    setProjects(buildProjectInfo(skills))
+    setProjects(buildProjectInfo(skills, basePath))
     setLoading(false)
   }, [basePath])
 
@@ -212,7 +230,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     loadData()
   }, [loadData])
 
-  const rows = buildScanRows(projects)
+  const rows = useMemo(() => buildScanRows(projects), [projects])
 
   const { selectedIndex } = useListNavigation({
     listLength: rows.length,
@@ -238,6 +256,29 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   })
 
   const selectedRow = rows[selectedIndex] ?? null
+
+  const terminalRows = stdout?.rows ?? 0
+  const availableRows = terminalRows > 0
+    ? terminalRows - SCAN_BASE_ROWS - SCAN_HEIGHT_BUFFER
+    : UI.CONTENT_MIN_HEIGHT
+  const windowSize = rows.length === 0
+    ? 0
+    : Math.min(rows.length, Math.max(1, availableRows))
+  const windowStart = getStickyWindowStart(
+    windowStartRef.current,
+    selectedIndex,
+    rows.length,
+    windowSize,
+  )
+
+  useEffect(() => {
+    windowStartRef.current = windowStart
+  })
+
+  const visibleRows = useMemo(
+    () => rows.slice(windowStart, windowStart + windowSize),
+    [rows, windowStart, windowSize],
+  )
 
   const isLastSkillInProject = (index: number): boolean => {
     const row = rows[index]
@@ -288,13 +329,19 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     )
   }
 
+  const helpAction = pendingConfirm
+    ? undefined
+    : selectedRow?.type === 'skill'
+        ? SCAN_HELP_ACTIONS[selectedRow.skill.status]
+        : undefined
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>skillbook</Text>
       <Text dimColor> - Library Scan</Text>
       <Box marginTop={1} />
 
-      <Text dimColor>Find skills across projects and add them to your central library.</Text>
+      <Text dimColor wrap="truncate">Find skills across projects and add them to your central library.</Text>
       <Box marginTop={1} />
 
       <Legend skills={allSkills} />
@@ -304,17 +351,19 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
       <Box marginTop={1} />
 
       <Box flexDirection="column">
-        {rows.map((row, index) => {
+        {visibleRows.map((row, index) => {
+          const totalIndex = windowStart + index
+          const projectKey = row.project.path || row.project.name
           const key = row.type === 'project'
-            ? `project-${row.project.name}`
-            : `skill-${row.project.name}-${row.skill.name}`
+            ? `project-${projectKey}`
+            : `skill-${projectKey}-${row.skill.name}`
 
           return (
             <RowDisplay
               key={key}
               row={row}
-              selected={index === selectedIndex}
-              isLastSkill={isLastSkillInProject(index)}
+              selected={totalIndex === selectedIndex}
+              isLastSkill={isLastSkillInProject(totalIndex)}
             />
           )
         })}
@@ -337,7 +386,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
         </Box>
       )}
 
-      <HelpBar selectedRow={pendingConfirm ? null : selectedRow} />
+      <HelpBar action={helpAction} />
     </Box>
   )
 }

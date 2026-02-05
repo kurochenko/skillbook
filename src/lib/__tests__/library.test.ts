@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, relative, dirname } from 'path'
 import { scanProjectSkills, addSkillToLibrary, type ScanSkillStatus } from '@/lib/library'
 import { withLibraryEnv } from '@/test-utils/env'
 
@@ -206,6 +206,14 @@ describe('scanProjectSkills', () => {
 
       expect(skills[0]!.project).toBe('project')
     })
+
+    test('includes project path in result', async () => {
+      createProjectSkill('.claude/skills/project/SKILL.md', '# Test')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills[0]!.projectPath).toBe(projectDir)
+    })
   })
 
 
@@ -327,6 +335,61 @@ describe('scanProjectSkills', () => {
       expect(skills).toHaveLength(3)
       expect(skills.every((s) => s.hasConflict)).toBe(true)
       expect(skills.every((s) => s.conflictCount === 3)).toBe(true)
+    })
+  })
+
+
+  describe('symlink deduplication', () => {
+    const createSymlink = (targetPath: string, symlinkPath: string) => {
+      const fullTarget = join(projectDir, targetPath)
+      const fullSymlink = join(projectDir, symlinkPath)
+      mkdirSync(dirname(fullSymlink), { recursive: true })
+      const relTarget = relative(dirname(fullSymlink), fullTarget)
+      symlinkSync(relTarget, fullSymlink)
+    }
+
+    test('does not duplicate skill when harness symlinks to .skillbook', async () => {
+      // Create the real skill in .skillbook/skills/
+      createProjectSkill('.skillbook/skills/my-skill/SKILL.md', '# My Skill')
+      // Create a harness symlink: .claude/skills/my-skill -> ../../.skillbook/skills/my-skill
+      createSymlink('.skillbook/skills/my-skill', '.claude/skills/my-skill')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      const mySkills = skills.filter((s) => s.name === 'my-skill')
+      expect(mySkills).toHaveLength(1)
+    })
+
+    test('does not duplicate with multiple harness symlinks', async () => {
+      createProjectSkill('.skillbook/skills/my-skill/SKILL.md', '# My Skill')
+      createSymlink('.skillbook/skills/my-skill', '.claude/skills/my-skill')
+      createSymlink('.skillbook/skills/my-skill', '.codex/skills/my-skill')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      const mySkills = skills.filter((s) => s.name === 'my-skill')
+      expect(mySkills).toHaveLength(1)
+    })
+
+    test('still finds non-symlinked skills in harness dirs', async () => {
+      // A real (non-symlinked) skill in .claude/skills/ should still be found
+      createProjectSkill('.claude/skills/real-skill/SKILL.md', '# Real')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.name).toBe('real-skill')
+    })
+
+    test('cursor symlink file does not duplicate', async () => {
+      createProjectSkill('.skillbook/skills/my-rule/SKILL.md', '# My Rule')
+      // Cursor uses file symlinks, not directory
+      createSymlink('.skillbook/skills/my-rule/SKILL.md', '.cursor/rules/my-rule.md')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      const mySkills = skills.filter((s) => s.name === 'my-rule')
+      expect(mySkills).toHaveLength(1)
     })
   })
 })

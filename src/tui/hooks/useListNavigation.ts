@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useInput, useApp } from 'ink'
 import { KEYS, isKey } from '@/tui/constants'
 
@@ -35,6 +35,37 @@ export const useListNavigation = ({
 }: UseListNavigationOptions): UseListNavigationResult => {
   const { exit } = useApp()
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const pendingDelta = useRef(0)
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (flushTimer.current) clearTimeout(flushTimer.current)
+    }
+  }, [])
+
+  const flushNavigation = useCallback(() => {
+    const delta = pendingDelta.current
+    if (delta === 0) return
+    pendingDelta.current = 0
+    flushTimer.current = null
+
+    setSelectedIndex((current) => {
+      if (listLength === 0) return 0
+      return Math.max(0, Math.min(listLength - 1, current + delta))
+    })
+  }, [listLength])
+
+  const queueNavigation = useCallback(
+    (delta: number) => {
+      pendingDelta.current += delta
+
+      if (!flushTimer.current) {
+        flushTimer.current = setTimeout(flushNavigation, 16)
+      }
+    },
+    [flushNavigation],
+  )
 
   const clampedSetIndex = useCallback(
     (updater: React.SetStateAction<number>) => {
@@ -67,10 +98,10 @@ export const useListNavigation = ({
     }
 
     if (key.upArrow || isKey(input, KEYS.UP)) {
-      clampedSetIndex((i) => i - 1)
+      queueNavigation(-1)
     }
     if (key.downArrow || isKey(input, KEYS.DOWN)) {
-      clampedSetIndex((i) => i + 1)
+      queueNavigation(1)
     }
 
     onInput?.(input, key)
