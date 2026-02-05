@@ -41,9 +41,8 @@ export const setupScrollFixtures = () => {
     mkdirSync(projectPath, { recursive: true })
 
     for (const skill of SKILLS_PER_PROJECT) {
-      const skillName = `${skill}`
       createFile(
-        join(projectPath, '.claude', 'skills', skillName, 'SKILL.md'),
+        join(projectPath, '.claude', 'skills', skill, 'SKILL.md'),
         `# ${skill} Skill\n\nSkill from ${project}.`,
       )
     }

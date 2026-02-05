@@ -60,6 +60,8 @@ export const renderWithHeight = (tree: ReactNode, terminalRows: number) => {
   const stderr = new TestStderr()
   const stdin = new TestStdin()
 
+  // ink's render() expects NodeJS.WriteStream but we use lightweight test doubles.
+  // Type-safe alternatives don't exist — ink-testing-library has the same approach internally.
   const instance = inkRender(tree, {
     stdout: stdout as any,
     stderr: stderr as any,

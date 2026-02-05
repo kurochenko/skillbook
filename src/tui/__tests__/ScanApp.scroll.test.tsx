@@ -30,11 +30,6 @@ afterAll(() => {
   restoreEnv?.()
 })
 
-const getVisibleLines = (frame: string): string[] => {
-  const stripped = stripAnsi(frame)
-  return stripped.split('\n').filter((line) => line.trim().length > 0)
-}
-
 const findCursorLine = (frame: string): { index: number; line: string } | null => {
   const lines = stripAnsi(frame).split('\n')
   for (let i = 0; i < lines.length; i++) {

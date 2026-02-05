@@ -117,10 +117,14 @@ skillbook resolve <id> --strategy library|project
 ## Development
 
 ```bash
-bun run src/cli.ts <command>
-bun test
-bun run build
+bun run dev <command>              # Run CLI in dev mode
+bun test                           # Run all tests
+bun test src/lib/__tests__/library.test.ts   # Run a single test file
+bun test --watch                   # Watch mode
+bun run build                      # Compile to dist/skillbook
 ```
+
+Test fixtures in `test-fixtures/` are generated at runtime and gitignored.
 
 ## License
 

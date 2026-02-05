@@ -47,3 +47,5 @@ SKILL.md
 # Test fixtures (generated)
 test-fixtures/library
 test-fixtures/project
+test-fixtures/scroll
+test-fixtures/scan
