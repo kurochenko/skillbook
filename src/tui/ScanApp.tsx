@@ -130,10 +130,8 @@ const SkillRow = memo(({ skill, selected, isLast }: { skill: ScannedSkill; selec
   return (
     <Box>
       <Text color={color} bold={selected}>{cursor}   {prefix} </Text>
-      <Box flexGrow={1}>
-        <Text color={color} bold={selected} wrap="truncate">{skill.name}</Text>
-      </Box>
-      <Text wrap="truncate"> </Text>
+      <Text color={color} bold={selected} wrap="truncate">{skill.name}</Text>
+      <Text> </Text>
       <SkillStatusBadge skill={skill} />
       <VariantWarning skill={skill} />
     </Box>
