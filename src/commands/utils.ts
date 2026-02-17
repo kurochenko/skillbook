@@ -20,8 +20,9 @@ export const getAllSkillArgs = (commandName: string, firstSkill: string): string
   const remainingArgs = process.argv.slice(subcommandIndex + 1)
   const flagsWithValues = new Set(['--project'])
 
-  const skillArgs: string[] = []
+  const skills: string[] = []
   const duplicates: string[] = []
+  const seen = new Set<string>()
   let skipNext = false
 
   for (const arg of remainingArgs) {
@@ -42,16 +43,18 @@ export const getAllSkillArgs = (commandName: string, firstSkill: string): string
       continue
     }
 
-    if (arg === firstSkill) {
+    if (seen.has(arg)) {
       duplicates.push(arg)
-    } else {
-      skillArgs.push(arg)
+      continue
     }
+
+    seen.add(arg)
+    skills.push(arg)
   }
 
   for (const dup of [...new Set(duplicates)]) {
     process.stderr.write(pc.yellow(`Warning: duplicate skill name ignored: ${dup}\n`))
   }
 
-  return [firstSkill, ...skillArgs]
+  return skills
 }

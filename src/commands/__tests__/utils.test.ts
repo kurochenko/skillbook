@@ -43,6 +43,55 @@ describe('getAllSkillArgs', () => {
     expect(stderrOutput.join()).toContain('duplicate skill name ignored')
   })
 
+  test('No warning on normal single skill', () => {
+    const originalStderrWrite = process.stderr.write
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+
+    process.argv = ['node', 'cli', 'install', 'alpha']
+    const result = getAllSkillArgs('install', 'alpha')
+
+    process.stderr.write = originalStderrWrite
+
+    expect(result).toEqual(['alpha'])
+    expect(stderrOutput.join()).not.toContain('duplicate skill name ignored')
+  })
+
+  test('No warning on normal multi skill', () => {
+    const originalStderrWrite = process.stderr.write
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+
+    process.argv = ['node', 'cli', 'install', 'alpha', 'beta']
+    const result = getAllSkillArgs('install', 'alpha')
+
+    process.stderr.write = originalStderrWrite
+
+    expect(result).toEqual(['alpha', 'beta'])
+    expect(stderrOutput.join()).not.toContain('duplicate skill name ignored')
+  })
+
+  test('Deduplicates non-first args', () => {
+    const originalStderrWrite = process.stderr.write
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+
+    process.argv = ['node', 'cli', 'install', 'alpha', 'beta', 'beta']
+    const result = getAllSkillArgs('install', 'alpha')
+    process.stderr.write = originalStderrWrite
+    expect(result).toEqual(['alpha', 'beta'])
+    expect(stderrOutput.join()).toContain('duplicate skill name ignored: beta')
+  })
+
   test('Handles --project value: skips flag and its value', () => {
     process.argv = ['node', 'cli', 'install', 'alpha', '--project', '/foo', 'beta']
     const result = getAllSkillArgs('install', 'alpha')

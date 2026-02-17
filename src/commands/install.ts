@@ -28,7 +28,7 @@ const installSkill = (
     if (force) {
       // Continue with overwriting
     } else {
-      return { success: false, error: `Skill already exists in project: ${skill}` }
+      return { success: false, error: `Skill already exists in project: ${skill}. Use --force to overwrite.` }
     }
   }
 
