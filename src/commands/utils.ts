@@ -6,55 +6,23 @@ export const fail = (message: string, exitCode = 1): never => {
   process.exit(exitCode)
 }
 
-export const getAllSkillArgs = (commandName: string, firstSkill: string): string[] => {
-  if (!firstSkill) {
-    return []
+export const resolveSkills = (skill?: string, skills?: string): string[] => {
+  const skillList: string[] = []
+  if (skill) skillList.push(skill)
+  if (skills) {
+    skillList.push(...skills.split(',').map(s => s.trim()).filter(Boolean))
   }
-
-  const subcommandIndex = process.argv.findIndex((arg) => arg === commandName)
-
-  if (subcommandIndex === -1) {
-    return [firstSkill]
+  const uniqueSkills = [...new Set(skillList)]
+  if (uniqueSkills.length === 0) {
+    process.stderr.write(pc.red('No skills specified\n'))
+    process.exit(1)
   }
-
-  const remainingArgs = process.argv.slice(subcommandIndex + 1)
-  const flagsWithValues = new Set(['--project'])
-
-  const skills: string[] = []
-  const duplicates: string[] = []
   const seen = new Set<string>()
-  let skipNext = false
-
-  for (const arg of remainingArgs) {
-    if (skipNext) {
-      skipNext = false
-      continue
+  for (const s of skillList) {
+    if (seen.has(s)) {
+      process.stderr.write(pc.yellow(`Warning: duplicate skill name ignored: ${s}\n`))
     }
-
-    if (arg.startsWith('-')) {
-      if (arg.includes('=')) {
-        continue
-      }
-
-      if (flagsWithValues.has(arg)) {
-        skipNext = true
-      }
-
-      continue
-    }
-
-    if (seen.has(arg)) {
-      duplicates.push(arg)
-      continue
-    }
-
-    seen.add(arg)
-    skills.push(arg)
+    seen.add(s)
   }
-
-  for (const dup of [...new Set(duplicates)]) {
-    process.stderr.write(pc.yellow(`Warning: duplicate skill name ignored: ${dup}\n`))
-  }
-
-  return skills
+  return uniqueSkills
 }

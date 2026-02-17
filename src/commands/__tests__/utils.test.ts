@@ -1,136 +1,107 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
-import { getAllSkillArgs } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
 
-describe('getAllSkillArgs', () => {
-  const originalArgv = process.argv
+describe('resolveSkills', () => {
+  const originalStderrWrite = process.stderr.write
+  const originalProcessExit = process.exit
 
   beforeEach(() => {
-    process.argv = originalArgv
+    process.stderr.write = originalStderrWrite
+    process.exit = originalProcessExit
   })
 
-  test('Basic: single skill returns [skill]', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha']
-    const result = getAllSkillArgs('install', 'alpha')
+  test('Single skill from positional arg', () => {
+    const result = resolveSkills('alpha', undefined)
     expect(result).toEqual(['alpha'])
   })
 
-  test('Multiple skills: returns all', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', 'beta', 'gamma']
-    const result = getAllSkillArgs('install', 'alpha')
+  test('Multiple skills from --skills flag', () => {
+    const result = resolveSkills(undefined, 'alpha,beta,gamma')
     expect(result).toEqual(['alpha', 'beta', 'gamma'])
   })
 
-  test('Deduplicates: install alpha alpha → [alpha]', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', 'alpha']
-    const result = getAllSkillArgs('install', 'alpha')
+  test('Single skill from --skills flag', () => {
+    const result = resolveSkills(undefined, 'alpha')
     expect(result).toEqual(['alpha'])
   })
 
-  test('Deduplicates with warning: install alpha beta alpha', () => {
-    const originalStderrWrite = process.stderr.write
+  test('Both positional and --skills merged', () => {
+    const result = resolveSkills('alpha', 'beta,gamma')
+    expect(result).toEqual(['alpha', 'beta', 'gamma'])
+  })
+
+  test('Deduplicates skills', () => {
+    const result = resolveSkills('alpha', 'alpha,beta')
+    expect(result).toEqual(['alpha', 'beta'])
+  })
+
+  test('Deduplicates with warning: both positional and --skills have same skill', () => {
     const stderrOutput: string[] = []
     process.stderr.write = (chunk: string) => {
       stderrOutput.push(chunk)
       return true
     }
 
-    process.argv = ['node', 'cli', 'install', 'alpha', 'beta', 'alpha']
-    const result = getAllSkillArgs('install', 'alpha')
-
-    process.stderr.write = originalStderrWrite
+    const result = resolveSkills('alpha', 'beta,alpha')
 
     expect(result).toEqual(['alpha', 'beta'])
     expect(stderrOutput.join()).toContain('duplicate skill name ignored')
   })
 
-  test('No warning on normal single skill', () => {
-    const originalStderrWrite = process.stderr.write
+  test('No warning on unique skills', () => {
     const stderrOutput: string[] = []
     process.stderr.write = (chunk: string) => {
       stderrOutput.push(chunk)
       return true
     }
 
-    process.argv = ['node', 'cli', 'install', 'alpha']
-    const result = getAllSkillArgs('install', 'alpha')
+    const result = resolveSkills('alpha', 'beta,gamma')
 
-    process.stderr.write = originalStderrWrite
+    expect(result).toEqual(['alpha', 'beta', 'gamma'])
+    expect(stderrOutput.join()).not.toContain('duplicate')
+  })
 
+  test('Empty --skills is ignored', () => {
+    const result = resolveSkills('alpha', '')
     expect(result).toEqual(['alpha'])
-    expect(stderrOutput.join()).not.toContain('duplicate skill name ignored')
   })
 
-  test('No warning on normal multi skill', () => {
-    const originalStderrWrite = process.stderr.write
+  test('Whitespace in --skills is trimmed', () => {
+    const result = resolveSkills(undefined, ' alpha , beta ,gamma ')
+    expect(result).toEqual(['alpha', 'beta', 'gamma'])
+  })
+
+  test('Exits with error when no skills specified', () => {
+    let exitCode: number | undefined
+    process.exit = ((code: number | string) => {
+      exitCode = typeof code === 'string' ? parseInt(code, 10) : code
+    }) as (code?: number | string) => never
     const stderrOutput: string[] = []
     process.stderr.write = (chunk: string) => {
       stderrOutput.push(chunk)
       return true
     }
 
-    process.argv = ['node', 'cli', 'install', 'alpha', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
+    resolveSkills(undefined, undefined)
 
-    process.stderr.write = originalStderrWrite
-
-    expect(result).toEqual(['alpha', 'beta'])
-    expect(stderrOutput.join()).not.toContain('duplicate skill name ignored')
+    expect(exitCode).toBe(1)
+    expect(stderrOutput.join()).toContain('No skills specified')
   })
 
-  test('Deduplicates non-first args', () => {
-    const originalStderrWrite = process.stderr.write
+  test('Empty string from both args exits with error', () => {
+    let exitCode: number | undefined
+    process.exit = ((code: number | string) => {
+      exitCode = typeof code === 'string' ? parseInt(code, 10) : code
+    }) as (code?: number | string) => never
     const stderrOutput: string[] = []
     process.stderr.write = (chunk: string) => {
       stderrOutput.push(chunk)
       return true
     }
 
-    process.argv = ['node', 'cli', 'install', 'alpha', 'beta', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    process.stderr.write = originalStderrWrite
-    expect(result).toEqual(['alpha', 'beta'])
-    expect(stderrOutput.join()).toContain('duplicate skill name ignored: beta')
-  })
+    resolveSkills('', '')
 
-  test('Handles --project value: skips flag and its value', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '--project', '/foo', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
-  })
-
-  test('Handles --project=value: skips it', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '--project=/foo', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
-  })
-
-  test('Unknown flags ignored: --unknown is not treated as skill', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '--unknown', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
-  })
-
-  test('Empty firstSkill returns []', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', 'beta']
-    const result = getAllSkillArgs('install', '')
-    expect(result).toEqual([])
-  })
-
-  test('Handles --help and --version flags', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '--help', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
-  })
-
-  test('Handles -h and -v short flags', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '-h', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
-  })
-
-  test('Handles --json flag', () => {
-    process.argv = ['node', 'cli', 'install', 'alpha', '--json', 'beta']
-    const result = getAllSkillArgs('install', 'alpha')
-    expect(result).toEqual(['alpha', 'beta'])
+    expect(exitCode).toBe(1)
+    expect(stderrOutput.join()).toContain('No skills specified')
   })
 })

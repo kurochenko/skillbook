@@ -7,7 +7,7 @@ import { readLockFile, writeLockFile } from '@/lib/lockfile'
 import { unlinkSkillFromHarness } from '@/lib/lock-harness'
 import { getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { getAllSkillArgs } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
 
 const removeIfExists = (path: string): void => {
   if (existsSync(path)) {
@@ -52,8 +52,12 @@ export default defineCommand({
   args: {
     skill: {
       type: 'positional',
-      description: 'Skill id to remove',
-      required: true,
+      description: 'Skill id',
+      required: false,
+    },
+    skills: {
+      type: 'string',
+      description: 'Comma-separated list of skill ids',
     },
     project: {
       type: 'string',
@@ -61,13 +65,13 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const { skill: firstSkill, project } = args
+    const { skill, skills, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs('uninstall', firstSkill)
+    const resolvedSkills = resolveSkills(skill, skills)
     const results: Array<{ skill: string; success: boolean; error?: string }> = []
 
-    for (const skill of skills) {
+    for (const skill of resolvedSkills) {
       const result = uninstallSkill(skill, projectPath)
       results.push({ skill, ...result })
 

@@ -237,7 +237,7 @@ describe('lock-based sync commands (CLI)', () => {
 
       runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
 
-      const result = runCli(['install', 'alpha', 'beta', '--project', projectDir], env())
+      const result = runCli(['install', '--skills', 'alpha,beta', '--project', projectDir], env())
       expect(result.exitCode).toBe(0)
 
       expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(alphaFiles[SKILL_FILE])
@@ -246,6 +246,39 @@ describe('lock-based sync commands (CLI)', () => {
       const projectLock = readLockFile(projectRoot())
       expect(projectLock.skills.alpha).toEqual({ version: 1, hash: alphaHash })
       expect(projectLock.skills.beta).toEqual({ version: 1, hash: betaHash })
+    })
+
+    test('install merges positional and --skills', () => {
+      runInit()
+      const alphaFiles = { [SKILL_FILE]: '# Alpha v1\n' }
+      const betaFiles = { [SKILL_FILE]: '# Beta v1\n' }
+      const gammaFiles = { [SKILL_FILE]: '# Gamma v1\n' }
+      const alphaHash = hashSkill(alphaFiles)
+      const betaHash = hashSkill(betaFiles)
+      const gammaHash = hashSkill(gammaFiles)
+
+      writeSkillFiles(libraryDir, 'alpha', alphaFiles)
+      writeSkillFiles(libraryDir, 'beta', betaFiles)
+      writeSkillFiles(libraryDir, 'gamma', gammaFiles)
+      writeLockFile(libraryDir, {
+        alpha: { version: 1, hash: alphaHash },
+        beta: { version: 1, hash: betaHash },
+        gamma: { version: 1, hash: gammaHash },
+      })
+
+      runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+
+      const result = runCli(['install', 'alpha', '--skills', 'beta,gamma', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(alphaFiles[SKILL_FILE])
+      expect(readSkillFile(projectRoot(), 'beta', SKILL_FILE)).toBe(betaFiles[SKILL_FILE])
+      expect(readSkillFile(projectRoot(), 'gamma', SKILL_FILE)).toBe(gammaFiles[SKILL_FILE])
+
+      const projectLock = readLockFile(projectRoot())
+      expect(projectLock.skills.alpha).toEqual({ version: 1, hash: alphaHash })
+      expect(projectLock.skills.beta).toEqual({ version: 1, hash: betaHash })
+      expect(projectLock.skills.gamma).toEqual({ version: 1, hash: gammaHash })
     })
 
     test('install continues on failure', () => {
@@ -258,7 +291,7 @@ describe('lock-based sync commands (CLI)', () => {
 
       runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
 
-      const result = runCli(['install', 'alpha', 'nonexistent', '--project', projectDir], env())
+      const result = runCli(['install', '--skills', 'alpha,nonexistent', '--project', projectDir], env())
       expect(result.exitCode).toBe(1)
 
       expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(alphaFiles[SKILL_FILE])
@@ -281,9 +314,9 @@ describe('lock-based sync commands (CLI)', () => {
         beta: { version: 1, hash: betaHash },
       })
 
-      runCli(['install', 'alpha', 'beta', '--project', projectDir], env())
+      runCli(['install', '--skills', 'alpha,beta', '--project', projectDir], env())
 
-      const result = runCli(['uninstall', 'alpha', 'beta', '--project', projectDir], env())
+      const result = runCli(['uninstall', '--skills', 'alpha,beta', '--project', projectDir], env())
       expect(result.exitCode).toBe(0)
 
       expect(existsSync(join(getLockSkillsPath(projectRoot()), 'alpha'))).toBe(false)
@@ -319,7 +352,7 @@ describe('lock-based sync commands (CLI)', () => {
         beta: { version: 1, hash: betaBaseHash },
       })
 
-      const result = runCli(['pull', 'alpha', 'beta', '--project', projectDir], env())
+      const result = runCli(['pull', '--skills', 'alpha,beta', '--project', projectDir], env())
       expect(result.exitCode).toBe(0)
 
       expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(alphaUpdated[SKILL_FILE])
@@ -355,7 +388,7 @@ describe('lock-based sync commands (CLI)', () => {
         beta: { version: 1, hash: betaBaseHash },
       })
 
-      const result = runCli(['push', 'alpha', 'beta', '--project', projectDir], env())
+      const result = runCli(['push', '--skills', 'alpha,beta', '--project', projectDir], env())
       expect(result.exitCode).toBe(0)
 
       expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(alphaLocal[SKILL_FILE])

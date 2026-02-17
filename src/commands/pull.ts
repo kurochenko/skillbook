@@ -7,7 +7,7 @@ import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { getAllSkillArgs } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
 
 const pullSkill = async (
   skill: string,
@@ -88,8 +88,12 @@ export default defineCommand({
   args: {
     skill: {
       type: 'positional',
-      description: 'Skill id to pull',
-      required: true,
+      description: 'Skill id',
+      required: false,
+    },
+    skills: {
+      type: 'string',
+      description: 'Comma-separated list of skill ids',
     },
     project: {
       type: 'string',
@@ -97,10 +101,10 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const { skill: firstSkill, project } = args
+    const { skill, skills, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs('pull', firstSkill)
+    const resolvedSkills = resolveSkills(skill, skills)
     const results: Array<{
       skill: string
       success: boolean
@@ -108,7 +112,7 @@ export default defineCommand({
       alreadyUpToDate?: boolean
     }> = []
 
-    for (const skill of skills) {
+    for (const skill of resolvedSkills) {
       const result = await pullSkill(skill, projectPath)
       results.push({ skill, ...result })
 

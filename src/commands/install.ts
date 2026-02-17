@@ -8,7 +8,7 @@ import { linkSkillToHarness } from '@/lib/lock-harness'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { getAllSkillArgs } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
 
 const installSkill = (
   skill: string,
@@ -69,8 +69,12 @@ export default defineCommand({
   args: {
     skill: {
       type: 'positional',
-      description: 'Skill id to install',
-      required: true,
+      description: 'Skill id',
+      required: false,
+    },
+    skills: {
+      type: 'string',
+      description: 'Comma-separated list of skill ids',
     },
     project: {
       type: 'string',
@@ -83,14 +87,14 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const { skill: firstSkill, project, force } = args
+    const { skill, skills, project, force } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs('install', firstSkill)
+    const resolvedSkills = resolveSkills(skill, skills)
     const results: Array<{ skill: string; success: boolean; error?: string; conflicts?: number }> =
       []
 
-    for (const skill of skills) {
+    for (const skill of resolvedSkills) {
       const result = installSkill(skill, projectPath, force)
       results.push({ skill, ...result })
 
