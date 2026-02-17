@@ -78,11 +78,11 @@ ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON outpu
 ${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
 ${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
 ${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
-${pc.cyan('  skillbook install <id> [--project <path>]')}${pc.dim(' Copy library skill into project')}
-${pc.cyan('  skillbook pull <id> [--project <path>]')}${pc.dim('    Pull library changes into project')}
-${pc.cyan('  skillbook push <id> [--project <path>]')}${pc.dim('    Push project changes into library')}
+${pc.cyan('  skillbook install <id...> [--project <path>]')}${pc.dim(' Copy library skill into project')}
+${pc.cyan('  skillbook pull <id...> [--project <path>]')}${pc.dim('    Pull library changes into project')}
+${pc.cyan('  skillbook push <id...> [--project <path>]')}${pc.dim('    Push project changes into library')}
 ${pc.cyan('  skillbook resolve <id> --project <path> --strategy <library|project>')}${pc.dim(' Resolve diverged skill')}
-${pc.cyan('  skillbook uninstall <id> [--project <path>]')}${pc.dim(' Remove skill from project')}
+${pc.cyan('  skillbook uninstall <id...> [--project <path>]')}${pc.dim(' Remove skill from project')}
 ${pc.cyan('  skillbook doctor --library')}${pc.dim('                 Validate library lock setup')}
 ${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate project lock setup')}
 ${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Write lockfile for project .skillbook')}
