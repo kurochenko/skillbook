@@ -143,8 +143,12 @@ export default defineCommand({
     )
 
     if (failCount > 0) {
-      const maxExitCode = Math.max(...results.filter((r) => !r.success).map((r) => r.exitCode ?? 1))
-      process.exit(maxExitCode)
+      if (skills.length === 1) {
+        const failedResult = results.find((r) => !r.success)
+        process.exit(failedResult?.exitCode ?? 1)
+      } else {
+        process.exit(1)
+      }
     }
   },
 })

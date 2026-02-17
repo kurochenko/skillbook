@@ -7,6 +7,10 @@ export const fail = (message: string, exitCode = 1): never => {
 }
 
 export const getAllSkillArgs = (firstSkill: string): string[] => {
+  if (!firstSkill) {
+    return []
+  }
+
   const subcommandIndex = process.argv.findIndex(
     (arg) => arg === 'install' || arg === 'pull' || arg === 'push' || arg === 'uninstall',
   )
@@ -18,6 +22,8 @@ export const getAllSkillArgs = (firstSkill: string): string[] => {
   const remainingArgs = process.argv.slice(subcommandIndex + 1)
   const flagsWithValues = new Set(['--project'])
 
+  const KNOWN_FLAGS = new Set(['--project', '--help', '--version', '-h', '-v', '--json'])
+
   const skillArgs: string[] = []
   let skipNext = false
 
@@ -27,9 +33,11 @@ export const getAllSkillArgs = (firstSkill: string): string[] => {
       continue
     }
 
-    if (arg.startsWith('--')) {
+    if (arg.startsWith('-')) {
       if (flagsWithValues.has(arg)) {
         skipNext = true
+      } else if (!KNOWN_FLAGS.has(arg)) {
+        skillArgs.push(arg)
       }
       continue
     }
@@ -39,5 +47,6 @@ export const getAllSkillArgs = (firstSkill: string): string[] => {
     }
   }
 
-  return [firstSkill, ...skillArgs]
+  const allSkills = [firstSkill, ...skillArgs]
+  return [...new Set(allSkills)].filter((s) => s.length > 0)
 }
