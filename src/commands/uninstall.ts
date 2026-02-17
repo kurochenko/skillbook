@@ -64,7 +64,7 @@ export default defineCommand({
     const { skill: firstSkill, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs(firstSkill)
+    const skills = getAllSkillArgs('uninstall', firstSkill)
     const results: Array<{ skill: string; success: boolean; error?: string }> = []
 
     for (const skill of skills) {

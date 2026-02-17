@@ -111,7 +111,7 @@ export default defineCommand({
     const { skill: firstSkill, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs(firstSkill)
+    const skills = getAllSkillArgs('push', firstSkill)
     const results: Array<{
       skill: string
       success: boolean
@@ -143,12 +143,7 @@ export default defineCommand({
     )
 
     if (failCount > 0) {
-      if (skills.length === 1) {
-        const failedResult = results.find((r) => !r.success)
-        process.exit(failedResult?.exitCode ?? 1)
-      } else {
-        process.exit(1)
-      }
+      process.exit(1)
     }
   },
 })

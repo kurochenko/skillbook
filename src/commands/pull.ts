@@ -100,7 +100,7 @@ export default defineCommand({
     const { skill: firstSkill, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs(firstSkill)
+    const skills = getAllSkillArgs('pull', firstSkill)
     const results: Array<{
       skill: string
       success: boolean

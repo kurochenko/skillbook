@@ -1,6 +1,5 @@
 import { existsSync } from 'fs'
 import { defineCommand } from 'citty'
-import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
@@ -77,7 +76,7 @@ export default defineCommand({
     const { skill: firstSkill, project } = args
     const projectPath = project ?? process.cwd()
 
-    const skills = getAllSkillArgs(firstSkill)
+    const skills = getAllSkillArgs('install', firstSkill)
     const results: Array<{ skill: string; success: boolean; error?: string; conflicts?: number }> =
       []
 
@@ -88,9 +87,9 @@ export default defineCommand({
       if (result.success) {
         process.stdout.write(pc.green('✔ ') + `Installed skill '${pc.bold(skill)}'\n`)
         if (result.conflicts && result.conflicts > 0) {
-          p.log.warn(
+          process.stdout.write(
             pc.yellow(
-              `  ${result.conflicts} harness link${result.conflicts === 1 ? '' : 's'} skipped (existing non-symlink).`,
+              `  ${result.conflicts} harness link${result.conflicts === 1 ? '' : 's'} skipped (existing non-symlink).\n`,
             ),
           )
         }
