@@ -115,6 +115,27 @@ describe('lock-based sync commands (CLI)', () => {
     expect(readlinkSync(harnessLink)).toBe(relative(dirname(harnessLink), target))
   })
 
+  test('install --force overwrites existing skill', () => {
+    runInit()
+    const filesV2 = { [SKILL_FILE]: '# Alpha v2\n' }
+    const hashV2 = hashSkill(filesV2)
+
+    writeSkillFiles(libraryDir, 'alpha', filesV2)
+    writeLockFile(libraryDir, { alpha: { version: 2, hash: hashV2 } })
+
+    runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+
+    runCli(['install', 'alpha', '--project', projectDir], env())
+    expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(filesV2[SKILL_FILE])
+
+    const result = runCli(['install', 'alpha', '--force', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(filesV2[SKILL_FILE])
+    const projectLock = readLockFile(projectRoot())
+    expect(projectLock.skills.alpha).toEqual({ version: 2, hash: hashV2 })
+  })
+
   test('pull updates project when behind', () => {
     runInit()
     const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }

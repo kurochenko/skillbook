@@ -21,6 +21,7 @@ export const getAllSkillArgs = (commandName: string, firstSkill: string): string
   const flagsWithValues = new Set(['--project'])
 
   const skillArgs: string[] = []
+  const duplicates: string[] = []
   let skipNext = false
 
   for (const arg of remainingArgs) {
@@ -41,11 +42,16 @@ export const getAllSkillArgs = (commandName: string, firstSkill: string): string
       continue
     }
 
-    if (arg !== firstSkill) {
+    if (arg === firstSkill) {
+      duplicates.push(arg)
+    } else {
       skillArgs.push(arg)
     }
   }
 
-  const allSkills = [firstSkill, ...skillArgs]
-  return [...new Set(allSkills)].filter((s) => s.length > 0)
+  for (const dup of [...new Set(duplicates)]) {
+    process.stderr.write(pc.yellow(`Warning: duplicate skill name ignored: ${dup}\n`))
+  }
+
+  return [firstSkill, ...skillArgs]
 }

@@ -12,7 +12,7 @@ import { getAllSkillArgs } from '@/commands/utils'
 const pushSkill = async (
   skill: string,
   projectPath: string,
-): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean; exitCode?: number }> => {
+): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean }> => {
   const projectContext = getProjectLockContext(projectPath)
   const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
 
@@ -34,7 +34,6 @@ const pushSkill = async (
     return {
       success: false,
       error: `Skill '${skill}' exists in library but has no project lock entry. Install first.`,
-      exitCode: 2,
     }
   }
 
@@ -64,12 +63,11 @@ const pushSkill = async (
       return {
         success: false,
         error: `Skill '${skill}' has diverged. Resolve conflicts before pushing.`,
-        exitCode: 2,
       }
     }
 
     if (!projectChanged && libraryAdvanced) {
-      return { success: false, error: `Skill '${skill}' is behind the library. Pull first.`, exitCode: 1 }
+      return { success: false, error: `Skill '${skill}' is behind the library. Pull first.` }
     }
 
     if (!projectChanged && !libraryAdvanced) {
@@ -117,7 +115,6 @@ export default defineCommand({
       success: boolean
       error?: string
       alreadyUpToDate?: boolean
-      exitCode?: number
     }> = []
 
     for (const skill of skills) {

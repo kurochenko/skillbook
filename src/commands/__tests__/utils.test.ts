@@ -26,6 +26,23 @@ describe('getAllSkillArgs', () => {
     expect(result).toEqual(['alpha'])
   })
 
+  test('Deduplicates with warning: install alpha beta alpha', () => {
+    const originalStderrWrite = process.stderr.write
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+
+    process.argv = ['node', 'cli', 'install', 'alpha', 'beta', 'alpha']
+    const result = getAllSkillArgs('install', 'alpha')
+
+    process.stderr.write = originalStderrWrite
+
+    expect(result).toEqual(['alpha', 'beta'])
+    expect(stderrOutput.join()).toContain('duplicate skill name ignored')
+  })
+
   test('Handles --project value: skips flag and its value', () => {
     process.argv = ['node', 'cli', 'install', 'alpha', '--project', '/foo', 'beta']
     const result = getAllSkillArgs('install', 'alpha')

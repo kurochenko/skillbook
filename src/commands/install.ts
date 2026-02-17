@@ -13,6 +13,7 @@ import { getAllSkillArgs } from '@/commands/utils'
 const installSkill = (
   skill: string,
   projectPath: string,
+  force = false,
 ): { success: boolean; error?: string; conflicts?: number } => {
   const projectContext = getProjectLockContext(projectPath)
   const libraryContext = getLibraryLockContext()
@@ -24,7 +25,11 @@ const installSkill = (
   }
 
   if (existsSync(projectSkillDir)) {
-    return { success: false, error: `Skill already exists in project: ${skill}` }
+    if (force) {
+      // Continue with overwriting
+    } else {
+      return { success: false, error: `Skill already exists in project: ${skill}` }
+    }
   }
 
   const libraryLock = readLockFile(libraryContext.lockFilePath)
@@ -71,9 +76,14 @@ export default defineCommand({
       type: 'string',
       description: 'Project path (defaults to current directory)',
     },
+    force: {
+      type: 'boolean',
+      description: 'Overwrite if skill already exists in project',
+      default: false,
+    },
   },
   run: async ({ args }) => {
-    const { skill: firstSkill, project } = args
+    const { skill: firstSkill, project, force } = args
     const projectPath = project ?? process.cwd()
 
     const skills = getAllSkillArgs('install', firstSkill)
@@ -81,7 +91,7 @@ export default defineCommand({
       []
 
     for (const skill of skills) {
-      const result = installSkill(skill, projectPath)
+      const result = installSkill(skill, projectPath, force)
       results.push({ skill, ...result })
 
       if (result.success) {
