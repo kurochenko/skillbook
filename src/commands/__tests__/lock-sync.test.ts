@@ -196,7 +196,7 @@ describe('lock-based sync commands (CLI)', () => {
     writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
 
     const result = runCli(['push', 'alpha', '--project', projectDir], env())
-    expect(result.exitCode).toBe(1)
+    expect(result.exitCode).toBe(2)
 
     expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(remoteFiles[SKILL_FILE])
     const libraryLock = readLockFile(libraryDir)

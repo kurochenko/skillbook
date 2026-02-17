@@ -71,6 +71,11 @@ describe('resolveSkills', () => {
     expect(result).toEqual(['alpha', 'beta', 'gamma'])
   })
 
+  test('Whitespace in positional arg is trimmed', () => {
+    const result = resolveSkills(' alpha ', undefined)
+    expect(result).toEqual(['alpha'])
+  })
+
   test('Exits with error when no skills specified', () => {
     let exitCode: number | undefined
     process.exit = ((code: number | string) => {

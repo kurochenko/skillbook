@@ -8,7 +8,7 @@ export const fail = (message: string, exitCode = 1): never => {
 
 export const resolveSkills = (skill?: string, skills?: string): string[] => {
   const skillList: string[] = []
-  if (skill) skillList.push(skill)
+  if (skill) skillList.push(skill.trim())
   if (skills) {
     skillList.push(...skills.split(',').map(s => s.trim()).filter(Boolean))
   }

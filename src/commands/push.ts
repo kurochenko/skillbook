@@ -12,12 +12,12 @@ import { resolveSkills } from '@/commands/utils'
 const pushSkill = async (
   skill: string,
   projectPath: string,
-): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean }> => {
+): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean; exitCode?: number }> => {
   const projectContext = getProjectLockContext(projectPath)
   const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
 
   if (!existsSync(projectSkillDir)) {
-    return { success: false, error: `Skill not found in project: ${skill}` }
+    return { success: false, error: `Skill not found in project: ${skill}`, exitCode: 1 }
   }
 
   const libraryContext = getLibraryLockContext()
@@ -34,6 +34,7 @@ const pushSkill = async (
     return {
       success: false,
       error: `Skill '${skill}' exists in library but has no project lock entry. Install first.`,
+      exitCode: 2,
     }
   }
 
@@ -63,11 +64,12 @@ const pushSkill = async (
       return {
         success: false,
         error: `Skill '${skill}' has diverged. Resolve conflicts before pushing.`,
+        exitCode: 2,
       }
     }
 
     if (!projectChanged && libraryAdvanced) {
-      return { success: false, error: `Skill '${skill}' is behind the library. Pull first.` }
+      return { success: false, error: `Skill '${skill}' is behind the library. Pull first.`, exitCode: 2 }
     }
 
     if (!projectChanged && !libraryAdvanced) {
@@ -119,6 +121,7 @@ export default defineCommand({
       success: boolean
       error?: string
       alreadyUpToDate?: boolean
+      exitCode?: number
     }> = []
 
     for (const skill of resolvedSkills) {
@@ -144,7 +147,8 @@ export default defineCommand({
     )
 
     if (failCount > 0) {
-      process.exit(1)
+      const maxExitCode = Math.max(...results.filter(r => !r.success).map(r => r.exitCode ?? 1))
+      process.exit(maxExitCode)
     }
   },
 })

@@ -12,14 +12,14 @@ import { resolveSkills } from '@/commands/utils'
 const pullSkill = async (
   skill: string,
   projectPath: string,
-): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean }> => {
+): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean; exitCode?: number }> => {
   const projectContext = getProjectLockContext(projectPath)
   const libraryContext = getLibraryLockContext()
   const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
   const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
   if (!existsSync(librarySkillDir)) {
-    return { success: false, error: `Skill not found in library: ${skill}` }
+    return { success: false, error: `Skill not found in library: ${skill}`, exitCode: 1 }
   }
 
   const libraryLock = readLockFile(libraryContext.lockFilePath)
@@ -28,7 +28,7 @@ const pullSkill = async (
   const projectEntry = projectLock.skills[skill]
 
   if (!libraryEntry) {
-    return { success: false, error: `No lock entry found for skill in library: ${skill}` }
+    return { success: false, error: `No lock entry found for skill in library: ${skill}`, exitCode: 1 }
   }
 
   if (!existsSync(projectSkillDir)) {
@@ -46,6 +46,7 @@ const pullSkill = async (
     return {
       success: false,
       error: `Skill '${skill}' is not linked to a lock entry. Run install instead.`,
+      exitCode: 2,
     }
   }
 
@@ -58,11 +59,12 @@ const pullSkill = async (
     return {
       success: false,
       error: `Skill '${skill}' has diverged. Resolve conflicts before pulling.`,
+      exitCode: 2,
     }
   }
 
   if (projectChanged && !libraryAdvanced) {
-    return { success: false, error: `Skill '${skill}' has local changes. Push before pulling.` }
+    return { success: false, error: `Skill '${skill}' has local changes. Push before pulling.`, exitCode: 2 }
   }
 
   if (!projectChanged && !libraryAdvanced) {
@@ -110,6 +112,7 @@ export default defineCommand({
       success: boolean
       error?: string
       alreadyUpToDate?: boolean
+      exitCode?: number
     }> = []
 
     for (const skill of resolvedSkills) {
@@ -135,7 +138,8 @@ export default defineCommand({
     )
 
     if (failCount > 0) {
-      process.exit(1)
+      const maxExitCode = Math.max(...results.filter(r => !r.success).map(r => r.exitCode ?? 1))
+      process.exit(maxExitCode)
     }
   },
 })
