@@ -19,6 +19,7 @@ type LockFile = {
   schema: 1
   skills: Record<string, { version: number; hash: string; updatedAt?: string }>
   harnesses?: string[]
+  harnessModes?: Record<string, 'symlink' | 'copy'>
 }
 
 describe('lock-based harness enable/disable (CLI)', () => {
@@ -60,6 +61,14 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(result.output).toContain('codex')
     expect(result.output).toContain('cursor')
     expect(result.output).toContain('opencode')
+  })
+
+  test('CLI help documents harness status and mode options', () => {
+    const result = runCli(['--help'])
+
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain('harness status')
+    expect(result.output).toContain('--mode symlink|copy')
   })
 
   test('harness enable writes harnesses to project lock file', () => {
@@ -138,5 +147,94 @@ describe('lock-based harness enable/disable (CLI)', () => {
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual([])
     expect(existsSync(join(projectDir, '.opencode', 'skill'))).toBe(false)
+  })
+
+  test('harness enable --mode copy writes real files and persists mode', () => {
+    runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
+
+    const result = runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--mode',
+      'copy',
+    ])
+
+    expect(result.exitCode).toBe(0)
+
+    const lock = readProjectLock()
+    expect(lock.harnesses).toEqual(['cursor'])
+    expect(lock.harnessModes?.cursor).toBe('copy')
+
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    expect(existsSync(cursorFile)).toBe(true)
+    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Alpha\n')
+  })
+
+  test('copy mode reports drift and requires --force to overwrite', () => {
+    runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha canonical\n')
+
+    runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--mode',
+      'copy',
+    ])
+
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    writeFileSync(cursorFile, '# Drifted\n', 'utf-8')
+
+    const status = runCli([
+      'harness',
+      'status',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--json',
+    ])
+
+    expect(status.exitCode).toBe(0)
+    const parsed = JSON.parse(status.stdout) as {
+      drifted: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(parsed.drifted).toBe(1)
+    expect(parsed.skills).toContainEqual({ id: 'alpha', status: 'harness-drifted' })
+
+    runCli(['harness', 'sync', '--id', 'cursor', '--project', projectDir])
+    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Drifted\n')
+
+    runCli(['harness', 'sync', '--id', 'cursor', '--project', projectDir, '--force'])
+    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Alpha canonical\n')
+  })
+
+  test('legacy lockfile without harnessModes defaults to symlink mode', () => {
+    runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
+
+    const lockPath = getLockFilePath(getProjectLockRoot(projectDir))
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ schema: 1, skills: {}, harnesses: ['opencode'] }, null, 2) + '\n',
+      'utf-8',
+    )
+
+    const result = runCli(['harness', 'sync', '--id', 'opencode', '--project', projectDir])
+    expect(result.exitCode).toBe(0)
+
+    const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
+    const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
+    expectSymlink(symlinkPath, targetPath)
   })
 })

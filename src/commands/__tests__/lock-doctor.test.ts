@@ -67,4 +67,31 @@ describe('doctor command (CLI)', () => {
     expect(result.exitCode).toBe(2)
     expect(result.output).toContain('uncommitted changes')
   })
+
+  test('doctor --project warns when harness copy mode has drifted files', () => {
+    runCli(['init', '--project', '--path', projectDir], env())
+
+    const projectSkills = getLockSkillsPath(getProjectLockRoot(projectDir))
+    mkdirSync(join(projectSkills, 'alpha'), { recursive: true })
+    writeFileSync(join(projectSkills, 'alpha', 'SKILL.md'), '# Canonical\n', 'utf-8')
+
+    runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--mode',
+      'copy',
+    ], env())
+
+    writeFileSync(join(projectDir, '.cursor', 'rules', 'alpha.md'), '# Drifted\n', 'utf-8')
+
+    const result = runCli(['doctor', '--project', projectDir], env())
+
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain('Project OK')
+    expect(result.output).toContain('drifted')
+  })
 })

@@ -157,6 +157,42 @@ describe('lock-based sync commands (CLI)', () => {
     expect(projectLock.skills.alpha).toEqual({ version: 2, hash: updatedHash })
   })
 
+  test('pull refreshes copied harness outputs in copy mode', () => {
+    runInit()
+    const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }
+    const updatedFiles = { [SKILL_FILE]: '# Alpha v2\n' }
+    const baseHash = hashSkill(baseFiles)
+    const updatedHash = hashSkill(updatedFiles)
+
+    writeSkillFiles(libraryDir, 'alpha', baseFiles)
+    writeLockFile(libraryDir, { alpha: { version: 1, hash: baseHash } })
+
+    runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--mode',
+      'copy',
+      '--project',
+      projectDir,
+    ], env())
+    runCli(['install', 'alpha', '--project', projectDir], env())
+
+    writeSkillFiles(libraryDir, 'alpha', updatedFiles)
+    writeLockFile(libraryDir, { alpha: { version: 2, hash: updatedHash } })
+
+    const result = runCli(['pull', 'alpha', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    expect(readFileSync(cursorFile, 'utf-8')).toBe(updatedFiles[SKILL_FILE])
+    expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(updatedFiles[SKILL_FILE])
+
+    const projectLock = readLockFile(projectRoot())
+    expect(projectLock.skills.alpha).toEqual({ version: 2, hash: updatedHash })
+  })
+
   test('push updates library when ahead and bumps version', () => {
     runInit()
     const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }

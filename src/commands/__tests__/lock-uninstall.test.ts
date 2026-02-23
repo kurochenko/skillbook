@@ -18,6 +18,8 @@ import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lo
 type LockFile = {
   schema: 1
   skills: Record<string, { version: number; hash: string; updatedAt?: string }>
+  harnesses?: string[]
+  harnessModes?: Record<string, 'symlink' | 'copy'>
 }
 
 describe('uninstall command (CLI)', () => {
@@ -81,5 +83,30 @@ describe('uninstall command (CLI)', () => {
     expect(result.exitCode).toBe(0)
     expect(existsSync(symlinkPath)).toBe(false)
     expect(existsSync(join(cursorDir, 'alpha.md'))).toBe(true)
+  })
+
+  test('uninstall removes copied harness entries in copy mode', () => {
+    runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
+    writeLockFile({ alpha: { version: 1, hash: 'sha256:alpha' } })
+
+    runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--mode',
+      'copy',
+    ])
+
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    expect(existsSync(cursorFile)).toBe(true)
+    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+
+    const result = runCli(['uninstall', 'alpha', '--project', projectDir])
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(cursorFile)).toBe(false)
   })
 })

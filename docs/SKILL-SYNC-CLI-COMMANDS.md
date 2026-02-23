@@ -66,12 +66,17 @@ Project vs harness (planned):
 
 - `skillbook harness list`
   - List available harness ids (claude-code, codex, cursor, opencode).
-- `skillbook harness enable <id>` / `skillbook harness disable <id>`
-  - Update project lock file with enabled harness ids, and link/unlink harness symlinks.
-- `skillbook harness sync --id <harness>`
-  - Link project skills into the harness via symlinks.
+- `skillbook harness enable <id> --mode symlink|copy` / `skillbook harness disable <id>`
+  - Update project lock file with enabled harness ids and per-harness mode.
+  - `symlink` keeps classic link behavior; `copy` materializes real files.
+  - If symlink creation fails due to filesystem limits, command falls back to `copy` and persists the mode.
+- `skillbook harness sync --id <harness> [--force]`
+  - Sync project skills into harness according to configured mode.
+  - In copy mode, drifted harness files are skipped by default and overwritten only with `--force`.
+- `skillbook harness status --id <harness> [--json]`
+  - Report per-skill harness state: `harness-synced`, `harness-drifted`, `missing`, `conflict`.
 - `skillbook harness import --id <harness>`
-  - Import harness changes into project and replace with symlinks.
+  - Import harness changes into project and re-sync harness output using configured mode.
 
 ### Ingestion and Discovery
 

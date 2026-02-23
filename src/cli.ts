@@ -88,9 +88,10 @@ ${pc.cyan('  skillbook doctor --project <path>')}${pc.dim('          Validate pr
 ${pc.cyan('  skillbook migrate --project <path>')}${pc.dim('             Write lockfile for project .skillbook')}
 ${pc.cyan('  skillbook migrate --library')}${pc.dim('                    Write lockfile for ~/.skillbook')}
 ${pc.cyan('  skillbook harness list')}${pc.dim('                                List available harness ids')}
-${pc.cyan('  skillbook harness sync [--project <path>] --id <harness>')}${pc.dim('    Link project skills to harness')}
-${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Import harness skills into project')}
-${pc.cyan('  skillbook harness enable [--project <path>] --id <harness>')}${pc.dim(' Enable harness in project lock file')}
+${pc.cyan('  skillbook harness status [--project <path>] --id <harness>')}${pc.dim('  Show harness-synced/harness-drifted state')}
+${pc.cyan('  skillbook harness sync [--project <path>] --id <harness> [--force]')}${pc.dim(' Sync project skills to harness (symlink/copy)')}
+${pc.cyan('  skillbook harness import [--project <path>] --id <harness>')}${pc.dim('  Import harness edits into project canonical copy')}
+${pc.cyan('  skillbook harness enable [--project <path>] --id <harness> --mode symlink|copy')}${pc.dim(' Enable harness and persist mode')}
 ${pc.cyan('  skillbook harness disable [--project <path>] --id <harness>')}${pc.dim(' Disable harness in project lock file')}
 
 ${pc.bold('LIBRARY CONTENT (CURRENT)')}
@@ -114,6 +115,7 @@ ${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library p
 ${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.skillbook)')}
 
 ${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
+${pc.dim('Harness mode defaults to symlink and falls back to copy when symlinks are unsupported.')}
 
 ${pc.bold('HARNESS IDS')}
 

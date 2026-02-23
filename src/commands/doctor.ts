@@ -5,7 +5,10 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
+import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
+import { getHarnessStatus } from '@/lib/lock-harness'
 import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
+import { getHarnessMode, readLockFile } from '@/lib/lockfile'
 
 const checkGitStatus = (rootPath: string) => {
   const gitDir = join(rootPath, '.git')
@@ -26,7 +29,46 @@ const checkGitStatus = (rootPath: string) => {
   return { ok: true, dirty }
 }
 
-const checkPaths = (label: string, context: LockContext, checkGit: boolean) => {
+const getProjectHarnessWarnings = (projectPath: string, context: LockContext): string[] => {
+  const lock = readLockFile(context.lockFilePath)
+  const enabledHarnesses = (lock.harnesses ?? [])
+    .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
+
+  const warnings: string[] = []
+
+  for (const harnessId of enabledHarnesses) {
+    const mode = getHarnessMode(lock, harnessId)
+    const status = getHarnessStatus(projectPath, harnessId, mode)
+    if (status.total === 0) continue
+
+    if (status.drifted > 0) {
+      warnings.push(
+        `Harness '${harnessId}' (${mode}) has ${status.drifted} drifted skill${status.drifted === 1 ? '' : 's'}.`,
+      )
+    }
+
+    if (status.conflicts > 0) {
+      warnings.push(
+        `Harness '${harnessId}' (${mode}) has ${status.conflicts} conflicting path${status.conflicts === 1 ? '' : 's'}.`,
+      )
+    }
+
+    if (status.missing > 0) {
+      warnings.push(
+        `Harness '${harnessId}' (${mode}) is missing ${status.missing} skill entr${status.missing === 1 ? 'y' : 'ies'}.`,
+      )
+    }
+  }
+
+  return warnings
+}
+
+const checkPaths = (
+  label: string,
+  context: LockContext,
+  checkGit: boolean,
+  projectPath?: string,
+) => {
   const lockFile = context.lockFilePath
   const skillsPath = context.skillsPath
   const errors: string[] = []
@@ -62,6 +104,10 @@ const checkPaths = (label: string, context: LockContext, checkGit: boolean) => {
     }
   }
 
+  if (projectPath) {
+    warnings.push(...getProjectHarnessWarnings(projectPath, context))
+  }
+
   p.log.success(`${label} OK`)
   for (const warning of warnings) {
     p.log.warn(pc.yellow(`- ${warning}`))
@@ -86,14 +132,14 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const checks: Array<{ label: string; context: LockContext }> = []
+    const checks: Array<{ label: string; context: LockContext; projectPath?: string }> = []
 
     if (args.library) {
       checks.push({ label: 'Library', context: getLibraryLockContext() })
     }
 
     if (args.project) {
-      checks.push({ label: 'Project', context: getProjectLockContext(args.project) })
+      checks.push({ label: 'Project', context: getProjectLockContext(args.project), projectPath: args.project })
     }
 
     if (checks.length === 0) {
@@ -103,7 +149,12 @@ export default defineCommand({
     let ok = true
     let dirty = false
     for (const check of checks) {
-      const result = checkPaths(check.label, check.context, check.label === 'Library')
+      const result = checkPaths(
+        check.label,
+        check.context,
+        check.label === 'Library',
+        check.projectPath,
+      )
       if (!result.ok) ok = false
       if (result.dirty) dirty = true
     }

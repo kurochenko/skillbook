@@ -7,7 +7,7 @@ Lock-based skill management for AI coding assistants. Keep a central library and
 - **Library**: `~/.skillbook/skills/<id>/SKILL.md` (git repo for versioning)
 - **Project**: `<project>/.skillbook/skills/<id>/SKILL.md` (committable)
 - **Lockfile**: `skillbook.lock.json` stores `version` + `hash` per skill
-- **Harnesses**: symlinks to project skills (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`)
+- **Harnesses**: synced from project skills (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`) using `symlink` or `copy` mode
 
 ## Install
 
@@ -27,7 +27,7 @@ skillbook list
 cd my-project
 skillbook init --project
 skillbook install <skill-id>
-skillbook harness enable --id opencode
+skillbook harness enable --id opencode --mode symlink
 ```
 
 ## Common workflows
@@ -59,7 +59,7 @@ skillbook push my-skill
 ```bash
 skillbook init --project
 skillbook install my-skill
-skillbook harness enable --id cursor
+skillbook harness enable --id cursor --mode copy
 ```
 
 ### 4) Update a skill and publish to the library
@@ -87,13 +87,26 @@ skillbook resolve my-skill --strategy library
 skillbook resolve my-skill --strategy project
 ```
 
-### 7) Re-link harness symlinks
+### 7) Re-sync harness outputs
 
-If harness links were changed or removed:
+If harness files were changed, removed, or drifted:
 
 ```bash
+skillbook harness status --id opencode
 skillbook harness sync --id opencode
+# overwrite drifted copied harness files
+skillbook harness sync --id opencode --force
 ```
+
+### 8) Use copy mode on filesystems without symlink support
+
+If symlinks are unsupported in your environment, use copy mode explicitly:
+
+```bash
+skillbook harness enable --id opencode --mode copy
+```
+
+When symlink mode is enabled but unsupported by the filesystem, skillbook automatically falls back to copy mode and persists it in `skillbook.lock.json`.
 
 ## Common commands
 
