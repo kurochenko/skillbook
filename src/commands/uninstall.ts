@@ -1,6 +1,5 @@
 import { existsSync, rmSync } from 'fs'
 import { defineCommand } from 'citty'
-import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
@@ -8,12 +7,41 @@ import { readLockFile, writeLockFile } from '@/lib/lockfile'
 import { unlinkSkillFromHarness } from '@/lib/lock-harness'
 import { getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { fail } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
 
 const removeIfExists = (path: string): void => {
   if (existsSync(path)) {
     rmSync(path, { recursive: true, force: true })
   }
+}
+
+const uninstallSkill = (
+  skill: string,
+  projectPath: string,
+): { success: boolean; error?: string } => {
+  const projectContext = getProjectLockContext(projectPath)
+
+  const skillDir = getSkillDir(projectContext.skillsPath, skill)
+  if (!existsSync(skillDir)) {
+    return { success: false, error: `Skill not found in project: ${skill}` }
+  }
+
+  removeIfExists(skillDir)
+
+  const lockPath = projectContext.lockFilePath
+  const lock = readLockFile(lockPath)
+  if (lock.skills[skill]) {
+    const { [skill]: _removed, ...rest } = lock.skills
+    writeLockFile(lockPath, { ...lock, skills: rest })
+  }
+
+  const harnesses = (lock.harnesses ?? []).filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
+
+  for (const harnessId of harnesses) {
+    unlinkSkillFromHarness(projectPath, harnessId, skill)
+  }
+
+  return { success: true }
 }
 
 export default defineCommand({
@@ -24,8 +52,12 @@ export default defineCommand({
   args: {
     skill: {
       type: 'positional',
-      description: 'Skill id to remove',
-      required: true,
+      description: 'Skill id',
+      required: false,
+    },
+    skills: {
+      type: 'string',
+      description: 'Comma-separated list of skill ids',
     },
     project: {
       type: 'string',
@@ -33,31 +65,34 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const projectPath = args.project ?? process.cwd()
-    const skill = args.skill
-    const projectContext = getProjectLockContext(projectPath)
+    const { skill, skills, project } = args
+    const projectPath = project ?? process.cwd()
 
-    const skillDir = getSkillDir(projectContext.skillsPath, skill)
-    if (!existsSync(skillDir)) {
-      fail(`Skill not found in project: ${skill}`)
+    const resolvedSkills = resolveSkills(skill, skills)
+    const results: Array<{ skill: string; success: boolean; error?: string }> = []
+
+    for (const skill of resolvedSkills) {
+      const result = uninstallSkill(skill, projectPath)
+      results.push({ skill, ...result })
+
+      if (result.success) {
+        process.stdout.write(pc.green('✔ ') + `Uninstalled skill '${pc.bold(skill)}'\n`)
+      } else {
+        process.stdout.write(pc.red('✗ ') + `${result.error}\n`)
+      }
     }
 
-    removeIfExists(skillDir)
+    const successCount = results.filter((r) => r.success).length
+    const failCount = results.filter((r) => !r.success).length
 
-    const lockPath = projectContext.lockFilePath
-    const lock = readLockFile(lockPath)
-    if (lock.skills[skill]) {
-      const { [skill]: _removed, ...rest } = lock.skills
-      writeLockFile(lockPath, { ...lock, skills: rest })
+    process.stdout.write(
+      pc.dim(
+        `${successCount} uninstalled${failCount > 0 ? `, ${failCount} failed` : ''}`,
+      ) + '\n',
+    )
+
+    if (failCount > 0) {
+      process.exit(1)
     }
-
-    const harnesses = (lock.harnesses ?? [])
-      .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
-
-    for (const harnessId of harnesses) {
-      unlinkSkillFromHarness(projectPath, harnessId, skill)
-    }
-
-    p.log.success(`Uninstalled skill '${pc.bold(skill)}'`)
   },
 })

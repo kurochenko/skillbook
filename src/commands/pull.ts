@@ -1,6 +1,5 @@
 import { existsSync } from 'fs'
 import { defineCommand } from 'citty'
-import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
@@ -8,7 +7,80 @@ import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { fail } from '@/commands/utils'
+import { resolveSkills } from '@/commands/utils'
+
+const pullSkill = async (
+  skill: string,
+  projectPath: string,
+): Promise<{ success: boolean; error?: string; alreadyUpToDate?: boolean; exitCode?: number }> => {
+  const projectContext = getProjectLockContext(projectPath)
+  const libraryContext = getLibraryLockContext()
+  const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
+  const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
+
+  if (!existsSync(librarySkillDir)) {
+    return { success: false, error: `Skill not found in library: ${skill}`, exitCode: 1 }
+  }
+
+  const libraryLock = readLockFile(libraryContext.lockFilePath)
+  const projectLock = readLockFile(projectContext.lockFilePath)
+  const libraryEntry = libraryLock.skills[skill]
+  const projectEntry = projectLock.skills[skill]
+
+  if (!libraryEntry) {
+    return { success: false, error: `No lock entry found for skill in library: ${skill}`, exitCode: 1 }
+  }
+
+  if (!existsSync(projectSkillDir)) {
+    copySkillDir(librarySkillDir, projectSkillDir)
+    const updated = setLockEntry(projectLock, skill, {
+      version: libraryEntry.version,
+      hash: libraryEntry.hash,
+      updatedAt: libraryEntry.updatedAt,
+    })
+    writeLockFile(projectContext.lockFilePath, updated)
+    return { success: true }
+  }
+
+  if (!projectEntry) {
+    return {
+      success: false,
+      error: `Skill '${skill}' is not linked to a lock entry. Run install instead.`,
+      exitCode: 2,
+    }
+  }
+
+  const projectHash = await computeSkillHash(projectSkillDir)
+  const projectChanged = projectHash !== projectEntry.hash
+  const libraryAdvanced =
+    libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
+
+  if (projectChanged && libraryAdvanced) {
+    return {
+      success: false,
+      error: `Skill '${skill}' has diverged. Resolve conflicts before pulling.`,
+      exitCode: 2,
+    }
+  }
+
+  if (projectChanged && !libraryAdvanced) {
+    return { success: false, error: `Skill '${skill}' has local changes. Push before pulling.`, exitCode: 2 }
+  }
+
+  if (!projectChanged && !libraryAdvanced) {
+    return { success: true, alreadyUpToDate: true }
+  }
+
+  copySkillDir(librarySkillDir, projectSkillDir)
+  const updated = setLockEntry(projectLock, skill, {
+    version: libraryEntry.version,
+    hash: libraryEntry.hash,
+    updatedAt: libraryEntry.updatedAt,
+  })
+  writeLockFile(projectContext.lockFilePath, updated)
+
+  return { success: true }
+}
 
 export default defineCommand({
   meta: {
@@ -18,8 +90,12 @@ export default defineCommand({
   args: {
     skill: {
       type: 'positional',
-      description: 'Skill id to pull',
-      required: true,
+      description: 'Skill id',
+      required: false,
+    },
+    skills: {
+      type: 'string',
+      description: 'Comma-separated list of skill ids',
     },
     project: {
       type: 'string',
@@ -27,68 +103,43 @@ export default defineCommand({
     },
   },
   run: async ({ args }) => {
-    const { skill, project } = args
+    const { skill, skills, project } = args
     const projectPath = project ?? process.cwd()
-    const projectContext = getProjectLockContext(projectPath)
-    const libraryContext = getLibraryLockContext()
-    const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
-    const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
-    if (!existsSync(librarySkillDir)) {
-      fail(`Skill not found in library: ${skill}`)
+    const resolvedSkills = resolveSkills(skill, skills)
+    const results: Array<{
+      skill: string
+      success: boolean
+      error?: string
+      alreadyUpToDate?: boolean
+      exitCode?: number
+    }> = []
+
+    for (const skill of resolvedSkills) {
+      const result = await pullSkill(skill, projectPath)
+      results.push({ skill, ...result })
+
+      if (result.success) {
+        if (result.alreadyUpToDate) {
+          process.stdout.write(pc.dim('✔ ') + `Skill '${skill}' is already up to date.\n`)
+        } else {
+          process.stdout.write(pc.green('✔ ') + `Pulled skill '${pc.bold(skill)}'\n`)
+        }
+      } else {
+        process.stdout.write(pc.red('✗ ') + `${result.error}\n`)
+      }
     }
 
-    const libraryLock = readLockFile(libraryContext.lockFilePath)
-    const projectLock = readLockFile(projectContext.lockFilePath)
-    const libraryEntry = libraryLock.skills[skill]
-    const projectEntry = projectLock.skills[skill]
+    const successCount = results.filter((r) => r.success).length
+    const failCount = results.filter((r) => !r.success).length
 
-    if (!libraryEntry) {
-      fail(`No lock entry found for skill in library: ${skill}`)
+    process.stdout.write(
+      pc.dim(`${successCount} pulled${failCount > 0 ? `, ${failCount} failed` : ''}`) + '\n',
+    )
+
+    if (failCount > 0) {
+      const maxExitCode = Math.max(...results.filter(r => !r.success).map(r => r.exitCode ?? 1))
+      process.exit(maxExitCode)
     }
-
-    if (!existsSync(projectSkillDir)) {
-      copySkillDir(librarySkillDir, projectSkillDir)
-      const updated = setLockEntry(projectLock, skill, {
-        version: libraryEntry.version,
-        hash: libraryEntry.hash,
-        updatedAt: libraryEntry.updatedAt,
-      })
-      writeLockFile(projectContext.lockFilePath, updated)
-      p.log.success(`Pulled skill '${pc.bold(skill)}' into project`)
-      return
-    }
-
-    if (!projectEntry) {
-      fail(`Skill '${skill}' is not linked to a lock entry. Run install instead.`, 2)
-    }
-
-    const projectHash = await computeSkillHash(projectSkillDir)
-    const projectChanged = projectHash !== projectEntry.hash
-    const libraryAdvanced =
-      libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
-
-    if (projectChanged && libraryAdvanced) {
-      fail(`Skill '${skill}' has diverged. Resolve conflicts before pulling.`, 2)
-    }
-
-    if (projectChanged && !libraryAdvanced) {
-      fail(`Skill '${skill}' has local changes. Push before pulling.`, 2)
-    }
-
-    if (!projectChanged && !libraryAdvanced) {
-      p.log.info(pc.dim(`Skill '${skill}' is already up to date.`))
-      return
-    }
-
-    copySkillDir(librarySkillDir, projectSkillDir)
-    const updated = setLockEntry(projectLock, skill, {
-      version: libraryEntry.version,
-      hash: libraryEntry.hash,
-      updatedAt: libraryEntry.updatedAt,
-    })
-    writeLockFile(projectContext.lockFilePath, updated)
-
-    p.log.success(`Pulled skill '${pc.bold(skill)}'`)
   },
 })
