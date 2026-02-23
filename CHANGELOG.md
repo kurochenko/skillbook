@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/kurochenko/skillbook/compare/v0.1.11...v0.1.12) (2026-02-23)
+
+
+### Features
+
+* multi skill args ([#32](https://github.com/kurochenko/skillbook/issues/32)) ([e03d7e8](https://github.com/kurochenko/skillbook/commit/e03d7e885d7eb99ac1ef854eab97084921c38e34))
+
+
+### Bug Fixes
+
+* scan TUI flickering, scroll batching, and symlink dedup ([#30](https://github.com/kurochenko/skillbook/issues/30)) ([b274677](https://github.com/kurochenko/skillbook/commit/b2746779eada4153e789b53b43fc5de65473128a))
+
 ## [0.1.11](https://github.com/kurochenko/skillbook/compare/v0.1.10...v0.1.11) (2026-02-02)
 
 
