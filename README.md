@@ -30,6 +30,20 @@ skillbook install <skill-id>
 skillbook harness enable --id opencode --mode symlink
 ```
 
+## Run from source (dev)
+
+Use this repository version directly with Bun:
+
+```bash
+bun run dev -- <command> [args]
+```
+
+Example (target a specific project path):
+
+```bash
+bun run dev -- harness enable --id cursor --mode copy --project "/absolute/path/to/project" --force
+```
+
 ## Common workflows
 
 ### 1) Build your library (first time)
@@ -59,6 +73,7 @@ skillbook push my-skill
 ```bash
 skillbook init --project
 skillbook install my-skill
+skillbook install --skills alpha,beta
 skillbook harness enable --id cursor --mode copy
 ```
 
@@ -75,6 +90,7 @@ skillbook push my-skill
 
 ```bash
 skillbook pull my-skill
+skillbook pull --skills alpha,beta
 ```
 
 ### 6) Resolve conflicts
@@ -108,14 +124,45 @@ skillbook harness enable --id opencode --mode copy
 
 When symlink mode is enabled but unsupported by the filesystem, skillbook automatically falls back to copy mode and persists it in `skillbook.lock.json`.
 
+### 9) Switch an existing harness from symlink mode to copy mode
+
+Use `--force` when migrating so existing harness entries are replaced with real files/directories:
+
+```bash
+skillbook harness enable --id cursor --mode copy --project "/absolute/path/to/project" --force
+skillbook harness status --id cursor --project "/absolute/path/to/project"
+```
+
+Repeat for each harness you use: `claude-code`, `codex`, `cursor`, `opencode`.
+
+### 10) Operate on multiple skills in one command
+
+The lock workflow commands support `--skills` (comma-separated):
+
+```bash
+skillbook install --skills alpha,beta --project /path/to/project
+skillbook pull --skills alpha,beta --project /path/to/project
+skillbook push --skills alpha,beta --project /path/to/project
+skillbook uninstall --skills alpha,beta --project /path/to/project
+```
+
+You can also combine positional + `--skills`:
+
+```bash
+skillbook install alpha --skills beta,gamma --project /path/to/project
+```
+
 ## Common commands
 
 ```bash
 skillbook status                          # project vs library
-skillbook install <id>                    # library -> project
-skillbook push <id>                       # project -> library
-skillbook pull <id>                       # library -> project
+skillbook install <id> [--skills a,b]     # library -> project
+skillbook push <id> [--skills a,b]        # project -> library
+skillbook pull <id> [--skills a,b]        # library -> project
+skillbook uninstall <id> [--skills a,b]   # remove from project
 skillbook resolve <id> --strategy library|project
+skillbook harness status --id <harness>
+skillbook harness enable --id <harness> --mode symlink|copy
 ```
 
 ## Supported harnesses
@@ -130,7 +177,7 @@ skillbook resolve <id> --strategy library|project
 ## Development
 
 ```bash
-bun run dev <command>              # Run CLI in dev mode
+bun run dev -- <command>           # Run CLI in dev mode
 bun test                           # Run all tests
 bun test src/lib/__tests__/library.test.ts   # Run a single test file
 bun test --watch                   # Watch mode

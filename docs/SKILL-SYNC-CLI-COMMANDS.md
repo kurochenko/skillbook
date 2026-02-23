@@ -2,7 +2,7 @@
 
 > Ticket: skill-book-lhz.1
 > Status: Proposed
-> Last updated: 2026-02-01
+> Last updated: 2026-02-23
 
 ## Scope
 
@@ -22,7 +22,7 @@ Project vs library:
 - `local-only`: skill exists in project but not in library.
 - `library-only`: skill exists in library but not in project (not reported by `status`).
 
-Project vs harness (planned):
+Project vs harness:
 
 - `harness-synced`: harness content matches project canonical copy.
 - `harness-drifted`: harness differs from project canonical copy.
@@ -51,16 +51,22 @@ Project vs harness (planned):
 
 ### Library <-> Project Sync
 
-- `skillbook install <skill>`
+- `skillbook install <skill> [--skills id1,id2,...]`
   - Copy library -> project and write lock entry.
-- `skillbook pull <skill|--all>`
+- `skillbook pull <skill> [--skills id1,id2,...]`
   - Pull library changes into project when behind.
-- `skillbook push <skill|--all>`
+- `skillbook push <skill> [--skills id1,id2,...]`
   - Push project changes into library when ahead, bump version.
 - `skillbook resolve <skill> --strategy library|project|merge`
   - Resolve diverged state with a chosen strategy.
-- `skillbook uninstall <skill>`
+- `skillbook uninstall <skill> [--skills id1,id2,...]`
   - Remove skill from project (library untouched).
+
+Notes:
+
+- Positional skill + `--skills` are merged.
+- Duplicate skill names are deduplicated with a warning.
+- Batch commands continue processing all skills and return non-zero if any skill fails.
 
 ### Project <-> Harness Sync
 
@@ -95,10 +101,8 @@ Project vs harness (planned):
 ## Shared Flags
 
 - `--json`: machine-readable output for LLMs.
-- `--dry-run`: show intended changes only.
-- `--yes`: skip confirmations.
 - `--force`: override safety checks.
-- `--all`: batch mode.
+- `--skills id1,id2,...`: batch mode for install/pull/push/uninstall.
 - `--project <path>` / `--library <path>`: explicit targeting.
 
 ## Exit Codes
