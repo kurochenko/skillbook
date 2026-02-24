@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/kurochenko/skillbook/compare/v0.1.12...v0.1.13) (2026-02-24)
+
+
+### Features
+
+* allow skill hard copy instead of symlinks ([8127b7b](https://github.com/kurochenko/skillbook/commit/8127b7b0d6b0a76eedf0f62b7fa5e2613028fb00))
+
 ## [0.1.12](https://github.com/kurochenko/skillbook/compare/v0.1.11...v0.1.12) (2026-02-23)
 
 
