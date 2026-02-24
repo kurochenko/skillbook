@@ -5,7 +5,13 @@ import pc from 'picocolors'
 import { copySkillDir } from '@/lib/lock-copy'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { linkSkillToHarness } from '@/lib/lock-harness'
-import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import {
+  getHarnessMode,
+  readLockFile,
+  setHarnessMode,
+  setLockEntry,
+  writeLockFile,
+} from '@/lib/lockfile'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
 import { resolveSkills } from '@/commands/utils'
@@ -14,7 +20,13 @@ const installSkill = (
   skill: string,
   projectPath: string,
   force = false,
-): { success: boolean; error?: string; conflicts?: number } => {
+): {
+  success: boolean
+  error?: string
+  conflicts?: number
+  drifted?: number
+  fallbackHarnesses?: ToolId[]
+} => {
   const projectContext = getProjectLockContext(projectPath)
   const libraryContext = getLibraryLockContext()
   const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
@@ -53,12 +65,31 @@ const installSkill = (
     .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
 
   let conflicts = 0
+  let drifted = 0
+  const fallbackHarnesses: ToolId[] = []
+  let nextProjectLock = updated
+
   for (const harnessId of harnesses) {
-    const result = linkSkillToHarness(projectPath, harnessId, skill)
+    const result = linkSkillToHarness(projectPath, harnessId, skill, {
+      mode: getHarnessMode(nextProjectLock, harnessId),
+      force: true,
+      allowModeFallback: true,
+    })
+
     if (result.conflict) conflicts += 1
+    if (result.drifted) drifted += 1
+
+    if (result.fallbackToCopy && getHarnessMode(nextProjectLock, harnessId) !== result.mode) {
+      nextProjectLock = setHarnessMode(nextProjectLock, harnessId, result.mode)
+      fallbackHarnesses.push(harnessId)
+    }
   }
 
-  return { success: true, conflicts }
+  if (fallbackHarnesses.length > 0) {
+    writeLockFile(projectContext.lockFilePath, nextProjectLock)
+  }
+
+  return { success: true, conflicts, drifted, fallbackHarnesses }
 }
 
 export default defineCommand({
@@ -91,8 +122,14 @@ export default defineCommand({
     const projectPath = project ?? process.cwd()
 
     const resolvedSkills = resolveSkills(skill, skills)
-    const results: Array<{ skill: string; success: boolean; error?: string; conflicts?: number }> =
-      []
+    const results: Array<{
+      skill: string
+      success: boolean
+      error?: string
+      conflicts?: number
+      drifted?: number
+      fallbackHarnesses?: ToolId[]
+    }> = []
 
     for (const skill of resolvedSkills) {
       const result = installSkill(skill, projectPath, force)
@@ -104,6 +141,22 @@ export default defineCommand({
           process.stdout.write(
             pc.yellow(
               `  ${result.conflicts} harness link${result.conflicts === 1 ? '' : 's'} skipped (existing non-symlink).\n`,
+            ),
+          )
+        }
+
+        if (result.drifted && result.drifted > 0) {
+          process.stdout.write(
+            pc.yellow(
+              `  ${result.drifted} drifted harness copy${result.drifted === 1 ? '' : 'ies'} skipped (use 'skillbook harness sync --force').\n`,
+            ),
+          )
+        }
+
+        if (result.fallbackHarnesses && result.fallbackHarnesses.length > 0) {
+          process.stdout.write(
+            pc.yellow(
+              `  Symlink fallback: switched to copy mode for ${result.fallbackHarnesses.join(', ')}.\n`,
             ),
           )
         }

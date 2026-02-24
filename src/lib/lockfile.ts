@@ -7,16 +7,22 @@ export type LockEntry = {
   updatedAt?: string
 }
 
+export type HarnessMode = 'symlink' | 'copy'
+
+export const DEFAULT_HARNESS_MODE: HarnessMode = 'symlink'
+
 export type LockFile = {
   schema: 1
   skills: Record<string, LockEntry>
   harnesses?: string[]
+  harnessModes?: Record<string, HarnessMode>
 }
 
 export const createEmptyLockFile = (): LockFile => ({
   schema: 1,
   skills: {},
   harnesses: [],
+  harnessModes: {},
 })
 
 const normalizeLockFile = (lockFile: Partial<LockFile>): LockFile => {
@@ -24,10 +30,18 @@ const normalizeLockFile = (lockFile: Partial<LockFile>): LockFile => {
     ? lockFile.harnesses.filter((h): h is string => typeof h === 'string')
     : []
 
+  const harnessModesEntries = Object.entries(lockFile.harnessModes ?? {})
+    .filter(([harnessId, mode]) =>
+      typeof harnessId === 'string' && (mode === 'symlink' || mode === 'copy'),
+    )
+
+  const harnessModes = Object.fromEntries(harnessModesEntries) as Record<string, HarnessMode>
+
   return {
     schema: 1,
     skills: lockFile.skills ?? {},
     harnesses,
+    harnessModes,
   }
 }
 
@@ -62,5 +76,21 @@ export const setLockEntry = (
     skills: {
       ...lockFile.skills,
       [skillId]: entry,
+    },
+  })
+
+export const getHarnessMode = (lockFile: LockFile, harnessId: string): HarnessMode =>
+  lockFile.harnessModes?.[harnessId] ?? DEFAULT_HARNESS_MODE
+
+export const setHarnessMode = (
+  lockFile: LockFile,
+  harnessId: string,
+  mode: HarnessMode,
+): LockFile =>
+  normalizeLockFile({
+    ...lockFile,
+    harnessModes: {
+      ...(lockFile.harnessModes ?? {}),
+      [harnessId]: mode,
     },
   })

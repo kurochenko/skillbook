@@ -2,7 +2,7 @@
 
 > Ticket: skill-book-lhz.1
 > Status: Proposed
-> Last updated: 2026-02-01
+> Last updated: 2026-02-23
 
 ## Scope
 
@@ -22,7 +22,7 @@ Project vs library:
 - `local-only`: skill exists in project but not in library.
 - `library-only`: skill exists in library but not in project (not reported by `status`).
 
-Project vs harness (planned):
+Project vs harness:
 
 - `harness-synced`: harness content matches project canonical copy.
 - `harness-drifted`: harness differs from project canonical copy.
@@ -51,27 +51,38 @@ Project vs harness (planned):
 
 ### Library <-> Project Sync
 
-- `skillbook install <skill>`
+- `skillbook install <skill> [--skills id1,id2,...]`
   - Copy library -> project and write lock entry.
-- `skillbook pull <skill|--all>`
+- `skillbook pull <skill> [--skills id1,id2,...]`
   - Pull library changes into project when behind.
-- `skillbook push <skill|--all>`
+- `skillbook push <skill> [--skills id1,id2,...]`
   - Push project changes into library when ahead, bump version.
 - `skillbook resolve <skill> --strategy library|project|merge`
   - Resolve diverged state with a chosen strategy.
-- `skillbook uninstall <skill>`
+- `skillbook uninstall <skill> [--skills id1,id2,...]`
   - Remove skill from project (library untouched).
+
+Notes:
+
+- Positional skill + `--skills` are merged.
+- Duplicate skill names are deduplicated with a warning.
+- Batch commands continue processing all skills and return non-zero if any skill fails.
 
 ### Project <-> Harness Sync
 
 - `skillbook harness list`
   - List available harness ids (claude-code, codex, cursor, opencode).
-- `skillbook harness enable <id>` / `skillbook harness disable <id>`
-  - Update project lock file with enabled harness ids, and link/unlink harness symlinks.
-- `skillbook harness sync --id <harness>`
-  - Link project skills into the harness via symlinks.
+- `skillbook harness enable <id> --mode symlink|copy` / `skillbook harness disable <id>`
+  - Update project lock file with enabled harness ids and per-harness mode.
+  - `symlink` keeps classic link behavior; `copy` materializes real files.
+  - If symlink creation fails due to filesystem limits, command falls back to `copy` and persists the mode.
+- `skillbook harness sync --id <harness> [--force]`
+  - Sync project skills into harness according to configured mode.
+  - In copy mode, drifted harness files are skipped by default and overwritten only with `--force`.
+- `skillbook harness status --id <harness> [--json]`
+  - Report per-skill harness state: `harness-synced`, `harness-drifted`, `missing`, `conflict`.
 - `skillbook harness import --id <harness>`
-  - Import harness changes into project and replace with symlinks.
+  - Import harness changes into project and re-sync harness output using configured mode.
 
 ### Ingestion and Discovery
 
@@ -90,10 +101,8 @@ Project vs harness (planned):
 ## Shared Flags
 
 - `--json`: machine-readable output for LLMs.
-- `--dry-run`: show intended changes only.
-- `--yes`: skip confirmations.
 - `--force`: override safety checks.
-- `--all`: batch mode.
+- `--skills id1,id2,...`: batch mode for install/pull/push/uninstall.
 - `--project <path>` / `--library <path>`: explicit targeting.
 
 ## Exit Codes

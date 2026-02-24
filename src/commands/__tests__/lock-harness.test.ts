@@ -287,4 +287,61 @@ describe('lock-based harness sync (CLI)', () => {
     expect(existsSync(projectSkill)).toBe(true)
     expect(readFileSync(projectSkill, 'utf-8')).toBe(baseFiles[SKILL_FILE])
   })
+
+  test('harness sync in copy mode writes directory harness files', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+      'notes.md': 'Notes v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'opencode', '--mode', 'copy'],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+
+    const harnessDir = join(projectDir, '.opencode', 'skill', 'alpha')
+    expect(existsSync(harnessDir)).toBe(true)
+    expect(lstatSync(harnessDir).isSymbolicLink()).toBe(false)
+    expect(readFileSync(join(harnessDir, SKILL_FILE), 'utf-8')).toBe(files[SKILL_FILE])
+    expect(readFileSync(join(harnessDir, 'notes.md'), 'utf-8')).toBe(files['notes.md'])
+  })
+
+  test('harness status reports drift for copied directory harness skill', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+      'notes.md': 'Notes v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'opencode', '--mode', 'copy'],
+      env(),
+    )
+
+    const harnessSkillFile = join(projectDir, '.opencode', 'skill', 'alpha', SKILL_FILE)
+    writeFileSync(harnessSkillFile, '# Drifted\n', 'utf-8')
+
+    const status = runCli(
+      ['harness', 'status', '--project', projectDir, '--id', 'opencode', '--json'],
+      env(),
+    )
+    expect(status.exitCode).toBe(0)
+
+    const parsed = JSON.parse(status.stdout) as {
+      drifted: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(parsed.drifted).toBe(1)
+    expect(parsed.skills).toContainEqual({ id: 'alpha', status: 'harness-drifted' })
+  })
 })

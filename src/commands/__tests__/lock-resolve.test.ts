@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { createHash } from 'crypto'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
@@ -16,6 +16,8 @@ type LockEntry = {
 type LockFile = {
   schema: 1
   skills: Record<string, LockEntry>
+  harnesses?: string[]
+  harnessModes?: Record<string, 'symlink' | 'copy'>
 }
 
 describe('resolve command (CLI)', () => {
@@ -72,7 +74,16 @@ describe('resolve command (CLI)', () => {
 
     const projectRoot = getProjectLockRoot(projectDir)
     writeSkill(projectRoot, 'alpha', localContent)
-    writeLockFile(projectRoot, { alpha: { version: 1, hash: baseHash } })
+    writeFileSync(
+      getLockFilePath(projectRoot),
+      JSON.stringify({
+        schema: 1,
+        skills: { alpha: { version: 1, hash: baseHash } },
+        harnesses: ['cursor'],
+        harnessModes: { cursor: 'copy' },
+      }, null, 2) + '\n',
+      'utf-8',
+    )
 
     const result = runCli(
       ['resolve', 'alpha', '--project', projectDir, '--strategy', 'library'],
@@ -111,5 +122,60 @@ describe('resolve command (CLI)', () => {
     expect(libraryLock.skills.alpha).toEqual({ version: 3, hash: localHash })
     expect(readFileSync(join(getLockSkillsPath(libraryDir), 'alpha', SKILL_FILE), 'utf-8'))
       .toBe(localContent)
+  })
+
+  test('resolve --strategy library refreshes copied harness output', () => {
+    const baseContent = '# Alpha v1\n'
+    const localContent = '# Alpha local\n'
+    const remoteContent = '# Alpha remote\n'
+    const baseHash = hashSkill(baseContent)
+    const remoteHash = hashSkill(remoteContent)
+
+    const projectRoot = getProjectLockRoot(projectDir)
+
+    runCli(['init', '--project', '--path', projectDir], env())
+    runCli([
+      'harness',
+      'enable',
+      '--id',
+      'cursor',
+      '--project',
+      projectDir,
+      '--mode',
+      'copy',
+    ], env())
+
+    writeSkill(libraryDir, 'alpha', remoteContent)
+    writeLockFile(libraryDir, { alpha: { version: 2, hash: remoteHash } })
+
+    writeSkill(projectRoot, 'alpha', localContent)
+    writeFileSync(
+      getLockFilePath(projectRoot),
+      JSON.stringify({
+        schema: 1,
+        skills: { alpha: { version: 1, hash: baseHash } },
+        harnesses: ['cursor'],
+        harnessModes: { cursor: 'copy' },
+      }, null, 2) + '\n',
+      'utf-8',
+    )
+
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    mkdirSync(dirname(cursorFile), { recursive: true })
+    writeFileSync(cursorFile, '# Drifted\n', 'utf-8')
+    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+
+    const result = runCli(
+      ['resolve', 'alpha', '--project', projectDir, '--strategy', 'library'],
+      env(),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(readFileSync(join(getLockSkillsPath(projectRoot), 'alpha', SKILL_FILE), 'utf-8'))
+      .toBe(remoteContent)
+    const projectLock = readLockFile(projectRoot)
+    expect(projectLock.harnesses).toEqual(['cursor'])
+    expect(projectLock.harnessModes?.cursor).toBe('copy')
+    expect(readFileSync(cursorFile, 'utf-8')).toBe(remoteContent)
   })
 })
