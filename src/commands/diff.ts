@@ -1,12 +1,12 @@
-import { existsSync, readFileSync, readdirSync } from 'fs'
-import { join, relative } from 'path'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { calculateDiff, type DiffStats } from '@/lib/library'
 import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
-import { getSkillDir, getSkillFilePath } from '@/lib/skill-fs'
+import { getSkillDir, getSkillFilePath, collectFiles } from '@/lib/skill-fs'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { SKILL_FILE } from '@/constants'
 import { fail } from '@/commands/utils'
@@ -39,26 +39,15 @@ const STATUS_LABELS: Record<string, string> = {
 const resolveScopeContext = (scope: DiffScope, projectPath: string): LockContext =>
   scope === 'library' ? getLibraryLockContext() : getProjectLockContext(projectPath)
 
-const collectFiles = (dir: string, base: string = dir, acc: string[] = []): string[] => {
-  if (!existsSync(dir)) return acc
-  const entries = readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      collectFiles(fullPath, base, acc)
-    } else if (entry.isFile()) {
-      acc.push(relative(base, fullPath).replace(/\\/g, '/'))
-    }
-  }
-  return acc
-}
+const getRelativePaths = (dir: string): string[] =>
+  collectFiles(dir).map((f) => f.relativePath)
 
 const computeFileDiffs = (
   fromDir: string,
   toDir: string,
 ): FileDiffEntry[] => {
-  const fromFiles = new Set(collectFiles(fromDir))
-  const toFiles = new Set(collectFiles(toDir))
+  const fromFiles = new Set(getRelativePaths(fromDir))
+  const toFiles = new Set(getRelativePaths(toDir))
   const allFiles = new Set([...fromFiles, ...toFiles])
   const entries: FileDiffEntry[] = []
 

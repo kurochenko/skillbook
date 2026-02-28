@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'fs'
-import { join, relative } from 'path'
+import { readFileSync } from 'fs'
 import { createHash } from 'crypto'
+
+import { collectFiles } from '@/lib/skill-fs'
 
 export type SkillHashOptions = {
   ignore?: string[]
@@ -10,19 +11,6 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/')
 
 const normalizeContent = (content: string): string => content.replace(/\r\n/g, '\n')
 
-const collectFiles = (dir: string, acc: string[] = []): string[] => {
-  const entries = readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      collectFiles(fullPath, acc)
-    } else if (entry.isFile()) {
-      acc.push(fullPath)
-    }
-  }
-  return acc
-}
-
 export const computeSkillHash = async (
   skillDir: string,
   options: SkillHashOptions = {},
@@ -31,10 +19,6 @@ export const computeSkillHash = async (
   const hash = createHash('sha256')
 
   const files = collectFiles(skillDir)
-    .map((file) => ({
-      fullPath: file,
-      relativePath: normalizePath(relative(skillDir, file)),
-    }))
     .filter((file) => !ignore.has(file.relativePath))
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'fs'
-import { join } from 'path'
+import { join, relative } from 'path'
 import { SKILL_FILE } from '@/constants'
 
 export const getSkillDir = (skillsPath: string, skillId: string): string =>
@@ -16,4 +16,26 @@ export const listSkillIds = (skillsPath: string): string[] => {
     .filter((entry) => existsSync(getSkillFilePath(skillsPath, entry.name)))
     .map((entry) => entry.name)
     .sort()
+}
+
+export type CollectedFile = {
+  fullPath: string
+  relativePath: string
+}
+
+export const collectFiles = (dir: string, base: string = dir, acc: CollectedFile[] = []): CollectedFile[] => {
+  if (!existsSync(dir)) return acc
+  const entries = readdirSync(dir, { withFileTypes: true })
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      collectFiles(fullPath, base, acc)
+    } else if (entry.isFile()) {
+      acc.push({
+        fullPath,
+        relativePath: relative(base, fullPath).replace(/\\/g, '/'),
+      })
+    }
+  }
+  return acc
 }
