@@ -439,4 +439,161 @@ describe('lock-based sync commands (CLI)', () => {
       expect(projectLock.skills.beta).toEqual({ version: 2, hash: betaLocalHash })
     })
   })
+
+  describe('multi-file skill lifecycle', () => {
+    test('install copies all files from multi-file library skill', () => {
+      runInit()
+      const files = {
+        [SKILL_FILE]: '# Multi Skill\n',
+        'scripts/deploy.sh': '#!/bin/bash\necho deploy\n',
+        'references/API.md': '# API Ref\n',
+      }
+      const hash = hashSkill(files)
+
+      writeSkillFiles(libraryDir, 'multi', files)
+      writeLockFile(libraryDir, { multi: { version: 1, hash } })
+
+      runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+      const result = runCli(['install', 'multi', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      expect(readSkillFile(projectRoot(), 'multi', SKILL_FILE)).toBe(files[SKILL_FILE])
+      expect(readSkillFile(projectRoot(), 'multi', 'scripts/deploy.sh')).toBe(files['scripts/deploy.sh'])
+      expect(readSkillFile(projectRoot(), 'multi', 'references/API.md')).toBe(files['references/API.md'])
+
+      const projectLock = readLockFile(projectRoot())
+      expect(projectLock.skills.multi).toEqual({ version: 1, hash })
+    })
+
+    test('harness symlinks full directory for directory-based tools', () => {
+      runInit()
+      const files = {
+        [SKILL_FILE]: '# Harness Dir Test\n',
+        'extra.md': '# Extra\n',
+      }
+      const hash = hashSkill(files)
+
+      writeSkillFiles(libraryDir, 'hdir', files)
+      writeLockFile(libraryDir, { hdir: { version: 1, hash } })
+
+      runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+      const result = runCli(['install', 'hdir', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      const harnessDir = join(projectDir, '.opencode', 'skill', 'hdir')
+      expect(lstatSync(harnessDir).isSymbolicLink()).toBe(true)
+    })
+
+    test('cursor harness gets only SKILL.md (not directory)', () => {
+      runInit()
+      const files = {
+        [SKILL_FILE]: '# Cursor Test\n',
+        'extra.md': '# Extra\n',
+      }
+      const hash = hashSkill(files)
+
+      writeSkillFiles(libraryDir, 'cursor-test', files)
+      writeLockFile(libraryDir, { 'cursor-test': { version: 1, hash } })
+
+      runCli(['harness', 'enable', '--id', 'cursor', '--project', projectDir], env())
+      const result = runCli(['install', 'cursor-test', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      const cursorFile = join(projectDir, '.cursor', 'rules', 'cursor-test.md')
+      // Cursor should have the SKILL.md content linked (not the directory)
+      expect(existsSync(cursorFile)).toBe(true)
+    })
+
+    test('push updates library with multi-file skill changes', () => {
+      runInit()
+      const baseFiles = {
+        [SKILL_FILE]: '# V1\n',
+        'extra.md': '# Extra V1\n',
+      }
+      const updatedFiles = {
+        [SKILL_FILE]: '# V2\n',
+        'extra.md': '# Extra V2\n',
+        'new-file.md': '# New\n',
+      }
+      const baseHash = hashSkill(baseFiles)
+      const updatedHash = hashSkill(updatedFiles)
+
+      writeSkillFiles(libraryDir, 'pushable', baseFiles)
+      writeLockFile(libraryDir, { pushable: { version: 1, hash: baseHash } })
+
+      writeSkillFiles(projectRoot(), 'pushable', updatedFiles)
+      writeLockFile(projectRoot(), { pushable: { version: 1, hash: baseHash } })
+
+      const result = runCli(['push', 'pushable', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      expect(readSkillFile(libraryDir, 'pushable', SKILL_FILE)).toBe(updatedFiles[SKILL_FILE])
+      expect(readSkillFile(libraryDir, 'pushable', 'extra.md')).toBe(updatedFiles['extra.md'])
+      expect(readSkillFile(libraryDir, 'pushable', 'new-file.md')).toBe(updatedFiles['new-file.md'])
+
+      const libraryLock = readLockFile(libraryDir)
+      expect(libraryLock.skills.pushable).toEqual({ version: 2, hash: updatedHash })
+
+      const projectLock = readLockFile(projectRoot())
+      expect(projectLock.skills.pushable).toEqual({ version: 2, hash: updatedHash })
+    })
+
+    test('pull updates project with multi-file library changes', () => {
+      runInit()
+      const baseFiles = {
+        [SKILL_FILE]: '# V1\n',
+        'ref.md': '# Ref V1\n',
+      }
+      const updatedFiles = {
+        [SKILL_FILE]: '# V2\n',
+        'ref.md': '# Ref V2\n',
+        'added.md': '# Added\n',
+      }
+      const baseHash = hashSkill(baseFiles)
+      const updatedHash = hashSkill(updatedFiles)
+
+      writeSkillFiles(libraryDir, 'pullable', updatedFiles)
+      writeLockFile(libraryDir, { pullable: { version: 2, hash: updatedHash } })
+
+      writeSkillFiles(projectRoot(), 'pullable', baseFiles)
+      writeLockFile(projectRoot(), { pullable: { version: 1, hash: baseHash } })
+
+      const result = runCli(['pull', 'pullable', '--project', projectDir], env())
+      expect(result.exitCode).toBe(0)
+
+      expect(readSkillFile(projectRoot(), 'pullable', SKILL_FILE)).toBe(updatedFiles[SKILL_FILE])
+      expect(readSkillFile(projectRoot(), 'pullable', 'ref.md')).toBe(updatedFiles['ref.md'])
+      expect(readSkillFile(projectRoot(), 'pullable', 'added.md')).toBe(updatedFiles['added.md'])
+
+      const projectLock = readLockFile(projectRoot())
+      expect(projectLock.skills.pullable).toEqual({ version: 2, hash: updatedHash })
+    })
+
+    test('status shows ahead when project edits auxiliary file', () => {
+      runInit()
+      const baseFiles = {
+        [SKILL_FILE]: '# Status Test\n',
+        'extra.md': '# V1\n',
+      }
+      const baseHash = hashSkill(baseFiles)
+
+      writeSkillFiles(libraryDir, 'status-test', baseFiles)
+      writeLockFile(libraryDir, { 'status-test': { version: 1, hash: baseHash } })
+
+      writeSkillFiles(projectRoot(), 'status-test', baseFiles)
+      writeLockFile(projectRoot(), { 'status-test': { version: 1, hash: baseHash } })
+
+      // Edit auxiliary file in project
+      const modifiedFiles = { ...baseFiles, 'extra.md': '# V2 modified\n' }
+      writeSkillFiles(projectRoot(), 'status-test', modifiedFiles)
+
+      const result = runCli(['status', '--project', projectDir, '--json'], env())
+      expect(result.exitCode).toBe(0)
+
+      const output = JSON.parse(result.stdout)
+      const skill = output.skills.find((s: { id: string }) => s.id === 'status-test')
+      expect(skill).toBeDefined()
+      expect(skill.status).toBe('ahead')
+    })
+  })
 })
