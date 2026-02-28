@@ -597,3 +597,174 @@ describe('lock-based sync commands (CLI)', () => {
     })
   })
 })
+
+describe('stale file cleanup through sync flows', () => {
+  let tempDir: string
+  let libraryDir: string
+  let projectDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-stale-sync-'))
+    libraryDir = join(tempDir, '.skillbook')
+    projectDir = join(tempDir, 'project')
+    mkdirSync(projectDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({ SKILLBOOK_LOCK_LIBRARY: libraryDir })
+
+  const normalize = (content: string) => content.replace(/\r\n/g, '\n')
+
+  const hashSkill = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(normalize(content))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const writeSkillFiles = (root: string, skillId: string, files: Record<string, string>) => {
+    const skillsPath = getLockSkillsPath(root)
+    // Clean existing skill dir to simulate clean state
+    const skillDir = join(skillsPath, skillId)
+    if (existsSync(skillDir)) {
+      rmSync(skillDir, { recursive: true, force: true })
+    }
+    for (const [relativePath, content] of Object.entries(files)) {
+      const filePath = join(skillsPath, skillId, relativePath)
+      mkdirSync(dirname(filePath), { recursive: true })
+      writeFileSync(filePath, content, 'utf-8')
+    }
+  }
+
+  const writeLockFile = (root: string, skills: Record<string, { version: number; hash: string }>) => {
+    const lock = { schema: 1, skills }
+    mkdirSync(root, { recursive: true })
+    writeFileSync(getLockFilePath(root), JSON.stringify(lock, null, 2) + '\n', 'utf-8')
+  }
+
+  const readLockFile = (root: string) => {
+    const content = readFileSync(getLockFilePath(root), 'utf-8')
+    return JSON.parse(content) as { schema: 1; skills: Record<string, { version: number; hash: string }> }
+  }
+
+  const projectRoot = () => getProjectLockRoot(projectDir)
+
+  const runInit = () => {
+    runCli(['init', '--library'], env())
+    runCli(['init', '--project', '--path', projectDir], env())
+  }
+
+  test('pull removes stale files from project when library version has fewer files', () => {
+    runInit()
+    const v1Files = {
+      [SKILL_FILE]: '# Stale Pull v1\n',
+      'scripts/old.sh': '#!/bin/bash\necho old\n',
+      'references/guide.md': '# Guide\n',
+    }
+    const v2Files = {
+      [SKILL_FILE]: '# Stale Pull v2\n',
+      'references/guide.md': '# Guide v2\n',
+    }
+    const v1Hash = hashSkill(v1Files)
+    const v2Hash = hashSkill(v2Files)
+
+    // Library has v2 (without scripts/old.sh)
+    writeSkillFiles(libraryDir, 'stale-pull', v2Files)
+    writeLockFile(libraryDir, { 'stale-pull': { version: 2, hash: v2Hash } })
+
+    // Project has v1 (with scripts/old.sh)
+    writeSkillFiles(projectRoot(), 'stale-pull', v1Files)
+    writeLockFile(projectRoot(), { 'stale-pull': { version: 1, hash: v1Hash } })
+
+    const result = runCli(['pull', 'stale-pull', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    // Stale file should be gone
+    const skillDir = join(getLockSkillsPath(projectRoot()), 'stale-pull')
+    expect(existsSync(join(skillDir, SKILL_FILE))).toBe(true)
+    expect(existsSync(join(skillDir, 'references/guide.md'))).toBe(true)
+    expect(existsSync(join(skillDir, 'scripts/old.sh'))).toBe(false)
+
+    const projectLock = readLockFile(projectRoot())
+    expect(projectLock.skills['stale-pull']).toEqual({ version: 2, hash: v2Hash })
+  })
+
+  test('push removes stale files from library when project version has fewer files', () => {
+    runInit()
+    const v1Files = {
+      [SKILL_FILE]: '# Stale Push v1\n',
+      'scripts/old.sh': '#!/bin/bash\necho old\n',
+      'references/guide.md': '# Guide\n',
+    }
+    const v2Files = {
+      [SKILL_FILE]: '# Stale Push v2\n',
+      'references/guide.md': '# Guide v2\n',
+    }
+    const v1Hash = hashSkill(v1Files)
+
+    // Library has v1 (with scripts/old.sh)
+    writeSkillFiles(libraryDir, 'stale-push', v1Files)
+    writeLockFile(libraryDir, { 'stale-push': { version: 1, hash: v1Hash } })
+
+    // Project has v2 (without scripts/old.sh)
+    writeSkillFiles(projectRoot(), 'stale-push', v2Files)
+    writeLockFile(projectRoot(), { 'stale-push': { version: 1, hash: v1Hash } })
+
+    const result = runCli(['push', 'stale-push', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    // Stale file should be gone from library
+    const librarySkillDir = join(getLockSkillsPath(libraryDir), 'stale-push')
+    expect(existsSync(join(librarySkillDir, SKILL_FILE))).toBe(true)
+    expect(existsSync(join(librarySkillDir, 'references/guide.md'))).toBe(true)
+    expect(existsSync(join(librarySkillDir, 'scripts/old.sh'))).toBe(false)
+  })
+
+  test('install removes stale files from project when re-installing updated library skill', () => {
+    runInit()
+    const v1Files = {
+      [SKILL_FILE]: '# Stale Install v1\n',
+      'scripts/old.sh': '#!/bin/bash\necho old\n',
+      'references/guide.md': '# Guide\n',
+    }
+    const v2Files = {
+      [SKILL_FILE]: '# Stale Install v2\n',
+      'references/guide.md': '# Guide v2\n',
+    }
+    const v1Hash = hashSkill(v1Files)
+    const v2Hash = hashSkill(v2Files)
+
+    // Initial install with v1
+    writeSkillFiles(libraryDir, 'stale-install', v1Files)
+    writeLockFile(libraryDir, { 'stale-install': { version: 1, hash: v1Hash } })
+
+    runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir], env())
+    runCli(['install', 'stale-install', '--project', projectDir], env())
+
+    // Verify v1 files exist
+    const skillDir = join(getLockSkillsPath(projectRoot()), 'stale-install')
+    expect(existsSync(join(skillDir, 'scripts/old.sh'))).toBe(true)
+
+    // Update library to v2 (without scripts/old.sh)
+    writeSkillFiles(libraryDir, 'stale-install', v2Files)
+    writeLockFile(libraryDir, { 'stale-install': { version: 2, hash: v2Hash } })
+
+    // Re-install with force
+    const result = runCli(['install', 'stale-install', '--force', '--project', projectDir], env())
+    expect(result.exitCode).toBe(0)
+
+    // Stale file should be gone
+    expect(existsSync(join(skillDir, SKILL_FILE))).toBe(true)
+    expect(existsSync(join(skillDir, 'references/guide.md'))).toBe(true)
+    expect(existsSync(join(skillDir, 'scripts/old.sh'))).toBe(false)
+
+    const projectLock = readLockFile(projectRoot())
+    expect(projectLock.skills['stale-install']).toEqual({ version: 2, hash: v2Hash })
+  })
+})

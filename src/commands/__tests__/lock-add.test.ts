@@ -340,3 +340,97 @@ describe('multi-file add cold-start (no existing library)', () => {
     expect(result.output).toMatch(/commit: [a-f0-9]+/)
   })
 })
+
+describe('stale file cleanup on directory skill update', () => {
+  let tempDir: string
+  let libraryDir: string
+  let fixturesDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-stale-cleanup-'))
+    libraryDir = join(tempDir, '.skillbook')
+    fixturesDir = join(tempDir, 'fixtures')
+    mkdirSync(fixturesDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
+
+  const createSkillDir = (name: string, files: Record<string, string>) => {
+    const dirPath = join(fixturesDir, name)
+    // Clean the fixture dir completely to simulate file removal
+    if (existsSync(dirPath)) {
+      rmSync(dirPath, { recursive: true, force: true })
+    }
+    for (const [relativePath, content] of Object.entries(files)) {
+      const fullPath = join(dirPath, relativePath)
+      mkdirSync(join(fullPath, '..'), { recursive: true })
+      writeFileSync(fullPath, content, 'utf-8')
+    }
+    return dirPath
+  }
+
+  const readLockFile = () => {
+    const lockPath = join(libraryDir, 'skillbook.lock.json')
+    const content = readFileSync(lockPath, 'utf-8')
+    return JSON.parse(content) as { schema: 1; skills: Record<string, { version: number; hash: string }> }
+  }
+
+  const hashDir = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(content.replace(/\r\n/g, '\n'))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const librarySkillDir = (name: string) => join(libraryDir, 'skills', name)
+
+  test('removed source file is cleaned from library on update', () => {
+    // Step 1: Create skill dir with 3 files
+    const v1Files = {
+      [SKILL_FILE]: '# Cleanup Test\n',
+      'scripts/deploy.sh': '#!/bin/bash\necho deploy\n',
+      'references/API.md': '# API Reference\n',
+    }
+    const dirPath = createSkillDir('cleanup', v1Files)
+
+    // Step 2: Add to library
+    const addResult = runCli(['add', dirPath], env())
+    expect(addResult.exitCode).toBe(0)
+
+    // Verify all 3 files exist in library
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts/deploy.sh'))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'references/API.md'))).toBe(true)
+
+    // Step 3: Recreate source dir without scripts/deploy.sh
+    const v2Files = {
+      [SKILL_FILE]: '# Cleanup Test v2\n',
+      'references/API.md': '# API Reference\n',
+    }
+    const updatedDirPath = createSkillDir('cleanup', v2Files)
+
+    // Step 4: Update in library
+    const updateResult = runCli(['add', updatedDirPath, '--force'], env())
+    expect(updateResult.exitCode).toBe(0)
+
+    // Step 5: Verify library has only SKILL.md + references/API.md (scripts/deploy.sh gone)
+    expect(existsSync(join(librarySkillDir('cleanup'), SKILL_FILE))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'references/API.md'))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts/deploy.sh'))).toBe(false)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts'))).toBe(false)
+
+    // Step 6: Verify hash reflects the updated file set
+    const lock = readLockFile()
+    expect(lock.skills.cleanup.version).toBe(2)
+    expect(lock.skills.cleanup.hash).toBe(hashDir(v2Files))
+  })
+})
