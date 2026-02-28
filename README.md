@@ -4,10 +4,12 @@ Lock-based skill management for AI coding assistants. Keep a central library and
 
 ## How it works
 
-- **Library**: `~/.skillbook/skills/<id>/SKILL.md` (git repo for versioning)
-- **Project**: `<project>/.skillbook/skills/<id>/SKILL.md` (committable)
+- **Library**: `~/.skillbook/skills/<id>/` (git repo for versioning)
+- **Project**: `<project>/.skillbook/skills/<id>/` (committable)
 - **Lockfile**: `skillbook.lock.json` stores `version` + `hash` per skill
 - **Harnesses**: synced from project skills (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.pi/`) using `symlink` or `copy` mode
+
+Skills can be single-file (`SKILL.md`) or multi-file directories (`SKILL.md` + scripts/references/assets/subfolders).
 
 ## Install
 
@@ -59,9 +61,19 @@ If you already have `~/.skillbook/skills`, generate lock entries:
 skillbook migrate --library
 ```
 
-### 2) Add a skill you edited in a harness
+### 2) Add a skill from a local file or directory
 
-If you changed a harness file (Claude/Cursor/OpenCode), import it into the project copy, then push:
+Import a skill into the library from either a markdown file or a directory containing `SKILL.md`:
+
+```bash
+skillbook add ./my-skill.md
+skillbook add ./my-skill-dir
+skillbook add ./my-skill-dir --name my-skill
+```
+
+For directory skills, skillbook copies the full tree (including nested files).
+
+If you changed a harness skill and want to pull those changes into the project copy first, run:
 
 ```bash
 skillbook harness import --id opencode
@@ -79,10 +91,12 @@ skillbook harness enable --id cursor --mode copy
 
 ### 4) Update a skill and publish to the library
 
-Edit the project copy, then push:
+Edit the project copy (any file in the skill directory), then push:
 
 ```bash
 edit .skillbook/skills/my-skill/SKILL.md
+# or edit auxiliary files, e.g.
+edit .skillbook/skills/my-skill/scripts/deploy.sh
 skillbook push my-skill
 ```
 
@@ -156,6 +170,9 @@ skillbook install alpha --skills beta,gamma --project /path/to/project
 
 ```bash
 skillbook status                          # project vs library
+skillbook add <path> [--name id]          # add from .md file or skill directory
+skillbook scan <path>                      # discover skills in existing projects
+skillbook diff <id> [--files]              # compare library/project skill content
 skillbook install <id> [--skills a,b]     # library -> project
 skillbook push <id> [--skills a,b]        # project -> library
 skillbook pull <id> [--skills a,b]        # library -> project
