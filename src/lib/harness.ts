@@ -7,6 +7,7 @@ const HARNESS_BASE_DIRS: Record<ToolId, string[]> = {
   codex: ['.codex', 'skills'],
   opencode: ['.opencode', 'skill'],
   cursor: ['.cursor', 'rules'],
+  pi: ['.pi', 'skills'],
 }
 
 export const getHarnessBaseDir = (projectPath: string, harnessId: ToolId): string =>

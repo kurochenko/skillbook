@@ -61,6 +61,7 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(result.output).toContain('codex')
     expect(result.output).toContain('cursor')
     expect(result.output).toContain('opencode')
+    expect(result.output).toContain('pi')
   })
 
   test('CLI help documents harness status and mode options', () => {
@@ -95,6 +96,20 @@ describe('lock-based harness enable/disable (CLI)', () => {
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual(['codex'])
     const symlinkPath = join(projectDir, '.codex', 'skills', 'alpha')
+    const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
+    expectSymlink(symlinkPath, targetPath)
+  })
+
+  test('harness enable links pi harness', () => {
+    runCli(['init', '--project', '--path', projectDir])
+    writeProjectSkill('alpha', '# Alpha\n')
+
+    const result = runCli(['harness', 'enable', '--id', 'pi', '--project', projectDir])
+
+    expect(result.exitCode).toBe(0)
+    const lock = readProjectLock()
+    expect(lock.harnesses).toEqual(['pi'])
+    const symlinkPath = join(projectDir, '.pi', 'skills', 'alpha')
     const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
     expectSymlink(symlinkPath, targetPath)
   })
