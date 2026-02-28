@@ -4,6 +4,7 @@ import { resolve, relative } from 'path'
 import { existsSync } from 'fs'
 import {
   addSkillToLibrary,
+  addSkillDirToLibrary,
   scanProjectSkills,
   type ScannedSkill,
   type ScanSkillStatus,
@@ -286,7 +287,9 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
   }
 
   const handleAdd = async (skill: ScannedSkill) => {
-    const result = await addSkillToLibrary(skill.name, skill.content)
+    const result = skill.dirPath
+      ? await addSkillDirToLibrary(skill.name, skill.dirPath)
+      : await addSkillToLibrary(skill.name, skill.content)
 
     if (!result.success) {
       setMessage({ text: `Failed: ${result.error}`, color: 'red' })

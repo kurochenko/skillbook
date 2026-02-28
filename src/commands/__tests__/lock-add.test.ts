@@ -88,3 +88,349 @@ describe('lock-aware add command (CLI)', () => {
     expect(lock.skills.same).toEqual({ version: 1, hash: hashSkill(content) })
   })
 })
+
+describe('multi-file add command (CLI)', () => {
+  let tempDir: string
+  let libraryDir: string
+  let fixturesDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-lock-add-dir-'))
+    libraryDir = join(tempDir, '.skillbook')
+    fixturesDir = join(tempDir, 'fixtures')
+    mkdirSync(fixturesDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
+
+  const createSkillDir = (name: string, files: Record<string, string>) => {
+    const dirPath = join(fixturesDir, name)
+    for (const [relativePath, content] of Object.entries(files)) {
+      const fullPath = join(dirPath, relativePath)
+      mkdirSync(join(fullPath, '..'), { recursive: true })
+      writeFileSync(fullPath, content, 'utf-8')
+    }
+    return dirPath
+  }
+
+  const readLockFile = () => {
+    const lockPath = join(libraryDir, 'skillbook.lock.json')
+    const content = readFileSync(lockPath, 'utf-8')
+    return JSON.parse(content) as LockFile
+  }
+
+  const hashDir = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(content.replace(/\r\n/g, '\n'))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const librarySkillDir = (name: string) => join(libraryDir, 'skills', name)
+
+  test('add directory copies entire tree to library', () => {
+    const files = {
+      [SKILL_FILE]: '# My Skill\n',
+      'scripts/deploy.sh': '#!/bin/bash\necho deploy\n',
+      'references/API.md': '# API Reference\n',
+    }
+    const dirPath = createSkillDir('my-skill', files)
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(librarySkillDir('my-skill'), SKILL_FILE))).toBe(true)
+    expect(existsSync(join(librarySkillDir('my-skill'), 'scripts/deploy.sh'))).toBe(true)
+    expect(existsSync(join(librarySkillDir('my-skill'), 'references/API.md'))).toBe(true)
+    expect(readFileSync(join(librarySkillDir('my-skill'), SKILL_FILE), 'utf-8')).toBe(files[SKILL_FILE])
+    expect(readFileSync(join(librarySkillDir('my-skill'), 'scripts/deploy.sh'), 'utf-8')).toBe(files['scripts/deploy.sh'])
+  })
+
+  test('add directory writes lock entry with correct hash', () => {
+    const files = {
+      [SKILL_FILE]: '# Hash Test\n',
+      'extra.txt': 'extra content\n',
+    }
+    const dirPath = createSkillDir('hash-test', files)
+    const expectedHash = hashDir(files)
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+    const lock = readLockFile()
+    expect(lock.skills['hash-test']).toEqual({ version: 1, hash: expectedHash })
+  })
+
+  test('add directory rejects directory without SKILL.md', () => {
+    const dirPath = createSkillDir('no-skill', { 'readme.txt': 'no skill here\n' })
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).not.toBe(0)
+    expect(result.output).toContain(SKILL_FILE)
+  })
+
+  test('add directory --name flag overrides directory name', () => {
+    const files = { [SKILL_FILE]: '# Custom Name\n' }
+    const dirPath = createSkillDir('original-name', files)
+
+    const result = runCli(['add', dirPath, '--name', 'custom-name'], env())
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(librarySkillDir('custom-name'), SKILL_FILE))).toBe(true)
+    expect(existsSync(join(librarySkillDir('original-name'), SKILL_FILE))).toBe(false)
+  })
+
+  test('add directory update bumps version', () => {
+    const v1Files = { [SKILL_FILE]: '# V1\n' }
+    const v2Files = { [SKILL_FILE]: '# V2\n', 'new-file.md': '# New\n' }
+    const dirPath = createSkillDir('versioned', v1Files)
+
+    runCli(['add', dirPath], env())
+
+    // Overwrite the fixture with v2 content
+    writeFileSync(join(dirPath, SKILL_FILE), v2Files[SKILL_FILE])
+    writeFileSync(join(dirPath, 'new-file.md'), v2Files['new-file.md'])
+
+    const result = runCli(['add', dirPath, '--force'], env())
+
+    expect(result.exitCode).toBe(0)
+    const lock = readLockFile()
+    expect(lock.skills.versioned.version).toBe(2)
+    expect(lock.skills.versioned.hash).toBe(hashDir(v2Files))
+  })
+
+  test('add directory skips when hash is identical', () => {
+    const files = { [SKILL_FILE]: '# Identical\n' }
+    const dirPath = createSkillDir('identical', files)
+
+    runCli(['add', dirPath], env())
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+    const lock = readLockFile()
+    expect(lock.skills.identical.version).toBe(1)
+  })
+
+  test('add single file still works (backward compat)', () => {
+    const content = '# Single File\n'
+    const filePath = join(fixturesDir, '.claude', 'skills', 'single', SKILL_FILE)
+    mkdirSync(join(filePath, '..'), { recursive: true })
+    writeFileSync(filePath, content)
+
+    const result = runCli(['add', filePath], env())
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(librarySkillDir('single'), SKILL_FILE))).toBe(true)
+  })
+
+  test('add directory with nested subdirectories copies all files', () => {
+    const files = {
+      [SKILL_FILE]: '# Nested Skill\n',
+      'scripts/build/compile.sh': '#!/bin/bash\ncompile\n',
+      'scripts/build/test.sh': '#!/bin/bash\ntest\n',
+      'references/v1/API.md': '# API v1\n',
+      'references/v2/API.md': '# API v2\n',
+    }
+    const dirPath = createSkillDir('nested', files)
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+    for (const relativePath of Object.keys(files)) {
+      expect(existsSync(join(librarySkillDir('nested'), relativePath))).toBe(true)
+    }
+  })
+})
+
+describe('multi-file add cold-start (no existing library)', () => {
+  let tempDir: string
+  let libraryDir: string
+  let fixturesDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-cold-start-'))
+    libraryDir = join(tempDir, '.skillbook')
+    fixturesDir = join(tempDir, 'fixtures')
+    mkdirSync(fixturesDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
+
+  const createSkillDir = (name: string, files: Record<string, string>) => {
+    const dirPath = join(fixturesDir, name)
+    for (const [relativePath, content] of Object.entries(files)) {
+      const fullPath = join(dirPath, relativePath)
+      mkdirSync(join(fullPath, '..'), { recursive: true })
+      writeFileSync(fullPath, content, 'utf-8')
+    }
+    return dirPath
+  }
+
+  const readLockFile = () => {
+    const lockPath = join(libraryDir, 'skillbook.lock.json')
+    const content = readFileSync(lockPath, 'utf-8')
+    return JSON.parse(content) as { schema: 1; skills: Record<string, { version: number; hash: string }> }
+  }
+
+  const hashDir = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(content.replace(/\r\n/g, '\n'))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const librarySkillDir = (name: string) => join(libraryDir, 'skills', name)
+
+  test('addSkillDirToLibrary creates library, copies files, writes lock, and commits on cold start', () => {
+    // Verify library does not exist before the add
+    expect(existsSync(libraryDir)).toBe(false)
+
+    const files = {
+      [SKILL_FILE]: '# Cold Start Skill\nMulti-file skill added to fresh library.\n',
+      'scripts/setup.sh': '#!/bin/bash\necho setup\n',
+      'references/guide.md': '# Usage Guide\nStep-by-step instructions.\n',
+    }
+    const dirPath = createSkillDir('cold-start', files)
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+
+    // 1. Library was created
+    expect(existsSync(libraryDir)).toBe(true)
+
+    // 2. Skill directory was copied with all files
+    for (const [relativePath, content] of Object.entries(files)) {
+      const libFile = join(librarySkillDir('cold-start'), relativePath)
+      expect(existsSync(libFile)).toBe(true)
+      expect(readFileSync(libFile, 'utf-8')).toBe(content)
+    }
+
+    // 3. Lock entry was written with version 1 and correct hash
+    expect(existsSync(join(libraryDir, 'skillbook.lock.json'))).toBe(true)
+    const lock = readLockFile()
+    expect(lock.skills['cold-start']).toEqual({
+      version: 1,
+      hash: hashDir(files),
+    })
+
+    // 4. Git repo was initialized and skill was committed
+    expect(existsSync(join(libraryDir, '.git'))).toBe(true)
+    expect(result.output).toMatch(/commit: [a-f0-9]+/)
+  })
+})
+
+describe('stale file cleanup on directory skill update', () => {
+  let tempDir: string
+  let libraryDir: string
+  let fixturesDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-stale-cleanup-'))
+    libraryDir = join(tempDir, '.skillbook')
+    fixturesDir = join(tempDir, 'fixtures')
+    mkdirSync(fixturesDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
+
+  const createSkillDir = (name: string, files: Record<string, string>) => {
+    const dirPath = join(fixturesDir, name)
+    // Clean the fixture dir completely to simulate file removal
+    if (existsSync(dirPath)) {
+      rmSync(dirPath, { recursive: true, force: true })
+    }
+    for (const [relativePath, content] of Object.entries(files)) {
+      const fullPath = join(dirPath, relativePath)
+      mkdirSync(join(fullPath, '..'), { recursive: true })
+      writeFileSync(fullPath, content, 'utf-8')
+    }
+    return dirPath
+  }
+
+  const readLockFile = () => {
+    const lockPath = join(libraryDir, 'skillbook.lock.json')
+    const content = readFileSync(lockPath, 'utf-8')
+    return JSON.parse(content) as { schema: 1; skills: Record<string, { version: number; hash: string }> }
+  }
+
+  const hashDir = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(content.replace(/\r\n/g, '\n'))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const librarySkillDir = (name: string) => join(libraryDir, 'skills', name)
+
+  test('removed source file is cleaned from library on update', () => {
+    // Step 1: Create skill dir with 3 files
+    const v1Files = {
+      [SKILL_FILE]: '# Cleanup Test\n',
+      'scripts/deploy.sh': '#!/bin/bash\necho deploy\n',
+      'references/API.md': '# API Reference\n',
+    }
+    const dirPath = createSkillDir('cleanup', v1Files)
+
+    // Step 2: Add to library
+    const addResult = runCli(['add', dirPath], env())
+    expect(addResult.exitCode).toBe(0)
+
+    // Verify all 3 files exist in library
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts/deploy.sh'))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'references/API.md'))).toBe(true)
+
+    // Step 3: Recreate source dir without scripts/deploy.sh
+    const v2Files = {
+      [SKILL_FILE]: '# Cleanup Test v2\n',
+      'references/API.md': '# API Reference\n',
+    }
+    const updatedDirPath = createSkillDir('cleanup', v2Files)
+
+    // Step 4: Update in library
+    const updateResult = runCli(['add', updatedDirPath, '--force'], env())
+    expect(updateResult.exitCode).toBe(0)
+
+    // Step 5: Verify library has only SKILL.md + references/API.md (scripts/deploy.sh gone)
+    expect(existsSync(join(librarySkillDir('cleanup'), SKILL_FILE))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'references/API.md'))).toBe(true)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts/deploy.sh'))).toBe(false)
+    expect(existsSync(join(librarySkillDir('cleanup'), 'scripts'))).toBe(false)
+
+    // Step 6: Verify hash reflects the updated file set
+    const lock = readLockFile()
+    expect(lock.skills.cleanup.version).toBe(2)
+    expect(lock.skills.cleanup.hash).toBe(hashDir(v2Files))
+  })
+})

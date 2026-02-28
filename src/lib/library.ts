@@ -1,10 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, realpathSync, lstatSync } from 'fs'
 import { join, resolve, basename, dirname } from 'path'
+import { createHash } from 'crypto'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
 import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
 import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
+import { copySkillDir } from '@/lib/lock-copy'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush } from '@/lib/git'
 import { resolveOriginPlan } from '@/lib/library-sync'
 import { SKILL_FILE, SKILLS_DIR } from '@/constants'
@@ -30,6 +32,7 @@ export type DiffStats = {
 export type ScannedSkill = {
   name: string
   path: string
+  dirPath: string | null
   content: string
   status: ScanSkillStatus
   diff: DiffStats | null
@@ -42,7 +45,9 @@ export type ScannedSkill = {
 type PartialSkill = {
   name: string
   path: string
+  dirPath: string | null
   content: string
+  variantFingerprint: string
   status: ScanSkillStatus
   diff: DiffStats | null
   project: string
@@ -74,11 +79,12 @@ const IGNORED_DIRS_SET = new Set([
 ])
 
 const SKILL_PATH_MARKERS = [
-  { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}` },
-  { marker: '/.codex/skills/', suffix: `/${SKILL_FILE}` },
-  { marker: '/.cursor/rules/', suffix: '.md' },
-  { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}` },
-  { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}` },
+  { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  { marker: '/.codex/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  { marker: '/.cursor/rules/', suffix: '.md', needsDirectory: false },
+  { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  { marker: '/.pi/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
 ]
 
 const readFileSafe = (path: string): string | null => {
@@ -123,6 +129,19 @@ const isSkillFile = (path: string): boolean => {
   )
 }
 
+const isDirectoryBasedSkill = (path: string): boolean => {
+  const normalized = normalizePath(path)
+  const match = SKILL_PATH_MARKERS.find(({ marker, suffix }) =>
+    normalized.includes(marker) && normalized.endsWith(suffix)
+  )
+  return match?.needsDirectory ?? false
+}
+
+const getSkillDirPath = (filePath: string): string | null => {
+  if (!isDirectoryBasedSkill(filePath)) return null
+  return dirname(filePath)
+}
+
 const extractProjectPath = (filePath: string): string => {
   const normalized = normalizePath(filePath)
   const match = SKILL_PATH_MARKERS.find(({ marker }) => normalized.includes(marker))
@@ -144,6 +163,13 @@ const countLines = (text: string): Map<string, number> => {
     map.set(line, (map.get(line) ?? 0) + 1)
   }
   return map
+}
+
+const computeSingleFileSkillHash = (content: string): string => {
+  const hash = createHash('sha256')
+  hash.update(`${SKILL_FILE}\n`)
+  hash.update(content.replace(/\r\n/g, '\n'))
+  return `sha256:${hash.digest('hex')}`
 }
 
 export const calculateDiff = (base: string, current: string): DiffStats => {
@@ -219,6 +245,31 @@ const getScanStatus = (content: string, libraryContent: string | null) => {
   return { status: 'ahead' as const, diff: calculateDiff(libraryContent, content) }
 }
 
+const getScanStatusForDir = async (
+  dirPath: string,
+  skillName: string,
+): Promise<{ status: ScanSkillStatus; diff: DiffStats | null; projectHash: string }> => {
+  const projectHash = await computeSkillHash(dirPath)
+  const librarySkillDir = getSkillPath(skillName)
+  if (!existsSync(librarySkillDir) || !existsSync(join(librarySkillDir, SKILL_FILE))) {
+    return { status: 'detached', diff: null, projectHash }
+  }
+
+  const libraryHash = await computeSkillHash(librarySkillDir)
+
+  if (projectHash === libraryHash) {
+    return { status: 'synced', diff: null, projectHash }
+  }
+
+  const libraryContent = readFileSafe(join(librarySkillDir, SKILL_FILE))
+  const projectContent = readFileSafe(join(dirPath, SKILL_FILE))
+  const diff = libraryContent !== null && projectContent !== null
+    ? calculateDiff(libraryContent, projectContent)
+    : null
+
+  return { status: 'ahead', diff, projectHash }
+}
+
 const getConflictInfo = (
   skill: PartialSkill,
   skillsByName: Map<string, PartialSkill[]>,
@@ -234,8 +285,8 @@ const getConflictInfo = (
     return { hasConflict: false, conflictCount: 0 }
   }
 
-  const uniqueContents = new Set(sameStatusInstances.map((s) => s.content))
-  const conflictCount = uniqueContents.size
+  const uniqueVariants = new Set(sameStatusInstances.map((s) => s.variantFingerprint))
+  const conflictCount = uniqueVariants.size
 
   return {
     hasConflict: conflictCount > 1,
@@ -259,8 +310,8 @@ export const ensureDefaultSkills = async (): Promise<void> => {
 
       writeFileSync(skillFilePath, content, 'utf-8')
 
-      const relativeSkillPath = `${SKILLS_DIR}/${name}/${SKILL_FILE}`
-      await gitAdd(libraryPath, relativeSkillPath)
+      const relativeSkillDir = `${SKILLS_DIR}/${name}/`
+      await gitAdd(libraryPath, relativeSkillDir)
 
       const action = existingContent === null ? 'Add' : 'Update'
       await gitCommit(libraryPath, `${action} default skill: ${name}`)
@@ -333,15 +384,29 @@ export const listSkills = (): string[] => {
     .sort()
 }
 
-export const addSkillToLibrary = async (
-  skillName: string,
-  content: string,
-): Promise<AddSkillResult> => {
+type SkipCheckResult =
+  | { skip: true; result: AddSkillResult }
+  | { skip: false }
+
+type CommitSkillOptions = {
+  skillName: string
+  checkSkip: (params: {
+    skillDir: string
+    lock: ReturnType<typeof readLockFile>
+    existingEntry: ReturnType<typeof readLockFile>['skills'][string] | undefined
+    lockFilePath: string
+  }) => Promise<SkipCheckResult>
+  writeContent: (skillDir: string) => void
+  gitAddPath: string
+  resultPath: string
+  errorContext: Record<string, string>
+}
+
+const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSkillResult> => {
+  const { skillName, checkSkip, writeContent, gitAddPath, resultPath, errorContext } = options
   const libraryPath = getLibraryPath()
   const lockLibraryPath = getLockLibraryPath()
   const skillDir = getSkillPath(skillName)
-  const skillFilePath = join(skillDir, SKILL_FILE)
-  const relativeSkillPath = `${SKILLS_DIR}/${skillName}/${SKILL_FILE}`
 
   const libraryResult = await ensureLibrary()
   if (!libraryResult.success) {
@@ -350,32 +415,13 @@ export const addSkillToLibrary = async (
 
   const existingContent = getSkillContent(skillName)
   const isUpdate = existingContent !== null
-  const action = isUpdate ? 'updated' : 'added'
-  const buildSuccess = (commitHash?: string, warning?: string): AddSkillResult => ({
-    success: true,
-    action,
-    commitHash,
-    path: skillFilePath,
-    warning,
-  })
 
   const lockFilePath = getLockFilePath(lockLibraryPath)
   const lock = readLockFile(lockFilePath)
   const existingEntry = lock.skills[skillName]
 
-  if (existingContent !== null && existingContent === content) {
-    if (!existingEntry) {
-      const hash = await computeSkillHash(skillDir)
-      const updated = setLockEntry(lock, skillName, { version: 1, hash })
-      writeLockFile(lockFilePath, updated)
-    }
-
-    return {
-      success: true,
-      action: 'skipped',
-      path: skillFilePath,
-    }
-  }
+  const skipResult = await checkSkip({ skillDir, lock, existingEntry, lockFilePath })
+  if (skipResult.skip) return skipResult.result
 
   try {
     const originPlan = await resolveOriginPlan(libraryPath, skillName)
@@ -383,23 +429,29 @@ export const addSkillToLibrary = async (
       return { success: false, error: originPlan.error }
     }
 
-    if (!existsSync(skillDir)) {
-      mkdirSync(skillDir, { recursive: true })
-    }
+    writeContent(skillDir)
 
-    writeFileSync(skillFilePath, content, 'utf-8')
     const hash = await computeSkillHash(skillDir)
     const nextVersion = existingEntry ? existingEntry.version + 1 : 1
     const updatedLock = setLockEntry(lock, skillName, { version: nextVersion, hash })
     writeLockFile(lockFilePath, updatedLock)
 
-    const addResult = await gitAdd(libraryPath, relativeSkillPath)
+    const addResult = await gitAdd(libraryPath, gitAddPath)
     if (!addResult.success) {
-      return { success: false, error: `Failed to stage file: ${addResult.error}` }
+      return { success: false, error: `Failed to stage files: ${addResult.error}` }
     }
 
+    const action: 'added' | 'updated' = isUpdate ? 'updated' : 'added'
     const commitMessage = isUpdate ? `Update skill: ${skillName}` : `Add skill: ${skillName}`
     const commitResult = await gitCommit(libraryPath, commitMessage)
+
+    const buildSuccess = (commitHash?: string, warning?: string): AddSkillResult => ({
+      success: true,
+      action,
+      commitHash,
+      path: resultPath,
+      warning,
+    })
 
     if (!commitResult.success) {
       return buildSuccess(undefined, `Skill saved but git commit failed: ${commitResult.error}`)
@@ -416,10 +468,68 @@ export const addSkillToLibrary = async (
 
     return buildSuccess(commitResult.commitHash)
   } catch (error) {
-    logError('Failed to add skill to library', error, { skillName })
+    logError('Failed to add skill to library', error, errorContext)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: message }
   }
+}
+
+export const addSkillToLibrary = async (
+  skillName: string,
+  content: string,
+): Promise<AddSkillResult> => {
+  const skillDir = getSkillPath(skillName)
+  const skillFilePath = join(skillDir, SKILL_FILE)
+
+  return commitSkillToLibrary({
+    skillName,
+    checkSkip: async ({ skillDir: dir, lock, existingEntry, lockFilePath }) => {
+      const existingContent = getSkillContent(skillName)
+      if (existingContent !== null && existingContent === content) {
+        if (!existingEntry) {
+          const hash = await computeSkillHash(dir)
+          const updated = setLockEntry(lock, skillName, { version: 1, hash })
+          writeLockFile(lockFilePath, updated)
+        }
+        return { skip: true, result: { success: true, action: 'skipped', path: skillFilePath } }
+      }
+      return { skip: false }
+    },
+    writeContent: (dir) => {
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true })
+      }
+      writeFileSync(join(dir, SKILL_FILE), content, 'utf-8')
+    },
+    gitAddPath: `${SKILLS_DIR}/${skillName}/${SKILL_FILE}`,
+    resultPath: skillFilePath,
+    errorContext: { skillName },
+  })
+}
+
+export const addSkillDirToLibrary = async (
+  skillName: string,
+  sourceDir: string,
+): Promise<AddSkillResult> => {
+  const skillDir = getSkillPath(skillName)
+
+  return commitSkillToLibrary({
+    skillName,
+    checkSkip: async ({ existingEntry }) => {
+      const sourceHash = await computeSkillHash(sourceDir)
+      const existingHash = existingEntry?.hash
+      if (existingHash === sourceHash) {
+        return { skip: true, result: { success: true, action: 'skipped', path: skillDir } }
+      }
+      return { skip: false }
+    },
+    writeContent: (dir) => {
+      copySkillDir(sourceDir, dir)
+    },
+    gitAddPath: `${SKILLS_DIR}/${skillName}/`,
+    resultPath: skillDir,
+    errorContext: { skillName, sourceDir },
+  })
 }
 
 export const scanProjectSkills = async (
@@ -450,12 +560,27 @@ export const scanProjectSkills = async (
     const content = await readFileText(file)
     if (content === null) continue
 
-    const libraryContent = getLibraryContent(name)
+    const dirPath = getSkillDirPath(file)
     const projectPath = extractProjectPath(file)
     const project = projectPath ? basename(projectPath) : extractProjectFromPath(file)
-    const { status, diff } = getScanStatus(content, libraryContent)
 
-    const skill: PartialSkill = { name, path: file, content, status, diff, project, projectPath }
+    const directoryStatus = dirPath ? await getScanStatusForDir(dirPath, name) : null
+    const { status, diff } = directoryStatus ?? getScanStatus(content, getLibraryContent(name))
+    const variantFingerprint = directoryStatus
+      ? directoryStatus.projectHash
+      : computeSingleFileSkillHash(content)
+
+    const skill: PartialSkill = {
+      name,
+      path: file,
+      dirPath,
+      content,
+      variantFingerprint,
+      status,
+      diff,
+      project,
+      projectPath,
+    }
     skills.push(skill)
 
     const existing = skillsByName.get(name) ?? []
@@ -468,7 +593,8 @@ export const scanProjectSkills = async (
   return skills
     .map((skill) => {
       const { hasConflict, conflictCount } = getConflictInfo(skill, skillsByName)
-      return { ...skill, hasConflict, conflictCount }
+      const { variantFingerprint: _, ...rest } = skill
+      return { ...rest, hasConflict, conflictCount }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 }

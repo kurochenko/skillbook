@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, relative, dirname } from 'path'
-import { scanProjectSkills, addSkillToLibrary, type ScanSkillStatus } from '@/lib/library'
+import { scanProjectSkills, addSkillToLibrary, addSkillDirToLibrary, type ScanSkillStatus } from '@/lib/library'
 import { withLibraryEnv } from '@/test-utils/env'
 
 describe('scanProjectSkills', () => {
@@ -390,6 +390,188 @@ describe('scanProjectSkills', () => {
 
       const mySkills = skills.filter((s) => s.name === 'my-rule')
       expect(mySkills).toHaveLength(1)
+    })
+  })
+
+
+  describe('directory-aware scan', () => {
+    const createProjectSkillDir = (basePath: string, files: Record<string, string>) => {
+      for (const [relativePath, content] of Object.entries(files)) {
+        const fullPath = join(projectDir, basePath, relativePath)
+        mkdirSync(dirname(fullPath), { recursive: true })
+        writeFileSync(fullPath, content, 'utf-8')
+      }
+    }
+
+    const createLibrarySkillDir = (name: string, files: Record<string, string>) => {
+      for (const [relativePath, content] of Object.entries(files)) {
+        const fullPath = join(libraryDir, 'skills', name, relativePath)
+        mkdirSync(dirname(fullPath), { recursive: true })
+        writeFileSync(fullPath, content, 'utf-8')
+      }
+    }
+
+    test('scan discovers multi-file skills from directory-based harnesses', async () => {
+      createProjectSkillDir('.claude/skills/multi-skill', {
+        'SKILL.md': '# Multi Skill\n',
+        'scripts/deploy.sh': '#!/bin/bash\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.name).toBe('multi-skill')
+      expect(skills[0]!.dirPath).not.toBeNull()
+    })
+
+    test('scan sets dirPath for directory-based harnesses (claude, codex, opencode)', async () => {
+      createProjectSkillDir('.claude/skills/claude-skill', { 'SKILL.md': '# Claude\n' })
+      createProjectSkillDir('.opencode/skill/oc-skill', { 'SKILL.md': '# OpenCode\n' })
+
+      const skills = await scanProjectSkills(projectDir)
+
+      for (const skill of skills) {
+        expect(skill.dirPath).not.toBeNull()
+        expect(skill.dirPath).toContain(skill.name)
+      }
+    })
+
+    test('scan sets dirPath to null for cursor (file-based)', async () => {
+      createProjectSkill('.cursor/rules/cursor-skill.md', '# Cursor Skill\n')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.dirPath).toBeNull()
+    })
+
+    test('scan compares multi-file skills using directory hash (synced)', async () => {
+      const files = {
+        'SKILL.md': '# Synced Skill\n',
+        'extra.md': '# Extra file\n',
+      }
+      createProjectSkillDir('.claude/skills/synced-dir', files)
+      createLibrarySkillDir('synced-dir', files)
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.status).toBe('synced')
+    })
+
+    test('scan detects ahead status when auxiliary file differs', async () => {
+      const libraryFiles = {
+        'SKILL.md': '# Ahead Skill\n',
+        'extra.md': '# V1\n',
+      }
+      const projectFiles = {
+        'SKILL.md': '# Ahead Skill\n',
+        'extra.md': '# V2 - modified\n',
+      }
+      createLibrarySkillDir('ahead-dir', libraryFiles)
+      createProjectSkillDir('.claude/skills/ahead-dir', projectFiles)
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.status).toBe('ahead')
+    })
+
+    test('scan detects ahead when project adds new files', async () => {
+      const libraryFiles = {
+        'SKILL.md': '# Extra File\n',
+      }
+      const projectFiles = {
+        'SKILL.md': '# Extra File\n',
+        'scripts/new.sh': '#!/bin/bash\n',
+      }
+      createLibrarySkillDir('extra-file', libraryFiles)
+      createProjectSkillDir('.claude/skills/extra-file', projectFiles)
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.status).toBe('ahead')
+    })
+
+    test('scan marks detached when multi-file skill not in library', async () => {
+      createProjectSkillDir('.claude/skills/detached-dir', {
+        'SKILL.md': '# Detached\n',
+        'scripts/run.sh': '#!/bin/bash\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.status).toBe('detached')
+    })
+
+    test('cursor scan still uses single-file comparison', async () => {
+      createProjectSkill('.cursor/rules/cursor-file.md', '# Same content')
+      await addSkillToLibrary('cursor-file', '# Same content')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.status).toBe('synced')
+      expect(skills[0]!.dirPath).toBeNull()
+    })
+
+    test('conflict detection uses directory content when SKILL.md is identical (detached)', async () => {
+      createProjectSkillDir('.claude/skills/conflict-detached', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/claude.sh': '#!/bin/bash\necho claude\n',
+      })
+      createProjectSkillDir('.opencode/skill/conflict-detached', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/opencode.sh': '#!/bin/bash\necho opencode\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+      const conflictSkills = skills.filter((s) => s.name === 'conflict-detached')
+
+      expect(conflictSkills).toHaveLength(2)
+      expect(conflictSkills.every((s) => s.status === 'detached')).toBe(true)
+      expect(conflictSkills.every((s) => s.hasConflict)).toBe(true)
+      expect(conflictSkills.every((s) => s.conflictCount === 2)).toBe(true)
+    })
+
+    test('conflict detection uses directory content when SKILL.md is identical (ahead)', async () => {
+      createLibrarySkillDir('conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+      })
+
+      createProjectSkillDir('.claude/skills/conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/claude.sh': '#!/bin/bash\necho claude\n',
+      })
+      createProjectSkillDir('.opencode/skill/conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/opencode.sh': '#!/bin/bash\necho opencode\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+      const conflictSkills = skills.filter((s) => s.name === 'conflict-ahead')
+
+      expect(conflictSkills).toHaveLength(2)
+      expect(conflictSkills.every((s) => s.status === 'ahead')).toBe(true)
+      expect(conflictSkills.every((s) => s.hasConflict)).toBe(true)
+      expect(conflictSkills.every((s) => s.conflictCount === 2)).toBe(true)
+    })
+
+    test('conflict detection works across directory-based skills', async () => {
+      createProjectSkillDir('.claude/skills/conflict-dir', {
+        'SKILL.md': '# Claude version\n',
+      })
+      createProjectSkillDir('.opencode/skill/conflict-dir', {
+        'SKILL.md': '# OpenCode version\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+      const conflictSkills = skills.filter(s => s.name === 'conflict-dir')
+
+      expect(conflictSkills).toHaveLength(2)
+      expect(conflictSkills.every(s => s.hasConflict)).toBe(true)
     })
   })
 })
