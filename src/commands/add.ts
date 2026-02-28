@@ -7,6 +7,8 @@ import pc from 'picocolors'
 
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { addSkillToLibrary, addSkillDirToLibrary, getSkillContent, skillExists } from '@/lib/library'
+import { computeSkillHash } from '@/lib/skill-hash'
+import { getSkillPath } from '@/lib/paths'
 import { SKILL_FILE } from '@/constants'
 import { fail } from '@/commands/utils'
 
@@ -100,6 +102,14 @@ const runDirAdd = async (dirPath: string, providedName: string | undefined, forc
   const skillName = resolveSkillName(resolvedPath, true, providedName)
 
   if (skillExists(skillName)) {
+    const sourceHash = await computeSkillHash(resolvedPath)
+    const existingHash = await computeSkillHash(getSkillPath(skillName))
+
+    if (sourceHash === existingHash) {
+      p.log.info(pc.cyan(`Skill '${skillName}' already up to date, skipped`))
+      return
+    }
+
     await confirmOverwrite(skillName, force)
   }
 

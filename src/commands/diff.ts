@@ -20,6 +20,22 @@ type FileDiffEntry = {
   deletions: number
 }
 
+type DiffJsonOutput = {
+  id: string
+  from: DiffScope
+  to: DiffScope
+  additions: number
+  deletions: number
+  identical: boolean
+  files: FileDiffEntry[]
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  added: pc.green('added'),
+  removed: pc.red('removed'),
+  changed: pc.yellow('changed'),
+}
+
 const resolveScopeContext = (scope: DiffScope, projectPath: string): LockContext =>
   scope === 'library' ? getLibraryLockContext() : getProjectLockContext(projectPath)
 
@@ -152,7 +168,7 @@ export default defineCommand({
       : []
 
     if (args.json) {
-      const output: Record<string, unknown> = {
+      const output: DiffJsonOutput = {
         id: skill,
         from,
         to,
@@ -180,11 +196,6 @@ export default defineCommand({
       for (const entry of fileDiffs) {
         if (entry.status === 'unchanged') continue
 
-        const STATUS_LABELS: Record<string, string> = {
-          added: pc.green('added'),
-          removed: pc.red('removed'),
-          changed: pc.yellow('changed'),
-        }
         const label = STATUS_LABELS[entry.status] ?? entry.status
         const stats = entry.status === 'changed'
           ? ` ${pc.green(`+${entry.additions}`)} ${pc.red(`-${entry.deletions}`)}`
