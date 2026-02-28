@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, realpathSync, lstatSync } from 'fs'
 import { join, resolve, basename, dirname } from 'path'
+import { createHash } from 'crypto'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
 import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
@@ -46,6 +47,7 @@ type PartialSkill = {
   path: string
   dirPath: string | null
   content: string
+  variantFingerprint: string
   status: ScanSkillStatus
   diff: DiffStats | null
   project: string
@@ -163,6 +165,13 @@ const countLines = (text: string): Map<string, number> => {
   return map
 }
 
+const computeSingleFileSkillHash = (content: string): string => {
+  const hash = createHash('sha256')
+  hash.update(`${SKILL_FILE}\n`)
+  hash.update(content.replace(/\r\n/g, '\n'))
+  return `sha256:${hash.digest('hex')}`
+}
+
 export const calculateDiff = (base: string, current: string): DiffStats => {
   const baseCounts = countLines(base)
   const currentCounts = countLines(current)
@@ -239,17 +248,17 @@ const getScanStatus = (content: string, libraryContent: string | null) => {
 const getScanStatusForDir = async (
   dirPath: string,
   skillName: string,
-): Promise<{ status: ScanSkillStatus; diff: DiffStats | null }> => {
+): Promise<{ status: ScanSkillStatus; diff: DiffStats | null; projectHash: string }> => {
+  const projectHash = await computeSkillHash(dirPath)
   const librarySkillDir = getSkillPath(skillName)
   if (!existsSync(librarySkillDir) || !existsSync(join(librarySkillDir, SKILL_FILE))) {
-    return { status: 'detached', diff: null }
+    return { status: 'detached', diff: null, projectHash }
   }
 
-  const projectHash = await computeSkillHash(dirPath)
   const libraryHash = await computeSkillHash(librarySkillDir)
 
   if (projectHash === libraryHash) {
-    return { status: 'synced', diff: null }
+    return { status: 'synced', diff: null, projectHash }
   }
 
   const libraryContent = readFileSafe(join(librarySkillDir, SKILL_FILE))
@@ -258,7 +267,7 @@ const getScanStatusForDir = async (
     ? calculateDiff(libraryContent, projectContent)
     : null
 
-  return { status: 'ahead', diff }
+  return { status: 'ahead', diff, projectHash }
 }
 
 const getConflictInfo = (
@@ -276,8 +285,8 @@ const getConflictInfo = (
     return { hasConflict: false, conflictCount: 0 }
   }
 
-  const uniqueContents = new Set(sameStatusInstances.map((s) => s.content))
-  const conflictCount = uniqueContents.size
+  const uniqueVariants = new Set(sameStatusInstances.map((s) => s.variantFingerprint))
+  const conflictCount = uniqueVariants.size
 
   return {
     hasConflict: conflictCount > 1,
@@ -555,11 +564,23 @@ export const scanProjectSkills = async (
     const projectPath = extractProjectPath(file)
     const project = projectPath ? basename(projectPath) : extractProjectFromPath(file)
 
-    const { status, diff } = dirPath
-      ? await getScanStatusForDir(dirPath, name)
-      : getScanStatus(content, getLibraryContent(name))
+    const directoryStatus = dirPath ? await getScanStatusForDir(dirPath, name) : null
+    const { status, diff } = directoryStatus ?? getScanStatus(content, getLibraryContent(name))
+    const variantFingerprint = directoryStatus
+      ? directoryStatus.projectHash
+      : computeSingleFileSkillHash(content)
 
-    const skill: PartialSkill = { name, path: file, dirPath, content, status, diff, project, projectPath }
+    const skill: PartialSkill = {
+      name,
+      path: file,
+      dirPath,
+      content,
+      variantFingerprint,
+      status,
+      diff,
+      project,
+      projectPath,
+    }
     skills.push(skill)
 
     const existing = skillsByName.get(name) ?? []
@@ -572,7 +593,8 @@ export const scanProjectSkills = async (
   return skills
     .map((skill) => {
       const { hasConflict, conflictCount } = getConflictInfo(skill, skillsByName)
-      return { ...skill, hasConflict, conflictCount }
+      const { variantFingerprint: _, ...rest } = skill
+      return { ...rest, hasConflict, conflictCount }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 }

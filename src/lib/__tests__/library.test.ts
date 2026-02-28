@@ -517,6 +517,48 @@ describe('scanProjectSkills', () => {
       expect(skills[0]!.dirPath).toBeNull()
     })
 
+    test('conflict detection uses directory content when SKILL.md is identical (detached)', async () => {
+      createProjectSkillDir('.claude/skills/conflict-detached', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/claude.sh': '#!/bin/bash\necho claude\n',
+      })
+      createProjectSkillDir('.opencode/skill/conflict-detached', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/opencode.sh': '#!/bin/bash\necho opencode\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+      const conflictSkills = skills.filter((s) => s.name === 'conflict-detached')
+
+      expect(conflictSkills).toHaveLength(2)
+      expect(conflictSkills.every((s) => s.status === 'detached')).toBe(true)
+      expect(conflictSkills.every((s) => s.hasConflict)).toBe(true)
+      expect(conflictSkills.every((s) => s.conflictCount === 2)).toBe(true)
+    })
+
+    test('conflict detection uses directory content when SKILL.md is identical (ahead)', async () => {
+      createLibrarySkillDir('conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+      })
+
+      createProjectSkillDir('.claude/skills/conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/claude.sh': '#!/bin/bash\necho claude\n',
+      })
+      createProjectSkillDir('.opencode/skill/conflict-ahead', {
+        'SKILL.md': '# Shared Instructions\n',
+        'scripts/opencode.sh': '#!/bin/bash\necho opencode\n',
+      })
+
+      const skills = await scanProjectSkills(projectDir)
+      const conflictSkills = skills.filter((s) => s.name === 'conflict-ahead')
+
+      expect(conflictSkills).toHaveLength(2)
+      expect(conflictSkills.every((s) => s.status === 'ahead')).toBe(true)
+      expect(conflictSkills.every((s) => s.hasConflict)).toBe(true)
+      expect(conflictSkills.every((s) => s.conflictCount === 2)).toBe(true)
+    })
+
     test('conflict detection works across directory-based skills', async () => {
       createProjectSkillDir('.claude/skills/conflict-dir', {
         'SKILL.md': '# Claude version\n',
