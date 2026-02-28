@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/kurochenko/skillbook/compare/v0.1.14...v0.1.15) (2026-02-28)
+
+
+### Features
+
+* add support for multi file skills ([#37](https://github.com/kurochenko/skillbook/issues/37)) ([6befb51](https://github.com/kurochenko/skillbook/commit/6befb51ed8019cf9fda980f4a7ae52be41ec1954))
+
 ## [0.1.14](https://github.com/kurochenko/skillbook/compare/v0.1.13...v0.1.14) (2026-02-28)
 
 
