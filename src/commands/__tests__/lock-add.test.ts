@@ -252,3 +252,91 @@ describe('multi-file add command (CLI)', () => {
     }
   })
 })
+
+describe('multi-file add cold-start (no existing library)', () => {
+  let tempDir: string
+  let libraryDir: string
+  let fixturesDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'skillbook-cold-start-'))
+    libraryDir = join(tempDir, '.skillbook')
+    fixturesDir = join(tempDir, 'fixtures')
+    mkdirSync(fixturesDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const env = () => ({
+    SKILLBOOK_LIBRARY: libraryDir,
+    SKILLBOOK_LOCK_LIBRARY: libraryDir,
+  })
+
+  const createSkillDir = (name: string, files: Record<string, string>) => {
+    const dirPath = join(fixturesDir, name)
+    for (const [relativePath, content] of Object.entries(files)) {
+      const fullPath = join(dirPath, relativePath)
+      mkdirSync(join(fullPath, '..'), { recursive: true })
+      writeFileSync(fullPath, content, 'utf-8')
+    }
+    return dirPath
+  }
+
+  const readLockFile = () => {
+    const lockPath = join(libraryDir, 'skillbook.lock.json')
+    const content = readFileSync(lockPath, 'utf-8')
+    return JSON.parse(content) as { schema: 1; skills: Record<string, { version: number; hash: string }> }
+  }
+
+  const hashDir = (files: Record<string, string>) => {
+    const hash = createHash('sha256')
+    const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+    for (const [path, content] of entries) {
+      hash.update(`${path}\n`)
+      hash.update(content.replace(/\r\n/g, '\n'))
+    }
+    return `sha256:${hash.digest('hex')}`
+  }
+
+  const librarySkillDir = (name: string) => join(libraryDir, 'skills', name)
+
+  test('addSkillDirToLibrary creates library, copies files, writes lock, and commits on cold start', () => {
+    // Verify library does not exist before the add
+    expect(existsSync(libraryDir)).toBe(false)
+
+    const files = {
+      [SKILL_FILE]: '# Cold Start Skill\nMulti-file skill added to fresh library.\n',
+      'scripts/setup.sh': '#!/bin/bash\necho setup\n',
+      'references/guide.md': '# Usage Guide\nStep-by-step instructions.\n',
+    }
+    const dirPath = createSkillDir('cold-start', files)
+
+    const result = runCli(['add', dirPath], env())
+
+    expect(result.exitCode).toBe(0)
+
+    // 1. Library was created
+    expect(existsSync(libraryDir)).toBe(true)
+
+    // 2. Skill directory was copied with all files
+    for (const [relativePath, content] of Object.entries(files)) {
+      const libFile = join(librarySkillDir('cold-start'), relativePath)
+      expect(existsSync(libFile)).toBe(true)
+      expect(readFileSync(libFile, 'utf-8')).toBe(content)
+    }
+
+    // 3. Lock entry was written with version 1 and correct hash
+    expect(existsSync(join(libraryDir, 'skillbook.lock.json'))).toBe(true)
+    const lock = readLockFile()
+    expect(lock.skills['cold-start']).toEqual({
+      version: 1,
+      hash: hashDir(files),
+    })
+
+    // 4. Git repo was initialized and skill was committed
+    expect(existsSync(join(libraryDir, '.git'))).toBe(true)
+    expect(result.output).toMatch(/commit: [a-f0-9]+/)
+  })
+})
