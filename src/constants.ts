@@ -19,6 +19,11 @@ export const TOOLS = {
     skillPath: (name: string) => `.opencode/skill/${name}/SKILL.md`,
     needsDirectory: true,
   },
+  pi: {
+    name: 'Pi',
+    skillPath: (name: string) => `.pi/skills/${name}/SKILL.md`,
+    needsDirectory: true,
+  },
 } as const
 
 export type ToolId = keyof typeof TOOLS

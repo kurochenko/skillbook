@@ -7,7 +7,7 @@ Lock-based skill management for AI coding assistants. Keep a central library and
 - **Library**: `~/.skillbook/skills/<id>/SKILL.md` (git repo for versioning)
 - **Project**: `<project>/.skillbook/skills/<id>/SKILL.md` (committable)
 - **Lockfile**: `skillbook.lock.json` stores `version` + `hash` per skill
-- **Harnesses**: synced from project skills (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`) using `symlink` or `copy` mode
+- **Harnesses**: synced from project skills (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.pi/`) using `symlink` or `copy` mode
 
 ## Install
 
@@ -133,7 +133,7 @@ skillbook harness enable --id cursor --mode copy --project "/absolute/path/to/pr
 skillbook harness status --id cursor --project "/absolute/path/to/project"
 ```
 
-Repeat for each harness you use: `claude-code`, `codex`, `cursor`, `opencode`.
+Repeat for each harness you use: `claude-code`, `codex`, `cursor`, `opencode`, `pi`.
 
 ### 10) Operate on multiple skills in one command
 
@@ -173,6 +173,7 @@ skillbook harness enable --id <harness> --mode symlink|copy
 | Codex | `.codex/skills/<id>/SKILL.md` | directory |
 | Cursor | `.cursor/rules/<id>.md` | file |
 | OpenCode | `.opencode/skill/<id>/SKILL.md` | directory |
+| Pi | `.pi/skills/<id>/SKILL.md` | directory |
 
 ## Development
 
