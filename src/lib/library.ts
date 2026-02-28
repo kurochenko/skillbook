@@ -375,103 +375,29 @@ export const listSkills = (): string[] => {
     .sort()
 }
 
-export const addSkillToLibrary = async (
-  skillName: string,
-  content: string,
-): Promise<AddSkillResult> => {
-  const libraryPath = getLibraryPath()
-  const lockLibraryPath = getLockLibraryPath()
-  const skillDir = getSkillPath(skillName)
-  const skillFilePath = join(skillDir, SKILL_FILE)
-  const relativeSkillPath = `${SKILLS_DIR}/${skillName}/${SKILL_FILE}`
+type SkipCheckResult =
+  | { skip: true; result: AddSkillResult }
+  | { skip: false }
 
-  const libraryResult = await ensureLibrary()
-  if (!libraryResult.success) {
-    return { success: false, error: libraryResult.error }
-  }
-
-  const existingContent = getSkillContent(skillName)
-  const isUpdate = existingContent !== null
-  const action = isUpdate ? 'updated' : 'added'
-  const buildSuccess = (commitHash?: string, warning?: string): AddSkillResult => ({
-    success: true,
-    action,
-    commitHash,
-    path: skillFilePath,
-    warning,
-  })
-
-  const lockFilePath = getLockFilePath(lockLibraryPath)
-  const lock = readLockFile(lockFilePath)
-  const existingEntry = lock.skills[skillName]
-
-  if (existingContent !== null && existingContent === content) {
-    if (!existingEntry) {
-      const hash = await computeSkillHash(skillDir)
-      const updated = setLockEntry(lock, skillName, { version: 1, hash })
-      writeLockFile(lockFilePath, updated)
-    }
-
-    return {
-      success: true,
-      action: 'skipped',
-      path: skillFilePath,
-    }
-  }
-
-  try {
-    const originPlan = await resolveOriginPlan(libraryPath, skillName)
-    if (originPlan.status === 'error') {
-      return { success: false, error: originPlan.error }
-    }
-
-    if (!existsSync(skillDir)) {
-      mkdirSync(skillDir, { recursive: true })
-    }
-
-    writeFileSync(skillFilePath, content, 'utf-8')
-    const hash = await computeSkillHash(skillDir)
-    const nextVersion = existingEntry ? existingEntry.version + 1 : 1
-    const updatedLock = setLockEntry(lock, skillName, { version: nextVersion, hash })
-    writeLockFile(lockFilePath, updatedLock)
-
-    const addResult = await gitAdd(libraryPath, relativeSkillPath)
-    if (!addResult.success) {
-      return { success: false, error: `Failed to stage file: ${addResult.error}` }
-    }
-
-    const commitMessage = isUpdate ? `Update skill: ${skillName}` : `Add skill: ${skillName}`
-    const commitResult = await gitCommit(libraryPath, commitMessage)
-
-    if (!commitResult.success) {
-      return buildSuccess(undefined, `Skill saved but git commit failed: ${commitResult.error}`)
-    }
-
-    if (originPlan.status === 'skip') {
-      return buildSuccess(commitResult.commitHash, originPlan.warning)
-    }
-
-    const pushResult = await gitPush(libraryPath)
-    if (!pushResult.success) {
-      return buildSuccess(commitResult.commitHash, `Skill committed but failed to push to origin: ${pushResult.error}`)
-    }
-
-    return buildSuccess(commitResult.commitHash)
-  } catch (error) {
-    logError('Failed to add skill to library', error, { skillName })
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return { success: false, error: message }
-  }
+type CommitSkillOptions = {
+  skillName: string
+  checkSkip: (params: {
+    skillDir: string
+    lock: ReturnType<typeof readLockFile>
+    existingEntry: ReturnType<typeof readLockFile>['skills'][string] | undefined
+    lockFilePath: string
+  }) => Promise<SkipCheckResult>
+  writeContent: (skillDir: string) => void
+  gitAddPath: string
+  resultPath: string
+  errorContext: Record<string, string>
 }
 
-export const addSkillDirToLibrary = async (
-  skillName: string,
-  sourceDir: string,
-): Promise<AddSkillResult> => {
+const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSkillResult> => {
+  const { skillName, checkSkip, writeContent, gitAddPath, resultPath, errorContext } = options
   const libraryPath = getLibraryPath()
   const lockLibraryPath = getLockLibraryPath()
   const skillDir = getSkillPath(skillName)
-  const relativeSkillDir = `${SKILLS_DIR}/${skillName}/`
 
   const libraryResult = await ensureLibrary()
   if (!libraryResult.success) {
@@ -485,16 +411,8 @@ export const addSkillDirToLibrary = async (
   const lock = readLockFile(lockFilePath)
   const existingEntry = lock.skills[skillName]
 
-  const sourceHash = await computeSkillHash(sourceDir)
-  const existingHash = existingEntry?.hash
-
-  if (existingHash === sourceHash) {
-    return {
-      success: true,
-      action: 'skipped',
-      path: skillDir,
-    }
-  }
+  const skipResult = await checkSkip({ skillDir, lock, existingEntry, lockFilePath })
+  if (skipResult.skip) return skipResult.result
 
   try {
     const originPlan = await resolveOriginPlan(libraryPath, skillName)
@@ -502,19 +420,19 @@ export const addSkillDirToLibrary = async (
       return { success: false, error: originPlan.error }
     }
 
-    copySkillDir(sourceDir, skillDir)
+    writeContent(skillDir)
 
     const hash = await computeSkillHash(skillDir)
     const nextVersion = existingEntry ? existingEntry.version + 1 : 1
     const updatedLock = setLockEntry(lock, skillName, { version: nextVersion, hash })
     writeLockFile(lockFilePath, updatedLock)
 
-    const addResult = await gitAdd(libraryPath, relativeSkillDir)
+    const addResult = await gitAdd(libraryPath, gitAddPath)
     if (!addResult.success) {
       return { success: false, error: `Failed to stage files: ${addResult.error}` }
     }
 
-    const action = isUpdate ? 'updated' : 'added'
+    const action: 'added' | 'updated' = isUpdate ? 'updated' : 'added'
     const commitMessage = isUpdate ? `Update skill: ${skillName}` : `Add skill: ${skillName}`
     const commitResult = await gitCommit(libraryPath, commitMessage)
 
@@ -522,7 +440,7 @@ export const addSkillDirToLibrary = async (
       success: true,
       action,
       commitHash,
-      path: skillDir,
+      path: resultPath,
       warning,
     })
 
@@ -541,10 +459,68 @@ export const addSkillDirToLibrary = async (
 
     return buildSuccess(commitResult.commitHash)
   } catch (error) {
-    logError('Failed to add skill directory to library', error, { skillName, sourceDir })
+    logError('Failed to add skill to library', error, errorContext)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { success: false, error: message }
   }
+}
+
+export const addSkillToLibrary = async (
+  skillName: string,
+  content: string,
+): Promise<AddSkillResult> => {
+  const skillDir = getSkillPath(skillName)
+  const skillFilePath = join(skillDir, SKILL_FILE)
+
+  return commitSkillToLibrary({
+    skillName,
+    checkSkip: async ({ skillDir: dir, lock, existingEntry, lockFilePath }) => {
+      const existingContent = getSkillContent(skillName)
+      if (existingContent !== null && existingContent === content) {
+        if (!existingEntry) {
+          const hash = await computeSkillHash(dir)
+          const updated = setLockEntry(lock, skillName, { version: 1, hash })
+          writeLockFile(lockFilePath, updated)
+        }
+        return { skip: true, result: { success: true, action: 'skipped', path: skillFilePath } }
+      }
+      return { skip: false }
+    },
+    writeContent: (dir) => {
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true })
+      }
+      writeFileSync(join(dir, SKILL_FILE), content, 'utf-8')
+    },
+    gitAddPath: `${SKILLS_DIR}/${skillName}/${SKILL_FILE}`,
+    resultPath: skillFilePath,
+    errorContext: { skillName },
+  })
+}
+
+export const addSkillDirToLibrary = async (
+  skillName: string,
+  sourceDir: string,
+): Promise<AddSkillResult> => {
+  const skillDir = getSkillPath(skillName)
+
+  return commitSkillToLibrary({
+    skillName,
+    checkSkip: async ({ existingEntry }) => {
+      const sourceHash = await computeSkillHash(sourceDir)
+      const existingHash = existingEntry?.hash
+      if (existingHash === sourceHash) {
+        return { skip: true, result: { success: true, action: 'skipped', path: skillDir } }
+      }
+      return { skip: false }
+    },
+    writeContent: (dir) => {
+      copySkillDir(sourceDir, dir)
+    },
+    gitAddPath: `${SKILLS_DIR}/${skillName}/`,
+    resultPath: skillDir,
+    errorContext: { skillName, sourceDir },
+  })
 }
 
 export const scanProjectSkills = async (
