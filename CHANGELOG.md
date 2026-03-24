@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/kurochenko/skillbook/compare/v0.1.16...v0.1.17) (2026-03-24)
+
+
+### Features
+
+* sync all configured harnesses when --id omitted ([#42](https://github.com/kurochenko/skillbook/issues/42)) ([3653573](https://github.com/kurochenko/skillbook/commit/3653573032aec37e56cc4591b0f333d338fa8cd6))
+
 ## [0.1.16](https://github.com/kurochenko/skillbook/compare/v0.1.15...v0.1.16) (2026-03-24)
 
 
