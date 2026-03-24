@@ -187,7 +187,7 @@ skillbook harness enable --id <harness> --mode symlink|copy
 | Tool | Path | Format |
 | --- | --- | --- |
 | Claude Code | `.claude/skills/<id>/SKILL.md` | directory |
-| Codex | `.codex/skills/<id>/SKILL.md` | directory |
+| Codex | `.agents/skills/<id>/SKILL.md` | directory |
 | Cursor | `.cursor/rules/<id>.md` | file |
 | OpenCode | `.opencode/skill/<id>/SKILL.md` | directory |
 | Pi | `.pi/skills/<id>/SKILL.md` | directory |
