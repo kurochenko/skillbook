@@ -6,7 +6,7 @@ export const TOOLS = {
   },
   codex: {
     name: 'Codex',
-    skillPath: (name: string) => `.codex/skills/${name}/SKILL.md`,
+    skillPath: (name: string) => `.agents/skills/${name}/SKILL.md`,
     needsDirectory: true,
   },
   cursor: {

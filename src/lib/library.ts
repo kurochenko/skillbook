@@ -80,7 +80,7 @@ const IGNORED_DIRS_SET = new Set([
 
 const SKILL_PATH_MARKERS = [
   { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
-  { marker: '/.codex/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  { marker: '/.agents/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
   { marker: '/.cursor/rules/', suffix: '.md', needsDirectory: false },
   { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
   { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
