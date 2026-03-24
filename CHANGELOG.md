@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/kurochenko/skillbook/compare/v0.1.15...v0.1.16) (2026-03-24)
+
+
+### Bug Fixes
+
+* change codex folder to .agents ([#39](https://github.com/kurochenko/skillbook/issues/39)) ([ddebad8](https://github.com/kurochenko/skillbook/commit/ddebad8d936540b43ac6dd19f1ba06683fbd7dfc))
+
 ## [0.1.15](https://github.com/kurochenko/skillbook/compare/v0.1.14...v0.1.15) (2026-02-28)
 
 
