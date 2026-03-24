@@ -4,7 +4,7 @@ import { type ToolId } from '@/constants'
 
 const HARNESS_BASE_DIRS: Record<ToolId, string[]> = {
   'claude-code': ['.claude', 'skills'],
-  codex: ['.codex', 'skills'],
+  codex: ['.agents', 'skills'],
   opencode: ['.opencode', 'skill'],
   cursor: ['.cursor', 'rules'],
   pi: ['.pi', 'skills'],

@@ -167,7 +167,7 @@ describe('lock-based harness sync (CLI)', () => {
     )
     expect(result.exitCode).toBe(0)
 
-    const harnessDir = join(projectDir, '.codex', 'skills', 'alpha')
+    const harnessDir = join(projectDir, '.agents', 'skills', 'alpha')
     const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
     expectSymlink(harnessDir, targetDir)
   })
@@ -275,7 +275,7 @@ describe('lock-based harness sync (CLI)', () => {
     writeSkillFiles(projectRoot(), 'alpha', baseFiles)
     writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
 
-    const harnessPath = join(projectDir, '.codex', 'skills', 'alpha')
+    const harnessPath = join(projectDir, '.agents', 'skills', 'alpha')
     mkdirSync(harnessPath, { recursive: true })
     writeFileSync(join(harnessPath, SKILL_FILE), '# Alpha v2 from codex\n', 'utf-8')
 

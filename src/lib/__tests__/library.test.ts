@@ -363,7 +363,7 @@ describe('scanProjectSkills', () => {
     test('does not duplicate with multiple harness symlinks', async () => {
       createProjectSkill('.skillbook/skills/my-skill/SKILL.md', '# My Skill')
       createSymlink('.skillbook/skills/my-skill', '.claude/skills/my-skill')
-      createSymlink('.skillbook/skills/my-skill', '.codex/skills/my-skill')
+      createSymlink('.skillbook/skills/my-skill', '.agents/skills/my-skill')
 
       const skills = await scanProjectSkills(projectDir)
 

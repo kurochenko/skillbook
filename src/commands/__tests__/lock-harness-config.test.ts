@@ -95,7 +95,7 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(result.exitCode).toBe(0)
     const lock = readProjectLock()
     expect(lock.harnesses).toEqual(['codex'])
-    const symlinkPath = join(projectDir, '.codex', 'skills', 'alpha')
+    const symlinkPath = join(projectDir, '.agents', 'skills', 'alpha')
     const targetPath = join(getLockSkillsPath(getProjectLockRoot(projectDir)), 'alpha')
     expectSymlink(symlinkPath, targetPath)
   })
