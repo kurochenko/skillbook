@@ -66,8 +66,13 @@ describe('lock-based harness sync (CLI)', () => {
     }
   }
 
-  const writeLockFile = (root: string, skills: Record<string, LockEntry>) => {
-    const lock: LockFile = { schema: 1, skills }
+  const writeLockFile = (
+    root: string,
+    skills: Record<string, LockEntry>,
+    harnesses?: string[],
+    harnessModes?: Record<string, string>,
+  ) => {
+    const lock: LockFile = { schema: 1, skills, harnesses, harnessModes }
     mkdirSync(root, { recursive: true })
     writeFileSync(getLockFilePath(root), JSON.stringify(lock, null, 2) + '\n', 'utf-8')
   }
@@ -389,5 +394,72 @@ describe('lock-based harness sync (CLI)', () => {
     }
     expect(parsed.drifted).toBe(1)
     expect(parsed.skills).toContainEqual({ id: 'alpha', status: 'harness-drifted' })
+  })
+
+  test('harness sync without --id syncs all harnesses in lock.harnesses', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } }, ['claude-code', 'opencode'])
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('Synced 1 skill to claude-code')
+    expect(result.stdout).toContain('Synced 1 skill to opencode')
+
+    const claudeHarnessDir = join(projectDir, '.claude', 'skills', 'alpha')
+    expect(existsSync(claudeHarnessDir)).toBe(true)
+    expect(lstatSync(claudeHarnessDir).isSymbolicLink()).toBe(true)
+
+    const opencodeHarnessDir = join(projectDir, '.opencode', 'skill', 'alpha')
+    expect(existsSync(opencodeHarnessDir)).toBe(true)
+    expect(lstatSync(opencodeHarnessDir).isSymbolicLink()).toBe(true)
+  })
+
+  test('harness sync without --id shows message when no harnesses in lock', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } }, [])
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('No harnesses enabled for this project')
+    expect(result.stdout).toContain('skillbook harness sync --id all')
+    expect(result.stdout).toContain('skillbook harness add')
+  })
+
+  test('harness sync without --id shows message when harnesses is undefined', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('No harnesses enabled for this project')
+    expect(result.stdout).toContain('skillbook harness sync --id all')
+    expect(result.stdout).toContain('skillbook harness add')
   })
 })

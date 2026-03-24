@@ -224,7 +224,26 @@ export default defineCommand({
         },
         run: ({ args }) => {
           const projectPath = args.project ?? process.cwd()
-          const harnesses = parseHarness(resolveHarnessArg(args), true)
+          const harnessArg = resolveHarnessArg(args)
+          let harnesses: ToolId[]
+
+          if (harnessArg) {
+            harnesses = parseHarness(harnessArg, true)
+          } else {
+            const { lock } = getProjectLock(projectPath)
+            const configuredHarnesses = lock.harnesses ?? []
+
+            if (configuredHarnesses.length === 0) {
+              p.log.info(pc.dim(`No harnesses enabled for this project. To enable all harnesses, run:`))
+              p.log.info(pc.dim(`  skillbook harness sync --id all`))
+              p.log.info(pc.dim(`Or enable specific harnesses with:`))
+              p.log.info(pc.dim(`  skillbook harness add --id <harness>`))
+              return
+            }
+
+            harnesses = configuredHarnesses as ToolId[]
+          }
+
           const modeOverride = parseMode(args.mode)
 
           for (const harnessId of harnesses) {
