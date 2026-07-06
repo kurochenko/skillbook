@@ -119,7 +119,9 @@ describe('resolve command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const libraryLock = readLockFile(libraryDir)
-    expect(libraryLock.skills.alpha).toEqual({ version: 3, hash: localHash })
+    expect(libraryLock.skills.alpha).toMatchObject({ version: 3, hash: localHash })
+    expect(typeof libraryLock.skills.alpha.updatedAt).toBe('string')
+    expect(Number.isNaN(Date.parse(libraryLock.skills.alpha.updatedAt!))).toBe(false)
     expect(readFileSync(join(getLockSkillsPath(libraryDir), 'alpha', SKILL_FILE), 'utf-8'))
       .toBe(localContent)
   })

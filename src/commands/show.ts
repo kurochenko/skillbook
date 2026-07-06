@@ -62,7 +62,8 @@ export default defineCommand({
     p.log.info(`Skill: ${pc.bold(skill)}`)
     p.log.info(pc.dim(`Hash: ${hash}`))
     if (entry) {
-      p.log.info(pc.dim(`Version: ${entry.version}`))
+      const updated = entry.updatedAt ? ` updated ${entry.updatedAt}` : ''
+      p.log.info(pc.dim(`Version: ${entry.version}${updated}`))
     } else {
       p.log.warn(pc.yellow('No lock entry found'))
     }

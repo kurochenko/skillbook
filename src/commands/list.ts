@@ -6,9 +6,10 @@ import pc from 'picocolors'
 
 import { listSkills } from '@/lib/library'
 import { SUPPORTED_TOOLS, TOOLS } from '@/constants'
-import { getLibraryPath, getSkillsPath } from '@/lib/paths'
+import { getLibraryPath, getSkillsPath, getLockFilePath } from '@/lib/paths'
 import { getProjectLockContext } from '@/lib/lock-context'
 import { listSkillIds } from '@/lib/skill-fs'
+import { readLockFileOrFail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -34,9 +35,11 @@ export default defineCommand({
       const projectContext = getProjectLockContext(projectPath)
       const skillsPath = projectContext.skillsPath
       const skills = listSkillIds(skillsPath)
+      const lock = skills.length > 0 ? readLockFileOrFail(projectContext.lockFilePath) : null
+      const entries = Object.fromEntries(skills.map((skill) => [skill, lock?.skills[skill] ?? null]))
 
       if (isJson) {
-        process.stdout.write(JSON.stringify({ scope: 'project', path: projectPath, skills }))
+        process.stdout.write(JSON.stringify({ scope: 'project', path: projectPath, skills, entries }))
         return
       }
 
@@ -45,7 +48,8 @@ export default defineCommand({
         p.log.info(pc.dim('No skills installed in project'))
       } else {
         for (const skill of skills) {
-          console.log(`  ${pc.cyan('•')} ${skill}`)
+          const updated = lock?.skills[skill]?.updatedAt
+          console.log(`  ${pc.cyan('•')} ${skill}${updated ? pc.dim(` updated ${updated}`) : ''}`)
         }
         console.log('')
         p.log.info(pc.dim(`${skills.length} skill${skills.length === 1 ? '' : 's'} in ${projectPath}`))
@@ -57,9 +61,11 @@ export default defineCommand({
     const skillsPath = getSkillsPath()
 
     const skills = existsSync(skillsPath) ? listSkills() : []
+    const lock = skills.length > 0 ? readLockFileOrFail(getLockFilePath(libraryPath)) : null
+    const entries = Object.fromEntries(skills.map((skill) => [skill, lock?.skills[skill] ?? null]))
 
     if (isJson) {
-      process.stdout.write(JSON.stringify({ scope: 'library', path: libraryPath, skills }))
+      process.stdout.write(JSON.stringify({ scope: 'library', path: libraryPath, skills, entries }))
       return
     }
 
@@ -73,7 +79,8 @@ export default defineCommand({
     } else {
       console.log(pc.bold('\nAvailable skills:\n'))
       for (const skill of skills) {
-        console.log(`  ${pc.cyan('•')} ${skill}`)
+        const updated = lock?.skills[skill]?.updatedAt
+        console.log(`  ${pc.cyan('•')} ${skill}${updated ? pc.dim(` updated ${updated}`) : ''}`)
       }
       console.log('')
       p.log.info(pc.dim(`${skills.length} skill${skills.length === 1 ? '' : 's'} in ${libraryPath}`))

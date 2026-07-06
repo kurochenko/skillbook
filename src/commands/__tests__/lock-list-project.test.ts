@@ -4,12 +4,13 @@ import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
+import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type ListOutput = {
   scope: 'project' | 'library'
   path: string
   skills: string[]
+  entries: Record<string, { version: number; hash: string; updatedAt?: string } | null>
 }
 
 describe('list --project (CLI)', () => {
@@ -32,6 +33,14 @@ describe('list --project (CLI)', () => {
     writeFileSync(join(skillDir, SKILL_FILE), content, 'utf-8')
   }
 
+  const writeProjectLock = (
+    skills: Record<string, { version: number; hash: string; updatedAt?: string }>,
+  ) => {
+    const projectRoot = getProjectLockRoot(projectDir)
+    mkdirSync(projectRoot, { recursive: true })
+    writeFileSync(getLockFilePath(projectRoot), JSON.stringify({ schema: 1, skills }, null, 2) + '\n')
+  }
+
   const parseJson = (output: string) => JSON.parse(output) as ListOutput
 
   test('lists project skills as JSON', () => {
@@ -45,6 +54,19 @@ describe('list --project (CLI)', () => {
     expect(data.scope).toBe('project')
     expect(data.path).toBe(projectDir)
     expect(data.skills).toEqual(['alpha', 'beta'])
+    expect(data.entries).toEqual({ alpha: null, beta: null })
+  })
+
+  test('includes project lock updatedAt in JSON entries', () => {
+    const updatedAt = '2026-07-06T12:00:00.000Z'
+    writeProjectSkill('alpha', '# Alpha\n')
+    writeProjectLock({ alpha: { version: 1, hash: 'sha256:abc', updatedAt } })
+
+    const result = runCli(['list', '--project', projectDir, '--json'])
+
+    expect(result.exitCode).toBe(0)
+    const data = parseJson(result.stdout)
+    expect(data.entries.alpha).toEqual({ version: 1, hash: 'sha256:abc', updatedAt })
   })
 
   test('returns empty list when project has no skills', () => {
@@ -54,5 +76,6 @@ describe('list --project (CLI)', () => {
     const data = parseJson(result.stdout)
     expect(data.scope).toBe('project')
     expect(data.skills).toEqual([])
+    expect(data.entries).toEqual({})
   })
 })

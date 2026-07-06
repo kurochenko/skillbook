@@ -120,7 +120,7 @@ export default defineCommand({
 
     const projectHash = await computeSkillHash(projectSkillDir)
     const nextVersion = libraryEntry.version + 1
-    const nextEntry = { version: nextVersion, hash: projectHash }
+    const nextEntry = { version: nextVersion, hash: projectHash, updatedAt: new Date().toISOString() }
 
     copySkillDir(projectSkillDir, librarySkillDir)
     writeLockFile(libraryContext.lockFilePath, setLockEntry(libraryLock, skill, nextEntry))
