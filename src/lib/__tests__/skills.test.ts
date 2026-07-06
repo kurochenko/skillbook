@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { validateSkillName, extractSkillName } from '@/lib/skills'
+import { validateSkillName, validateExistingSkillName, isLegacySkillName, extractSkillName } from '@/lib/skills'
 
 describe('validateSkillName', () => {
   test('accepts valid names', () => {
@@ -8,10 +8,6 @@ describe('validateSkillName', () => {
       'typescript',
       'review-gitlab',
       'my-skill-2',
-      'my_skill',
-      'snake_case_name',
-      '_private',
-      '_underscore_start',
       'a',
       '1',
       '123skill',
@@ -26,13 +22,18 @@ describe('validateSkillName', () => {
   test('rejects invalid names', () => {
     const cases = [
       { name: '', error: 'empty' },
-      { name: 'a'.repeat(51), error: '50 characters' },
-      { name: 'Beads', error: 'lowercase' },
+      { name: 'a'.repeat(65), error: '64 characters' },
+      { name: 'Beads', error: 'uppercase' },
       { name: 'my skill', error: 'spaces' },
+      { name: 'my_skill', error: 'underscores are not allowed (Agent Skills spec)' },
+      { name: 'snake_case_name', error: 'underscores are not allowed (Agent Skills spec)' },
+      { name: '_private', error: 'underscores are not allowed (Agent Skills spec)' },
       { name: 'skill@test', error: null },
       { name: 'skill.test', error: null },
       { name: 'skill/test', error: null },
-      { name: '-skill', error: null },
+      { name: '-skill', error: 'start with a hyphen' },
+      { name: 'skill-', error: 'end with a hyphen' },
+      { name: 'my--skill', error: 'consecutive hyphens' },
     ]
 
     for (const { name, error } of cases) {
@@ -40,6 +41,32 @@ describe('validateSkillName', () => {
       expect(result.valid).toBe(false)
       if (error && !result.valid) expect(result.error).toContain(error)
     }
+  })
+})
+
+describe('validateExistingSkillName', () => {
+  test('accepts legacy underscore names', () => {
+    const cases = [
+      'my_skill',
+      'snake_case_name',
+      '_private',
+      '_underscore_start',
+      'skill-v2',
+    ]
+
+    for (const name of cases) {
+      expect(validateExistingSkillName(name)).toEqual({ valid: true, name })
+    }
+  })
+
+  test('identifies legacy-only names', () => {
+    expect(isLegacySkillName('my_skill')).toBe(true)
+    expect(isLegacySkillName('my-skill')).toBe(false)
+  })
+
+  test('still rejects unsafe existing ids', () => {
+    const result = validateExistingSkillName('../../x')
+    expect(result.valid).toBe(false)
   })
 })
 

@@ -82,6 +82,20 @@ describe('lockfile harness modes', () => {
     expect(() => readLockFile(lockPath)).toThrow('invalid skill id "../../x"')
   })
 
+  test('legacy underscore skill ids are accepted when reading existing lockfiles', () => {
+    const lockPath = join(tempDir, 'skillbook.lock.json')
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ schema: 1, skills: { legacy_skill: { version: 1, hash: 'sha256:abc' } } }),
+      'utf-8',
+    )
+
+    expect(readLockFile(lockPath).skills.legacy_skill).toEqual({
+      version: 1,
+      hash: 'sha256:abc',
+    })
+  })
+
   test('valid file round-trips', () => {
     const lockPath = join(tempDir, 'skillbook.lock.json')
     writeLockFile(lockPath, {

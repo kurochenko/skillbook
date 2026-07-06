@@ -1,6 +1,6 @@
 import pc from 'picocolors'
 import { LockFileError, readLockFile, type LockFile } from '@/lib/lockfile'
-import { validateSkillName } from '@/lib/skills'
+import { validateExistingSkillName } from '@/lib/skills'
 
 type FailOptions = {
   json?: boolean
@@ -43,7 +43,7 @@ export const resolveSkills = (skill?: string, skills?: string): string[] => {
     process.exit(1)
   }
   for (const s of uniqueSkills) {
-    const validation = validateSkillName(s)
+    const validation = validateExistingSkillName(s)
     if (!validation.valid) {
       process.stderr.write(pc.red(`Invalid skill name "${s}": ${validation.error}\n`))
       process.exit(1)

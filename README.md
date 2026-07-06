@@ -187,6 +187,7 @@ skillbook install alpha --skills beta,gamma --project /path/to/project
 skillbook status                          # project vs library
 skillbook sync                            # pull behind skills + sync enabled harnesses
 skillbook verify [--json]                 # read-only project integrity check
+skillbook lint [--json]                   # Agent Skills spec convention checks
 skillbook add <path> [--name id]          # add from .md file or skill directory
 skillbook scan <path>                      # discover skills in existing projects
 skillbook diff <id> [--files]              # compare library/project skill content
@@ -219,6 +220,20 @@ Exit codes:
 | 2 | Sync-state conflict, including diverged skills, push/pull refusals, and harness conflicts |
 
 The update banner is suppressed when `--json` is used or stdout is not a TTY.
+
+## Agent Skills lint
+
+`skillbook lint` checks skill directories against Agent Skills conventions:
+spec-compliant directory names, required `SKILL.md` frontmatter (`name` and
+`description`), frontmatter name/directory agreement, description length, large
+skill files, and unknown frontmatter keys. It defaults to project skills in the
+current directory; use `--project <path>` or `--library` to choose scope.
+
+```bash
+skillbook lint --project /path/to/project
+skillbook lint --library --json
+skillbook lint my-skill --project /path/to/project
+```
 
 ## Supported harnesses
 

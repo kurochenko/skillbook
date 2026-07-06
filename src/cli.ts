@@ -12,6 +12,7 @@ const SUBCOMMANDS = [
   'harness',
   'init',
   'install',
+  'lint',
   'list',
   'migrate',
   'pull',
@@ -95,6 +96,7 @@ ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-b
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
 ${pc.cyan('  skillbook sync [--project <path>] [--force]')}${pc.dim(' Pull behind skills and sync enabled harnesses')}
 ${pc.cyan('  skillbook verify [--project <path>] [--json]')}${pc.dim(' Verify project skill integrity without changes')}
+${pc.cyan('  skillbook lint [--project <path>] [--json]')}${pc.dim('   Lint skills against Agent Skills spec conventions')}
 ${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
 ${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
 ${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
@@ -160,6 +162,7 @@ const runSubcommand = async () => {
       harness: () => import('@/commands/harness').then((m) => m.default),
       init: () => import('@/commands/init').then((m) => m.default),
       install: () => import('@/commands/install').then((m) => m.default),
+      lint: () => import('@/commands/lint').then((m) => m.default),
       list: () => import('@/commands/list').then((m) => m.default),
       migrate: () => import('@/commands/migrate').then((m) => m.default),
       pull: () => import('@/commands/pull').then((m) => m.default),
