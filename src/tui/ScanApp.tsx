@@ -325,7 +325,7 @@ const ScanApp = ({ basePath }: ScanAppProps) => {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="yellow">No skills found</Text>
-        <Text dimColor>Looked in: .claude/skills/, .cursor/rules/, .opencode/skill/</Text>
+        <Text dimColor>Looked in: .claude/skills/, .cursor/skills/, .opencode/skill/</Text>
       </Box>
     )
   }

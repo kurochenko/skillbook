@@ -185,10 +185,10 @@ describe('lock-based harness enable/disable (CLI)', () => {
     expect(lock.harnesses).toEqual(['cursor'])
     expect(lock.harnessModes?.cursor).toBe('copy')
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
-    expect(existsSync(cursorFile)).toBe(true)
-    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
-    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Alpha\n')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
+    expect(existsSync(cursorDir)).toBe(true)
+    expect(lstatSync(cursorDir).isSymbolicLink()).toBe(false)
+    expect(readFileSync(join(cursorDir, SKILL_FILE), 'utf-8')).toBe('# Alpha\n')
   })
 
   test('copy mode reports drift and requires --force to overwrite', () => {
@@ -206,7 +206,7 @@ describe('lock-based harness enable/disable (CLI)', () => {
       'copy',
     ])
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const cursorFile = join(projectDir, '.cursor', 'skills', 'alpha', SKILL_FILE)
     writeFileSync(cursorFile, '# Drifted\n', 'utf-8')
 
     const status = runCli([

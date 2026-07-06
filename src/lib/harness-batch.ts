@@ -1,10 +1,13 @@
 import {
   existsSync,
+  lstatSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
+  unlinkSync,
   writeFileSync,
 } from 'fs'
-import { basename, extname, join } from 'path'
+import { basename, dirname, extname, join, resolve } from 'path'
 
 import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import { getHarnessBaseDir } from '@/lib/harness'
@@ -35,6 +38,7 @@ export type HarnessSyncResult = {
   conflicts: number
   drifted: number
   removedStale: number
+  removedLegacy: number
   fallbackToCopy: boolean
   mode: HarnessMode
 }
@@ -131,6 +135,59 @@ export const removeStaleHarnessEntries = (
   return removed
 }
 
+export const cleanupLegacyCursorRules = (
+  projectPath: string,
+  projectSkillIds: Set<string>,
+  warn: (message: string) => void = (message) => process.stderr.write(`${message}\n`),
+): number => {
+  const legacyDir = join(projectPath, '.cursor', 'rules')
+  if (!existsSync(legacyDir)) return 0
+
+  const projectSkillsPath = getLockSkillsPath(getProjectLockRoot(projectPath))
+  let removed = 0
+
+  for (const skillId of [...projectSkillIds].sort()) {
+    const entryPath = join(legacyDir, `${skillId}.md`)
+    if (!existsSync(entryPath) && !lstatSyncSafe(entryPath)?.isSymbolicLink()) continue
+
+    const targetSkillFile = join(getSkillDir(projectSkillsPath, skillId), SKILL_FILE)
+    const stat = lstatSyncSafe(entryPath)
+    if (!stat) continue
+
+    if (stat.isSymbolicLink()) {
+      const rawTarget = readlinkSync(entryPath)
+      const absoluteTarget = resolve(dirname(entryPath), rawTarget)
+      if (absoluteTarget.startsWith(`${projectSkillsPath}/`)) {
+        unlinkSync(entryPath)
+        removed += 1
+        continue
+      }
+    }
+
+    if (stat.isFile() && existsSync(targetSkillFile)) {
+      const legacyContent = readFileSync(entryPath, 'utf-8')
+      const skillContent = readFileSync(targetSkillFile, 'utf-8')
+      if (legacyContent === skillContent) {
+        unlinkSync(entryPath)
+        removed += 1
+        continue
+      }
+    }
+
+    warn(`legacy cursor rule '${skillId}.md' left in place`)
+  }
+
+  return removed
+}
+
+const lstatSyncSafe = (path: string) => {
+  try {
+    return lstatSync(path)
+  } catch {
+    return null
+  }
+}
+
 export const syncHarnessSkills = (
   projectPath: string,
   harnessId: ToolId,
@@ -143,6 +200,7 @@ export const syncHarnessSkills = (
   const initialMode = options.mode ?? 'symlink'
   if (skillIds.length === 0) {
     const removedStale = removeStaleHarnessEntries(projectPath, harnessId, skillIdSet)
+    const removedLegacy = harnessId === 'cursor' ? cleanupLegacyCursorRules(projectPath, skillIdSet) : 0
     return {
       total: 0,
       synced: 0,
@@ -150,6 +208,7 @@ export const syncHarnessSkills = (
       conflicts: 0,
       drifted: 0,
       removedStale,
+      removedLegacy,
       fallbackToCopy: false,
       mode: initialMode,
     }
@@ -178,6 +237,7 @@ export const syncHarnessSkills = (
   }
 
   const removedStale = removeStaleHarnessEntries(projectPath, harnessId, skillIdSet)
+  const removedLegacy = harnessId === 'cursor' ? cleanupLegacyCursorRules(projectPath, skillIdSet) : 0
 
   return {
     total: skillIds.length,
@@ -186,6 +246,7 @@ export const syncHarnessSkills = (
     conflicts,
     drifted,
     removedStale,
+    removedLegacy,
     fallbackToCopy,
     mode,
   }

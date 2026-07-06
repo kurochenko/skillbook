@@ -112,9 +112,9 @@ describe('lock operations', () => {
     expect(result.fallbackHarnesses).toEqual(['cursor'])
     expect(getHarnessMode(result.lock, 'cursor')).toBe('copy')
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
-    expect(existsSync(cursorFile)).toBe(true)
-    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
-    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Alpha\n')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
+    expect(existsSync(cursorDir)).toBe(true)
+    expect(lstatSync(cursorDir).isSymbolicLink()).toBe(false)
+    expect(readFileSync(join(cursorDir, SKILL_FILE), 'utf-8')).toBe('# Alpha\n')
   })
 })

@@ -46,11 +46,18 @@ describe('add command', () => {
         expectedName: 'typescript',
       },
       {
-        label: 'adds a skill from .cursor/rules/<name>.md',
-        path: '.cursor/rules/react-patterns.md',
+        label: 'adds a skill from .cursor/skills/<name>/SKILL.md',
+        path: '.cursor/skills/react-patterns/SKILL.md',
         content: '# React Patterns',
         args: (skillPath: string) => ['add', skillPath],
         expectedName: 'react-patterns',
+      },
+      {
+        label: 'adds a legacy skill from .cursor/rules/<name>.md',
+        path: '.cursor/rules/legacy-react-patterns.md',
+        content: '# Legacy React Patterns',
+        args: (skillPath: string) => ['add', skillPath],
+        expectedName: 'legacy-react-patterns',
       },
       {
         label: 'adds a skill with explicit --name',
@@ -175,6 +182,7 @@ describe('add command', () => {
       { path: '.claude/skills/my-skill/SKILL.md', expected: 'my-skill' },
       { path: '.claude/skills/my_skill/SKILL.md', expected: 'my_skill' },
       { path: '.claude/skills/_private/SKILL.md', expected: '_private' },
+      { path: '.cursor/skills/my-skill/SKILL.md', expected: 'my-skill' },
       { path: '.cursor/rules/my-skill.md', expected: 'my-skill' },
       { path: '.opencode/skill/my-skill/SKILL.md', expected: 'my-skill' },
       { path: 'custom-skill/SKILL.md', expected: 'custom-skill' },

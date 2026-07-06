@@ -162,7 +162,7 @@ describe('resolve command (CLI)', () => {
       'utf-8',
     )
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const cursorFile = join(projectDir, '.cursor', 'skills', 'alpha', SKILL_FILE)
     mkdirSync(dirname(cursorFile), { recursive: true })
     writeFileSync(cursorFile, '# Drifted\n', 'utf-8')
     expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)

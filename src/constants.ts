@@ -39,9 +39,8 @@ export const TOOLS = {
   }),
   cursor: defineTool({
     name: 'Cursor',
-    baseDir: ['.cursor', 'rules'],
-    needsDirectory: false,
-    fileSuffix: '.md',
+    baseDir: ['.cursor', 'skills'],
+    needsDirectory: true,
   }),
   opencode: defineTool({
     name: 'OpenCode',

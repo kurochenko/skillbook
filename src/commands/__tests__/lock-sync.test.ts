@@ -216,7 +216,7 @@ describe('lock-based sync commands (CLI)', () => {
     const result = runCli(['pull', 'alpha', '--project', projectDir], env())
     expect(result.exitCode).toBe(0)
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const cursorFile = join(projectDir, '.cursor', 'skills', 'alpha', SKILL_FILE)
     expect(readFileSync(cursorFile, 'utf-8')).toBe(updatedFiles[SKILL_FILE])
     expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(updatedFiles[SKILL_FILE])
 
@@ -537,7 +537,7 @@ describe('lock-based sync commands (CLI)', () => {
       expect(lstatSync(harnessDir).isSymbolicLink()).toBe(true)
     })
 
-    test('cursor harness gets only SKILL.md (not directory)', () => {
+    test('cursor harness gets full skill directory', () => {
       runInit()
       const files = {
         [SKILL_FILE]: '# Cursor Test\n',
@@ -552,9 +552,9 @@ describe('lock-based sync commands (CLI)', () => {
       const result = runCli(['install', 'cursor-test', '--project', projectDir], env())
       expect(result.exitCode).toBe(0)
 
-      const cursorFile = join(projectDir, '.cursor', 'rules', 'cursor-test.md')
-      // Cursor should have the SKILL.md content linked (not the directory)
-      expect(existsSync(cursorFile)).toBe(true)
+      const cursorDir = join(projectDir, '.cursor', 'skills', 'cursor-test')
+      expect(existsSync(join(cursorDir, SKILL_FILE))).toBe(true)
+      expect(existsSync(join(cursorDir, 'extra.md'))).toBe(true)
     })
 
     test('push updates library with multi-file skill changes', () => {

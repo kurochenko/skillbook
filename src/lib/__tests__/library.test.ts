@@ -45,7 +45,12 @@ describe('scanProjectSkills', () => {
         name: 'typescript',
       },
       {
-        label: 'finds .cursor/rules/*.md',
+        label: 'finds .cursor/skills/*/SKILL.md',
+        path: '.cursor/skills/react/SKILL.md',
+        name: 'react',
+      },
+      {
+        label: 'finds legacy .cursor/rules/*.md',
         path: '.cursor/rules/react.md',
         name: 'react',
       },
@@ -69,7 +74,7 @@ describe('scanProjectSkills', () => {
 
     test('finds skills from multiple locations', async () => {
       createProjectSkill('.claude/skills/skill-a/SKILL.md', '# A')
-      createProjectSkill('.cursor/rules/skill-b.md', '# B')
+      createProjectSkill('.cursor/skills/skill-b/SKILL.md', '# B')
       createProjectSkill('.opencode/skill/skill-c/SKILL.md', '# C')
 
       const skills = await scanProjectSkills(projectDir)
@@ -436,7 +441,16 @@ describe('scanProjectSkills', () => {
       }
     })
 
-    test('scan sets dirPath to null for cursor (file-based)', async () => {
+    test('scan sets dirPath for native cursor skills', async () => {
+      createProjectSkill('.cursor/skills/cursor-skill/SKILL.md', '# Cursor Skill\n')
+
+      const skills = await scanProjectSkills(projectDir)
+
+      expect(skills).toHaveLength(1)
+      expect(skills[0]!.dirPath).not.toBeNull()
+    })
+
+    test('scan sets dirPath to null for legacy cursor rules', async () => {
       createProjectSkill('.cursor/rules/cursor-skill.md', '# Cursor Skill\n')
 
       const skills = await scanProjectSkills(projectDir)

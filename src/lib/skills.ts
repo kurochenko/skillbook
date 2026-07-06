@@ -14,6 +14,11 @@ const HARNESS_PATTERNS = Object.values(TOOLS).map((tool) => {
   return new RegExp(`${baseDirPattern}/([^/]+)${escapeRegExp(tool.fileSuffix ?? '')}$`, 'i')
 })
 
+// Legacy Cursor rule files remain importable/scannable for older projects.
+const LEGACY_HARNESS_PATTERNS = [
+  new RegExp(`${escapeRegExp('.cursor/rules')}/([^/]+)\\.md$`, 'i'),
+]
+
 export type SkillNameValidation =
   | { valid: true; name: string }
   | { valid: false; error: string }
@@ -44,7 +49,7 @@ export const validateSkillName = (name: string): SkillNameValidation => {
 export const extractSkillName = (filePath: string): string | null => {
   const normalizedPath = filePath.replace(/\\/g, '/')
 
-  for (const pattern of HARNESS_PATTERNS) {
+  for (const pattern of [...HARNESS_PATTERNS, ...LEGACY_HARNESS_PATTERNS]) {
     const match = normalizedPath.match(pattern)
     if (match?.[1]) return match[1].toLowerCase()
   }
