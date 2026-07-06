@@ -7,16 +7,10 @@ import { copySkillDir } from '@/lib/lock-copy'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { linkSkillToHarness } from '@/lib/lock-harness'
-import {
-  getHarnessMode,
-  readLockFile,
-  setHarnessMode,
-  setLockEntry,
-  writeLockFile,
-} from '@/lib/lockfile'
+import { getHarnessMode, setHarnessMode, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { fail } from '@/commands/utils'
+import { fail, readLockFileOrFail } from '@/commands/utils'
 
 type Strategy = 'library' | 'project' | 'merge'
 
@@ -59,8 +53,8 @@ export default defineCommand({
       fail(`Skill must exist in both project and library to resolve: ${skill}`)
     }
 
-    const projectLock = readLockFile(projectContext.lockFilePath)
-    const libraryLock = readLockFile(libraryContext.lockFilePath)
+    const projectLock = readLockFileOrFail(projectContext.lockFilePath)
+    const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
     const libraryEntry = libraryLock.skills[skill]
 
     if (!libraryEntry) {

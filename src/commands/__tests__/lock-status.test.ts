@@ -196,5 +196,22 @@ describe('lock-based workflow (CLI)', () => {
       const data = parseStatus(result.stdout)
       expect(data.skills).toHaveLength(0)
     })
+
+    test('corrupt project lockfile exits cleanly without stack trace', () => {
+      writeLockFile(libraryDir, {})
+      mkdirSync(projectRoot(), { recursive: true })
+      const lockPath = getLockFilePath(projectRoot())
+      writeFileSync(lockPath, '{ nope', 'utf-8')
+
+      const result = runStatus()
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe('')
+      expect(result.stderr).toContain(`Invalid lock file at ${lockPath}:`)
+      expect(result.stderr).toContain("Fix or delete the file and re-run 'skillbook migrate'.")
+      expect(result.stderr).not.toContain('LockFileError')
+      expect(result.stderr).not.toContain('SyntaxError')
+      expect(result.stderr).not.toContain('src/lib/lockfile')
+    })
   })
 })

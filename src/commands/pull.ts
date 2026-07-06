@@ -5,19 +5,12 @@ import pc from 'picocolors'
 import { copySkillDir } from '@/lib/lock-copy'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { linkSkillToHarness } from '@/lib/lock-harness'
-import {
-  getHarnessMode,
-  readLockFile,
-  setHarnessMode,
-  setLockEntry,
-  type LockFile,
-  writeLockFile,
-} from '@/lib/lockfile'
+import { getHarnessMode, setHarnessMode, setLockEntry, type LockFile, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { resolveLockStatus } from '@/lib/lock-status'
 import { getSkillDir } from '@/lib/skill-fs'
-import { resolveSkills } from '@/commands/utils'
+import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
 
 const pullSkill = async (
   skill: string,
@@ -40,8 +33,8 @@ const pullSkill = async (
     return { success: false, error: `Skill not found in library: ${skill}`, exitCode: 1 }
   }
 
-  const libraryLock = readLockFile(libraryContext.lockFilePath)
-  const projectLock = readLockFile(projectContext.lockFilePath)
+  const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
+  const projectLock = readLockFileOrFail(projectContext.lockFilePath)
   const libraryEntry = libraryLock.skills[skill]
   const projectEntry = projectLock.skills[skill]
 

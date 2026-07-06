@@ -3,8 +3,9 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { createEmptyLockFile, readLockFile, writeLockFile } from '@/lib/lockfile'
+import { createEmptyLockFile, writeLockFile } from '@/lib/lockfile'
 import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { readLockFileOrFail } from '@/commands/utils'
 
 const ensureDir = (path: string): boolean => {
   if (!existsSync(path)) {
@@ -21,7 +22,7 @@ const ensureLockFile = (path: string): boolean => {
     return true
   }
 
-  const lock = readLockFile(path)
+  const lock = readLockFileOrFail(path)
   writeLockFile(path, lock)
   return false
 }
