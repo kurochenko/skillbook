@@ -1,15 +1,14 @@
 import { existsSync } from 'fs'
-import pc from 'picocolors'
 
-import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
+import { type ToolId } from '@/constants'
+import { enabledHarnesses } from '@/lib/harness'
 import { copySkillDir } from '@/lib/lock-copy'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { linkSkillToHarness, removeSkillFromHarness } from '@/lib/lock-harness'
+import { readLockFileOrFail } from '@/lib/lock-read'
 import { resolveLockStatus } from '@/lib/lock-status'
 import {
   getHarnessMode,
-  LockFileError,
-  readLockFile,
   setHarnessMode,
   setLockEntry,
   type LockFile,
@@ -35,26 +34,11 @@ export type SkillOperationResult = {
   fallbackHarnesses?: ToolId[]
 }
 
-const readLockFileOrFail = (path: string): LockFile => {
-  try {
-    return readLockFile(path)
-  } catch (error) {
-    if (error instanceof LockFileError) {
-      process.stderr.write(`${pc.red(error.message)}\n`)
-      process.exit(1)
-    }
-    throw error
-  }
-}
-
-const supportedHarnesses = (harnesses: string[] | undefined): ToolId[] =>
-  (harnesses ?? []).filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
-
 export const syncSkillToHarnesses = (
   projectPath: string,
   skillId: string,
   lock: LockFile,
-  harnesses: ToolId[] = supportedHarnesses(lock.harnesses),
+  harnesses: ToolId[] = enabledHarnesses(lock.harnesses),
 ): HarnessSyncOperationResult => {
   let conflicts = 0
   let drifted = 0
@@ -84,7 +68,7 @@ export const removeSkillFromHarnesses = (
   projectPath: string,
   skillId: string,
   lock: LockFile,
-  harnesses: ToolId[] = supportedHarnesses(lock.harnesses),
+  harnesses: ToolId[] = enabledHarnesses(lock.harnesses),
 ): void => {
   for (const harnessId of harnesses) {
     removeSkillFromHarness(projectPath, harnessId, skillId, getHarnessMode(lock, harnessId))

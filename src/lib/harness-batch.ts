@@ -34,7 +34,6 @@ import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
 export type HarnessSyncResult = {
   total: number
   synced: number
-  linked: number
   conflicts: number
   drifted: number
   removedStale: number
@@ -206,7 +205,6 @@ export const syncHarnessSkills = (
     return {
       total: 0,
       synced: 0,
-      linked: 0,
       conflicts: 0,
       drifted: 0,
       removedStale,
@@ -244,7 +242,6 @@ export const syncHarnessSkills = (
   return {
     total: skillIds.length,
     synced,
-    linked: synced,
     conflicts,
     drifted,
     removedStale,
