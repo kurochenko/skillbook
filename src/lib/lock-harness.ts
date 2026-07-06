@@ -19,7 +19,7 @@ import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import { copySkillDir } from '@/lib/lock-copy'
 import { getHarnessBaseDir } from '@/lib/harness'
 import { type HarnessMode } from '@/lib/lockfile'
-import { getProjectLockRoot, getLockSkillsPath } from '@/lib/lock-paths'
+import { getProjectLockRoot, getLockSkillsPath } from '@/lib/paths'
 import { getSkillDir, getSkillFilePath, listSkillIds } from '@/lib/skill-fs'
 
 const SYMLINK_UNSUPPORTED_CODES = new Set([

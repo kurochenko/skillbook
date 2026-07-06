@@ -22,7 +22,6 @@ describe('add command', () => {
 
   const env = () => ({
     SKILLBOOK_LIBRARY: libraryDir,
-    SKILLBOOK_LOCK_LIBRARY: libraryDir,
   })
 
   const createSkillFile = (path: string, content: string) => {

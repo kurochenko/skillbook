@@ -29,20 +29,20 @@ bun run build                # Compile to dist/skillbook
 ### Core layers
 
 - **`src/lib/lockfile.ts`** — Read/write `skillbook.lock.json`. Schema: `{ schema: 1, skills: Record<id, { version, hash }>, harnesses: string[] }`.
-- **`src/lib/lock-paths.ts`** / **`lock-context.ts`** — Resolve paths for library (`~/.skillbook` or `SKILLBOOK_LOCK_LIBRARY`) and project (`.skillbook/` within project root).
+- **`src/lib/paths.ts`** / **`lock-context.ts`** — Resolve paths for library (`~/.skillbook` or `SKILLBOOK_LIBRARY`) and project (`.skillbook/` within project root).
 - **`src/lib/lock-status.ts`** — Compare project vs library lock entries to determine sync status: `synced | ahead | behind | diverged | local-only | library-only`.
 - **`src/lib/library.ts`** — Library operations: `ensureLibrary()` (init git repo), `addSkillToLibrary()`, `scanProjectSkills()` (crawl filesystem via `fdir`), `listSkills()`.
 - **`src/lib/lock-harness.ts`** — Symlink management: create/remove symlinks from harness dirs to `.skillbook/skills/`.
 - **`src/lib/skill-hash.ts`** — Content hashing for change detection.
 - **`src/lib/skills.ts`** — Skill name validation (`/^[a-z0-9_][a-z0-9_-]{0,49}$/`) and extraction from file paths.
 
-### Two path systems
+### Path system
 
-The library has a legacy path system (`src/lib/paths.ts`, env `SKILLBOOK_LIBRARY`) and a lock-based system (`src/lib/lock-paths.ts`, env `SKILLBOOK_LOCK_LIBRARY`). Both default to `~/.skillbook`. New code should use the lock-based system.
+The library and lock-based commands share `src/lib/paths.ts`. `SKILLBOOK_LIBRARY` is the canonical library override, defaulting to `~/.skillbook`. `SKILLBOOK_LOCK_LIBRARY` is still honored as a deprecated fallback when `SKILLBOOK_LIBRARY` is unset.
 
 ## Testing patterns
 
-Tests use `bun:test` with temp directories and env overrides. The helper `withLibraryEnv(path)` from `src/test-utils/env.ts` sets both `SKILLBOOK_LIBRARY` and `SKILLBOOK_LOCK_LIBRARY` to isolate tests from the real library. Integration tests in `src/commands/__tests__/` use `runCli()` from `src/test-utils/cli.ts` which spawns a subprocess.
+Tests use `bun:test` with temp directories and env overrides. The helper `withLibraryEnv(path)` from `src/test-utils/env.ts` sets `SKILLBOOK_LIBRARY` to isolate tests from the real library. Integration tests in `src/commands/__tests__/` use `runCli()` from `src/test-utils/cli.ts` which spawns a subprocess.
 
 ## Key constants
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { initGitRepo } from '@/test-utils/git'
-import { getLockFilePath, getProjectLockRoot, getLockSkillsPath } from '@/lib/lock-paths'
+import { getLockFilePath, getProjectLockRoot, getLockSkillsPath } from '@/lib/paths'
 
 describe('doctor command (CLI)', () => {
   let tempDir: string
@@ -22,7 +22,7 @@ describe('doctor command (CLI)', () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  const env = () => ({ SKILLBOOK_LOCK_LIBRARY: libraryDir })
+  const env = () => ({ SKILLBOOK_LIBRARY: libraryDir })
 
   test('doctor --library succeeds with lock file and skills dir', () => {
     mkdirSync(getLockSkillsPath(libraryDir), { recursive: true })

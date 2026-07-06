@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type FileDiffEntry = {
   file: string
@@ -39,7 +39,7 @@ describe('diff command (CLI)', () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  const env = () => ({ SKILLBOOK_LOCK_LIBRARY: libraryDir })
+  const env = () => ({ SKILLBOOK_LIBRARY: libraryDir })
 
   const writeSkill = (root: string, skillId: string, content: string) => {
     const skillDir = join(getLockSkillsPath(root), skillId)

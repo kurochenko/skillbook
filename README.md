@@ -46,6 +46,11 @@ Example (target a specific project path):
 bun run dev -- harness enable --id cursor --mode copy --project "/absolute/path/to/project" --force
 ```
 
+## Environment
+
+Set `SKILLBOOK_LIBRARY` to override the central library path. The default is `~/.skillbook`.
+`SKILLBOOK_LOCK_LIBRARY` is still honored as a deprecated fallback when `SKILLBOOK_LIBRARY` is unset.
+
 ## Common workflows
 
 ### 1) Build your library (first time)

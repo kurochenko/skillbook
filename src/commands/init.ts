@@ -4,7 +4,7 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { createEmptyLockFile, writeLockFile } from '@/lib/lockfile'
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 import { readLockFileOrFail } from '@/commands/utils'
 
 const ensureDir = (path: string): boolean => {
@@ -35,7 +35,7 @@ export default defineCommand({
   args: {
     library: {
       type: 'boolean',
-      description: 'Initialize the lock-based library at ~/.skillbook or SKILLBOOK_LOCK_LIBRARY',
+      description: 'Initialize the lock-based library at ~/.skillbook or SKILLBOOK_LIBRARY',
       default: false,
     },
     project: {
@@ -57,7 +57,7 @@ export default defineCommand({
     }
 
     if (library) {
-      const libraryPath = getLockLibraryPath()
+      const libraryPath = getLibraryPath()
       const createdLibrary = ensureDir(libraryPath)
       const createdSkills = ensureDir(getLockSkillsPath(libraryPath))
       const createdLock = ensureLockFile(getLockFilePath(libraryPath))

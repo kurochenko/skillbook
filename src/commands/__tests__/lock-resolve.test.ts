@@ -5,7 +5,7 @@ import { dirname, join } from 'path'
 import { createHash } from 'crypto'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type LockEntry = {
   version: number
@@ -36,7 +36,7 @@ describe('resolve command (CLI)', () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  const env = () => ({ SKILLBOOK_LOCK_LIBRARY: libraryDir })
+  const env = () => ({ SKILLBOOK_LIBRARY: libraryDir })
 
   const hashSkill = (content: string) => {
     const hash = createHash('sha256')

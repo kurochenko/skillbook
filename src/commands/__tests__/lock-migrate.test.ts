@@ -5,7 +5,7 @@ import { join } from 'path'
 import { createHash } from 'crypto'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type LockEntry = {
   version: number
@@ -44,7 +44,7 @@ describe('migrate command (CLI)', () => {
   }
 
   const env = () => ({
-    SKILLBOOK_LOCK_LIBRARY: lockLibraryDir,
+    SKILLBOOK_LIBRARY: lockLibraryDir,
   })
 
   test('migrate writes lock entries for .skillbook skills', () => {

@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type ListOutput = {
   scope: 'project' | 'library'

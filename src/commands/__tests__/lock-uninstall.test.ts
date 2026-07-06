@@ -13,7 +13,7 @@ import { tmpdir } from 'os'
 import { join, dirname, relative } from 'path'
 import { runCli } from '@/test-utils/cli'
 import { SKILL_FILE } from '@/constants'
-import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type LockFile = {
   schema: 1

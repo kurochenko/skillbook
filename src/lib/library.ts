@@ -2,8 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, realpa
 import { join, resolve, basename, dirname } from 'path'
 import { createHash } from 'crypto'
 import { fdir } from 'fdir'
-import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
-import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
+import { getLibraryPath, getSkillsPath, getSkillPath, getLockFilePath } from '@/lib/paths'
 import { LockFileError, readLockFile, setLockEntry, writeLockFile, type LockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { copySkillDir } from '@/lib/lock-copy'
@@ -405,7 +404,6 @@ type CommitSkillOptions = {
 const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSkillResult> => {
   const { skillName, checkSkip, writeContent, gitAddPath, resultPath, errorContext } = options
   const libraryPath = getLibraryPath()
-  const lockLibraryPath = getLockLibraryPath()
   const skillDir = getSkillPath(skillName)
 
   const libraryResult = await ensureLibrary()
@@ -416,7 +414,7 @@ const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSki
   const existingContent = getSkillContent(skillName)
   const isUpdate = existingContent !== null
 
-  const lockFilePath = getLockFilePath(lockLibraryPath)
+  const lockFilePath = getLockFilePath(libraryPath)
   let lock: LockFile
   try {
     lock = readLockFile(lockFilePath)

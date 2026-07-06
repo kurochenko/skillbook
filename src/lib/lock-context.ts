@@ -1,4 +1,4 @@
-import { getLockFilePath, getLockLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getLibraryPath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 export type LockContext = {
   root: string
@@ -16,7 +16,7 @@ export const getProjectLockContext = (projectPath: string): LockContext => {
 }
 
 export const getLibraryLockContext = (): LockContext => {
-  const root = getLockLibraryPath()
+  const root = getLibraryPath()
   return {
     root,
     skillsPath: getLockSkillsPath(root),
