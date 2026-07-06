@@ -11,7 +11,7 @@ import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context
 import { getSkillDir } from '@/lib/skill-fs'
 import { fail, readLockFileOrFail } from '@/commands/utils'
 
-type Strategy = 'library' | 'project' | 'merge'
+type Strategy = 'library' | 'project'
 
 export default defineCommand({
   meta: {
@@ -30,7 +30,7 @@ export default defineCommand({
     },
     strategy: {
       type: 'string',
-      description: 'Resolution strategy (library, project, merge)',
+      description: 'Resolution strategy (library, project)',
       default: 'library',
     },
   },
@@ -41,8 +41,8 @@ export default defineCommand({
     const skill = args.skill
     const strategy = args.strategy as Strategy
 
-    if (!['library', 'project', 'merge'].includes(strategy)) {
-      fail('Invalid strategy. Use library, project, or merge.')
+    if (!['library', 'project'].includes(strategy)) {
+      fail('Invalid strategy. Use library or project.')
     }
 
     const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
@@ -58,10 +58,6 @@ export default defineCommand({
 
     if (!libraryEntry) {
       fail(`No lock entry for skill in library: ${skill}`)
-    }
-
-    if (strategy === 'merge') {
-      fail('Merge strategy is not implemented. Resolve manually.', 2)
     }
 
     if (strategy === 'library') {
