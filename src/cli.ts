@@ -20,6 +20,7 @@ const SUBCOMMANDS = [
   'scan',
   'show',
   'status',
+  'sync',
   'uninstall',
   'upgrade',
 ]
@@ -91,6 +92,7 @@ ${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library 
 ${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .skillbook folder')}
 ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
+${pc.cyan('  skillbook sync [--project <path>] [--force]')}${pc.dim(' Pull behind skills and sync enabled harnesses')}
 ${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
 ${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
 ${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
@@ -164,6 +166,7 @@ const runSubcommand = async () => {
       scan: () => import('@/commands/scan').then((m) => m.default),
       show: () => import('@/commands/show').then((m) => m.default),
       status: () => import('@/commands/status').then((m) => m.default),
+      sync: () => import('@/commands/sync').then((m) => m.default),
       uninstall: () => import('@/commands/uninstall').then((m) => m.default),
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
