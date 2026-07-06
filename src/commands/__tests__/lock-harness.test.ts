@@ -8,6 +8,7 @@ import {
   existsSync,
   lstatSync,
   readlinkSync,
+  symlinkSync,
 } from 'fs'
 import { tmpdir } from 'os'
 import { join, dirname, relative } from 'path'
@@ -361,6 +362,117 @@ describe('lock-based harness sync (CLI)', () => {
     expect(lstatSync(harnessDir).isSymbolicLink()).toBe(false)
     expect(readFileSync(join(harnessDir, SKILL_FILE), 'utf-8')).toBe(files[SKILL_FILE])
     expect(readFileSync(join(harnessDir, 'notes.md'), 'utf-8')).toBe(files['notes.md'])
+  })
+
+  test('harness enable --mode symlink --force replaces copied directory and file harness entries', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+      'notes.md': 'Notes v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    runCli(
+      ['harness', 'enable', '--project', projectDir, '--id', 'claude-code', '--mode', 'copy'],
+      env(),
+    )
+    runCli(
+      ['harness', 'enable', '--project', projectDir, '--id', 'cursor', '--mode', 'copy'],
+      env(),
+    )
+
+    const claudeHarnessDir = join(projectDir, '.claude', 'skills', 'alpha')
+    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    expect(lstatSync(claudeHarnessDir).isSymbolicLink()).toBe(false)
+    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+
+    const claudeResult = runCli(
+      [
+        'harness',
+        'enable',
+        '--project',
+        projectDir,
+        '--id',
+        'claude-code',
+        '--mode',
+        'symlink',
+        '--force',
+      ],
+      env(),
+    )
+    const cursorResult = runCli(
+      [
+        'harness',
+        'enable',
+        '--project',
+        projectDir,
+        '--id',
+        'cursor',
+        '--mode',
+        'symlink',
+        '--force',
+      ],
+      env(),
+    )
+    expect(claudeResult.exitCode).toBe(0)
+    expect(cursorResult.exitCode).toBe(0)
+
+    expectSymlink(claudeHarnessDir, join(getLockSkillsPath(projectRoot()), 'alpha'))
+    expectSymlink(cursorFile, join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE))
+  })
+
+  test('harness sync without --force reports real file conflict and preserves it', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const cursorDir = join(projectDir, '.cursor', 'rules')
+    const cursorFile = join(cursorDir, 'alpha.md')
+    mkdirSync(cursorDir, { recursive: true })
+    writeFileSync(cursorFile, '# Existing cursor rule\n', 'utf-8')
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor', '--mode', 'symlink'],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('1 conflicting path skipped')
+    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Existing cursor rule\n')
+  })
+
+  test('harness sync heals dangling symlink entries', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const harnessDir = join(projectDir, '.claude', 'skills')
+    const harnessEntry = join(harnessDir, 'alpha')
+    mkdirSync(harnessDir, { recursive: true })
+    symlinkSync('missing-alpha-target', harnessEntry)
+    expect(existsSync(harnessEntry)).toBe(false)
+    expect(lstatSync(harnessEntry).isSymbolicLink()).toBe(true)
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'claude-code'],
+      env(),
+    )
+    expect(result.exitCode).toBe(0)
+
+    expectSymlink(harnessEntry, join(getLockSkillsPath(projectRoot()), 'alpha'))
   })
 
   test('harness status reports drift for copied directory harness skill', () => {

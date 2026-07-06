@@ -116,8 +116,6 @@ const getPathType = (path: string): HarnessPathType => {
   }
 }
 
-const isSymlink = (path: string): boolean => getPathType(path) === 'symlink'
-
 const readSymlinkTarget = (path: string): string | null => {
   try {
     return readlinkSync(path)
@@ -267,19 +265,25 @@ const inspectCopyTarget = (
 const ensureSymlink = (
   symlinkPath: string,
   targetPath: string,
+  force = false,
 ): { synced: boolean; conflict: boolean; unsupported: boolean; error?: string } => {
   ensureDir(dirname(symlinkPath))
   const relativeTarget = relative(dirname(symlinkPath), targetPath)
+  const pathType = getPathType(symlinkPath)
 
-  if (existsSync(symlinkPath)) {
-    if (isSymlink(symlinkPath)) {
+  if (pathType !== 'missing') {
+    if (pathType === 'symlink') {
       const currentTarget = readSymlinkTarget(symlinkPath)
       if (currentTarget === relativeTarget) {
         return { synced: true, conflict: false, unsupported: false }
       }
       unlinkSync(symlinkPath)
     } else {
-      return { synced: false, conflict: true, unsupported: false }
+      if (force) {
+        removePath(symlinkPath)
+      } else {
+        return { synced: false, conflict: true, unsupported: false }
+      }
     }
   }
 
@@ -402,7 +406,7 @@ const syncSkillToHarnessWithMode = (
     return ensureCopy(entryPath, targetPath, tool.needsDirectory, force)
   }
 
-  const symlinkResult = ensureSymlink(entryPath, targetPath)
+  const symlinkResult = ensureSymlink(entryPath, targetPath, force)
   if (symlinkResult.synced) {
     return {
       synced: true,
