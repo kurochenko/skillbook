@@ -13,6 +13,7 @@ export type LintRule =
   | 'description-length'
   | 'body-length'
   | 'unknown-frontmatter'
+  | 'unknown-skill'
 
 export type LintFinding = {
   skill: string
@@ -171,10 +172,21 @@ const lintSkillContent = (skill: string, content: string): LintFinding[] => {
 
 export const lintSkills = (skillsPath: string, options: LintSkillsOptions = {}): LintResult => {
   const availableIds = listSkillIds(skillsPath)
-  const ids = options.ids?.length
-    ? availableIds.filter((id) => options.ids?.includes(id))
+  const requestedIds = options.ids?.length ? [...new Set(options.ids)] : null
+  const ids = requestedIds
+    ? availableIds.filter((id) => requestedIds.includes(id))
     : availableIds
   const findings: LintFinding[] = []
+
+  for (const id of requestedIds ?? []) {
+    if (availableIds.includes(id)) continue
+    findings.push({
+      skill: id,
+      level: 'error',
+      rule: 'unknown-skill',
+      detail: `Skill '${id}' not found in ${skillsPath}`,
+    })
+  }
 
   for (const skill of ids) {
     const skillFile = join(skillsPath, skill, SKILL_FILE)

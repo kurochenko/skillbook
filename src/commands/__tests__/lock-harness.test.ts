@@ -664,6 +664,33 @@ describe('lock-based harness sync (CLI)', () => {
     expectSymlink(join(projectDir, '.cursor', 'skills', 'alpha'), join(getLockSkillsPath(projectRoot()), 'alpha'))
   })
 
+  test('cursor sync leaves legacy symlink pointing at a different skill', () => {
+    runInit()
+    const files = { [SKILL_FILE]: '# Alpha v1\n' }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeSkillFiles(projectRoot(), 'beta', files)
+    writeLockFile(projectRoot(), {
+      alpha: { version: 1, hash },
+      beta: { version: 1, hash },
+    })
+
+    const legacyFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const otherSkillTarget = join(getLockSkillsPath(projectRoot()), 'beta', SKILL_FILE)
+    mkdirSync(dirname(legacyFile), { recursive: true })
+    symlinkSync(relative(dirname(legacyFile), otherSkillTarget), legacyFile)
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor'],
+      env(),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(legacyFile)).toBe(true)
+    expect(result.stderr).toContain("legacy cursor rule 'alpha.md' left in place")
+  })
+
   test('cursor sync removes legacy identical real rule for project skill', () => {
     runInit()
     const files = { [SKILL_FILE]: '# Alpha v1\n' }

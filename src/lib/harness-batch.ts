@@ -148,16 +148,18 @@ export const cleanupLegacyCursorRules = (
 
   for (const skillId of [...projectSkillIds].sort()) {
     const entryPath = join(legacyDir, `${skillId}.md`)
-    if (!existsSync(entryPath) && !lstatSyncSafe(entryPath)?.isSymbolicLink()) continue
-
-    const targetSkillFile = join(getSkillDir(projectSkillsPath, skillId), SKILL_FILE)
     const stat = lstatSyncSafe(entryPath)
     if (!stat) continue
+
+    const skillDir = getSkillDir(projectSkillsPath, skillId)
+    const targetSkillFile = join(skillDir, SKILL_FILE)
 
     if (stat.isSymbolicLink()) {
       const rawTarget = readlinkSync(entryPath)
       const absoluteTarget = resolve(dirname(entryPath), rawTarget)
-      if (absoluteTarget.startsWith(`${projectSkillsPath}/`)) {
+      // only remove links skillbook itself created for this skill — a link to
+      // any other target (even inside .skillbook/skills) is not ours to delete
+      if (absoluteTarget === resolve(targetSkillFile) || absoluteTarget === resolve(skillDir)) {
         unlinkSync(entryPath)
         removed += 1
         continue
