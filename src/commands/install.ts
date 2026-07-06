@@ -5,16 +5,10 @@ import pc from 'picocolors'
 import { copySkillDir } from '@/lib/lock-copy'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { linkSkillToHarness } from '@/lib/lock-harness'
-import {
-  getHarnessMode,
-  readLockFile,
-  setHarnessMode,
-  setLockEntry,
-  writeLockFile,
-} from '@/lib/lockfile'
+import { getHarnessMode, setHarnessMode, setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { resolveSkills } from '@/commands/utils'
+import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
 
 const installSkill = (
   skill: string,
@@ -44,7 +38,7 @@ const installSkill = (
     }
   }
 
-  const libraryLock = readLockFile(libraryContext.lockFilePath)
+  const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
   const entry = libraryLock.skills[skill]
 
   if (!entry) {
@@ -53,7 +47,7 @@ const installSkill = (
 
   copySkillDir(librarySkillDir, projectSkillDir)
 
-  const projectLock = readLockFile(projectContext.lockFilePath)
+  const projectLock = readLockFileOrFail(projectContext.lockFilePath)
   const updated = setLockEntry(projectLock, skill, {
     version: entry.version,
     hash: entry.hash,

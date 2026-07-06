@@ -4,7 +4,7 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { fail } from '@/commands/utils'
+import { fail, readLockFileOrFail } from '@/commands/utils'
 import { SUPPORTED_TOOLS, TOOLS, type ToolId } from '@/constants'
 import { getHarnessBaseDir } from '@/lib/harness'
 import {
@@ -14,15 +14,7 @@ import {
   syncHarnessSkills,
 } from '@/lib/lock-harness'
 import { getLockFilePath, getProjectLockRoot } from '@/lib/lock-paths'
-import {
-  createEmptyLockFile,
-  type HarnessMode,
-  type LockFile,
-  getHarnessMode,
-  readLockFile,
-  setHarnessMode,
-  writeLockFile,
-} from '@/lib/lockfile'
+import { createEmptyLockFile, type HarnessMode, type LockFile, getHarnessMode, setHarnessMode, writeLockFile } from '@/lib/lockfile'
 
 const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => {
   if (allowAll && value === 'all') return SUPPORTED_TOOLS
@@ -49,7 +41,7 @@ const resolveHarnessArg = (args: { id?: string; harness?: string }) =>
 
 const getProjectLock = (projectPath: string): { lockPath: string; lock: LockFile } => {
   const lockPath = getLockFilePath(getProjectLockRoot(projectPath))
-  const lock = existsSync(lockPath) ? readLockFile(lockPath) : createEmptyLockFile()
+  const lock = existsSync(lockPath) ? readLockFileOrFail(lockPath) : createEmptyLockFile()
   return { lockPath, lock }
 }
 

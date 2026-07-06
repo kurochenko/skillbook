@@ -4,7 +4,7 @@ import { createHash } from 'crypto'
 import { fdir } from 'fdir'
 import { getLibraryPath, getSkillsPath, getSkillPath } from '@/lib/paths'
 import { getLockFilePath, getLockLibraryPath } from '@/lib/lock-paths'
-import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import { LockFileError, readLockFile, setLockEntry, writeLockFile, type LockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { copySkillDir } from '@/lib/lock-copy'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush } from '@/lib/git'
@@ -417,7 +417,15 @@ const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSki
   const isUpdate = existingContent !== null
 
   const lockFilePath = getLockFilePath(lockLibraryPath)
-  const lock = readLockFile(lockFilePath)
+  let lock: LockFile
+  try {
+    lock = readLockFile(lockFilePath)
+  } catch (error) {
+    if (error instanceof LockFileError) {
+      return { success: false, error: error.message }
+    }
+    throw error
+  }
   const existingEntry = lock.skills[skillName]
 
   const skipResult = await checkSkip({ skillDir, lock, existingEntry, lockFilePath })

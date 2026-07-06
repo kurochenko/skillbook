@@ -4,7 +4,7 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { computeSkillHash } from '@/lib/skill-hash'
-import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import { setLockEntry, writeLockFile } from '@/lib/lockfile'
 import {
   getLockFilePath,
   getLockLibraryPath,
@@ -12,7 +12,7 @@ import {
   getProjectLockRoot,
 } from '@/lib/lock-paths'
 import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
-import { fail } from '@/commands/utils'
+import { fail, readLockFileOrFail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -45,7 +45,7 @@ export default defineCommand({
       fail(`Skills directory not found at ${skillsPath}`)
     }
 
-    let lock = readLockFile(lockPath)
+    let lock = readLockFileOrFail(lockPath)
     const entries = listSkillIds(skillsPath)
 
     if (entries.length === 0) {

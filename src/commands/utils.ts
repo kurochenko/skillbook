@@ -1,10 +1,21 @@
-import * as p from '@clack/prompts'
 import pc from 'picocolors'
+import { LockFileError, readLockFile, type LockFile } from '@/lib/lockfile'
 import { validateSkillName } from '@/lib/skills'
 
 export const fail = (message: string, exitCode = 1): never => {
-  p.log.error(pc.red(message))
+  process.stderr.write(`${pc.red(message)}\n`)
   process.exit(exitCode)
+}
+
+export const readLockFileOrFail = (path: string): LockFile => {
+  try {
+    return readLockFile(path)
+  } catch (error) {
+    if (error instanceof LockFileError) {
+      fail(error.message)
+    }
+    throw error
+  }
 }
 
 export const resolveSkills = (skill?: string, skills?: string): string[] => {

@@ -4,10 +4,10 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { computeSkillHash } from '@/lib/skill-hash'
-import { readLockFile } from '@/lib/lockfile'
+
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir, getSkillFilePath } from '@/lib/skill-fs'
-import { fail } from '@/commands/utils'
+import { fail, readLockFileOrFail } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
@@ -49,7 +49,7 @@ export default defineCommand({
       fail(`Skill not found in ${scope}: ${skill}`)
     }
 
-    const lock = readLockFile(context.lockFilePath)
+    const lock = readLockFileOrFail(context.lockFilePath)
     const entry = lock.skills[skill] ?? null
     const hash = await computeSkillHash(skillDir)
 

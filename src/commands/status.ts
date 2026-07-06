@@ -3,10 +3,10 @@ import pc from 'picocolors'
 import * as p from '@clack/prompts'
 
 import { computeSkillHash } from '@/lib/skill-hash'
-import { readLockFile } from '@/lib/lockfile'
 import { resolveLockStatus, type LockStatus } from '@/lib/lock-status'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
+import { readLockFileOrFail } from '@/commands/utils'
 
 type StatusSkill = {
   id: string
@@ -81,8 +81,8 @@ export default defineCommand({
     const projectContext = getProjectLockContext(projectPath)
     const libraryContext = getLibraryLockContext()
 
-    const libraryLock = readLockFile(libraryContext.lockFilePath)
-    const projectLock = readLockFile(projectContext.lockFilePath)
+    const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
+    const projectLock = readLockFileOrFail(projectContext.lockFilePath)
 
     const skillNames = listSkillIds(projectContext.skillsPath)
     const skills: StatusSkill[] = []

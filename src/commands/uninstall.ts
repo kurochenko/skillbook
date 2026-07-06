@@ -4,10 +4,10 @@ import pc from 'picocolors'
 
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { removeSkillFromHarness } from '@/lib/lock-harness'
-import { getHarnessMode, readLockFile, writeLockFile } from '@/lib/lockfile'
+import { getHarnessMode, writeLockFile } from '@/lib/lockfile'
 import { getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
-import { resolveSkills } from '@/commands/utils'
+import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
 
 const removeIfExists = (path: string): void => {
   if (existsSync(path)) {
@@ -29,7 +29,7 @@ const uninstallSkill = (
   removeIfExists(skillDir)
 
   const lockPath = projectContext.lockFilePath
-  const lock = readLockFile(lockPath)
+  const lock = readLockFileOrFail(lockPath)
   if (lock.skills[skill]) {
     const { [skill]: _removed, ...rest } = lock.skills
     writeLockFile(lockPath, { ...lock, skills: rest })

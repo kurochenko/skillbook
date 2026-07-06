@@ -8,7 +8,8 @@ import pc from 'picocolors'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { getHarnessStatus } from '@/lib/lock-harness'
 import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
-import { getHarnessMode, readLockFile } from '@/lib/lockfile'
+import { getHarnessMode } from '@/lib/lockfile'
+import { readLockFileOrFail } from '@/commands/utils'
 
 const checkGitStatus = (rootPath: string) => {
   const gitDir = join(rootPath, '.git')
@@ -30,7 +31,7 @@ const checkGitStatus = (rootPath: string) => {
 }
 
 const getProjectHarnessWarnings = (projectPath: string, context: LockContext): string[] => {
-  const lock = readLockFile(context.lockFilePath)
+  const lock = readLockFileOrFail(context.lockFilePath)
   const enabledHarnesses = (lock.harnesses ?? [])
     .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
 

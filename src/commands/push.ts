@@ -3,12 +3,12 @@ import { defineCommand } from 'citty'
 import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
-import { readLockFile, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import { setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { resolveLockStatus } from '@/lib/lock-status'
 import { getSkillDir } from '@/lib/skill-fs'
-import { resolveSkills } from '@/commands/utils'
+import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
 
 const pushSkill = async (
   skill: string,
@@ -24,8 +24,8 @@ const pushSkill = async (
   const libraryContext = getLibraryLockContext()
   const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
 
-  const libraryLock = readLockFile(libraryContext.lockFilePath)
-  const projectLock = readLockFile(projectContext.lockFilePath)
+  const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
+  const projectLock = readLockFileOrFail(projectContext.lockFilePath)
   const projectEntry = projectLock.skills[skill]
   const libraryEntry = libraryLock.skills[skill]
 
