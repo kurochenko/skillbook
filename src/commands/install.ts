@@ -1,9 +1,79 @@
 import { defineCommand } from 'citty'
+import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { type ToolId } from '@/constants'
+import { listSkills } from '@/lib/library'
 import { installSkill } from '@/lib/lock-operations'
-import { resolveSkills } from '@/commands/utils'
+import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { type LockEntry } from '@/lib/lockfile'
+import { listSkillIds } from '@/lib/skill-fs'
+import { readLockFileOrFail, resolveSkills } from '@/commands/utils'
+
+type InstallableSkillOption = {
+  value: string
+  label: string
+  hint?: string
+}
+
+export const getInstallableSkillOptions = (
+  librarySkills: string[],
+  installedSkills: string[],
+  libraryEntries: Record<string, LockEntry | undefined>,
+): InstallableSkillOption[] => {
+  const installed = new Set(installedSkills)
+
+  return librarySkills
+    .filter((skill) => !installed.has(skill))
+    .map((skill) => {
+      const entry = libraryEntries[skill]
+      const hint = entry
+        ? [
+            `v${entry.version}`,
+            entry.updatedAt ? `updated ${entry.updatedAt}` : null,
+          ].filter(Boolean).join(' ')
+        : undefined
+
+      return {
+        value: skill,
+        label: skill,
+        hint,
+      }
+    })
+}
+
+const resolveInteractiveSkills = async (projectPath: string): Promise<string[] | null> => {
+  const librarySkills = listSkills()
+
+  if (librarySkills.length === 0) {
+    p.log.info('No skills in the library')
+    return null
+  }
+
+  const projectContext = getProjectLockContext(projectPath)
+  const installedSkills = listSkillIds(projectContext.skillsPath)
+  const libraryContext = getLibraryLockContext()
+  const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
+  const options = getInstallableSkillOptions(librarySkills, installedSkills, libraryLock.skills)
+
+  if (options.length === 0) {
+    p.log.info('All library skills are already installed in this project')
+    return null
+  }
+
+  const selected = await p.multiselect({
+    message: 'Select skills to install',
+    options,
+    required: false,
+  })
+
+  if (p.isCancel(selected)) {
+    p.log.info(pc.dim('Cancelled'))
+    return null
+  }
+
+  return Array.from(selected)
+}
 
 export default defineCommand({
   meta: {
@@ -34,7 +104,15 @@ export default defineCommand({
     const { skill, skills, project, force } = args
     const projectPath = project ?? process.cwd()
 
-    const resolvedSkills = resolveSkills(skill, skills)
+    const hasSkillArgs = skill !== undefined || skills !== undefined
+    const resolvedSkills = hasSkillArgs || !process.stdin.isTTY || !process.stdout.isTTY
+      ? resolveSkills(skill, skills)
+      : await resolveInteractiveSkills(projectPath)
+
+    if (!resolvedSkills) {
+      return
+    }
+
     const results: Array<{
       skill: string
       success: boolean
