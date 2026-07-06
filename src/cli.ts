@@ -63,6 +63,22 @@ const showUpdateBanner = async () => {
   }
 }
 
+export const shouldShowUpdateBanner = (
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  isTTY: boolean | undefined,
+  version = VERSION,
+): boolean => {
+  if (version === 'dev') return false
+  if (!isTTY) return false
+  if (env.CI !== undefined) return false
+  if (args.includes('--json')) return false
+  if (args.includes('--version') || args.includes('-v')) return false
+  if (args[0] === 'upgrade') return false
+
+  return true
+}
+
 const helpText = () => `
 ${pc.bold(pc.cyan('skillbook'))}${pc.dim(` v${VERSION}`)}
 
@@ -126,7 +142,7 @@ ${pc.dim("Tip: alias sb='skillbook' for quick access")}
 
 const showHelp = () => out(helpText())
 
-const runSubcommand = () => {
+const runSubcommand = async () => {
   const main = defineCommand({
     meta: {
       name: 'skillbook',
@@ -152,10 +168,10 @@ const runSubcommand = () => {
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
     },
   })
-  runMain(main)
+  await runMain(main)
 }
 
-const main = () => {
+export const main = async () => {
   const parsed = parseLogFlags(process.argv.slice(2))
   initLogger({ logToFile: parsed.logToFile, logToStderr: parsed.logToStderr })
 
@@ -174,7 +190,7 @@ const main = () => {
   if (isHelp && !isSubcommand) {
     showHelp()
   } else if (isSubcommand) {
-    runSubcommand()
+    await runSubcommand()
   } else {
     if (firstArg) {
       err(pc.red(`Unknown command: ${firstArg}`))
@@ -183,6 +199,12 @@ const main = () => {
     }
     showHelp()
   }
+
+  if (shouldShowUpdateBanner(args, process.env, process.stdout.isTTY)) {
+    await showUpdateBanner()
+  }
 }
 
-main()
+if (import.meta.main) {
+  await main()
+}
