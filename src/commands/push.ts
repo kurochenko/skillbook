@@ -48,7 +48,7 @@ const pushSkill = async (
         ? baseVersion + 1
         : Math.max(baseVersion, 1)
       : 1
-    const nextEntry = { version: nextVersion, hash: projectHash }
+    const nextEntry = { version: nextVersion, hash: projectHash, updatedAt: new Date().toISOString() }
 
     copySkillDir(projectSkillDir, librarySkillDir)
     writeLockFile(libraryContext.lockFilePath, setLockEntry(libraryLock, skill, nextEntry))
@@ -78,7 +78,7 @@ const pushSkill = async (
   }
 
   const nextVersion = libraryEntry.version + 1
-  const nextEntry = { version: nextVersion, hash: projectHash }
+  const nextEntry = { version: nextVersion, hash: projectHash, updatedAt: new Date().toISOString() }
 
   copySkillDir(projectSkillDir, librarySkillDir)
 

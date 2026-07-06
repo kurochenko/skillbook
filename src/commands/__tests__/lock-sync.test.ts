@@ -77,6 +77,15 @@ describe('lock-based sync commands (CLI)', () => {
     return JSON.parse(content) as LockFile
   }
 
+  const expectLockEntryWithUpdatedAt = (
+    entry: LockEntry,
+    expected: { version: number; hash: string },
+  ) => {
+    expect(entry).toMatchObject(expected)
+    expect(typeof entry.updatedAt).toBe('string')
+    expect(Number.isNaN(Date.parse(entry.updatedAt!))).toBe(false)
+  }
+
   const readSkillFile = (root: string, skillId: string, relativePath: string) =>
     readFileSync(join(getLockSkillsPath(root), skillId, relativePath), 'utf-8')
 
@@ -233,10 +242,10 @@ describe('lock-based sync commands (CLI)', () => {
 
     expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(updatedFiles[SKILL_FILE])
     const libraryLock = readLockFile(libraryDir)
-    expect(libraryLock.skills.alpha).toEqual({ version: 2, hash: updatedHash })
+    expectLockEntryWithUpdatedAt(libraryLock.skills.alpha, { version: 2, hash: updatedHash })
 
     const projectLock = readLockFile(projectRoot())
-    expect(projectLock.skills.alpha).toEqual({ version: 2, hash: updatedHash })
+    expect(projectLock.skills.alpha).toEqual(libraryLock.skills.alpha)
   })
 
   test('push returns conflict when library advanced and project changed', () => {
@@ -297,7 +306,7 @@ describe('lock-based sync commands (CLI)', () => {
 
     expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(files[SKILL_FILE])
     const libraryLock = readLockFile(libraryDir)
-    expect(libraryLock.skills.alpha).toEqual({ version: 1, hash })
+    expectLockEntryWithUpdatedAt(libraryLock.skills.alpha, { version: 1, hash })
   })
 
   describe('multi-skill support', () => {
@@ -475,12 +484,12 @@ describe('lock-based sync commands (CLI)', () => {
       expect(readSkillFile(libraryDir, 'beta', SKILL_FILE)).toBe(betaLocal[SKILL_FILE])
 
       const libraryLock = readLockFile(libraryDir)
-      expect(libraryLock.skills.alpha).toEqual({ version: 2, hash: alphaLocalHash })
-      expect(libraryLock.skills.beta).toEqual({ version: 2, hash: betaLocalHash })
+      expectLockEntryWithUpdatedAt(libraryLock.skills.alpha, { version: 2, hash: alphaLocalHash })
+      expectLockEntryWithUpdatedAt(libraryLock.skills.beta, { version: 2, hash: betaLocalHash })
 
       const projectLock = readLockFile(projectRoot())
-      expect(projectLock.skills.alpha).toEqual({ version: 2, hash: alphaLocalHash })
-      expect(projectLock.skills.beta).toEqual({ version: 2, hash: betaLocalHash })
+      expect(projectLock.skills.alpha).toEqual(libraryLock.skills.alpha)
+      expect(projectLock.skills.beta).toEqual(libraryLock.skills.beta)
     })
   })
 
@@ -576,10 +585,10 @@ describe('lock-based sync commands (CLI)', () => {
       expect(readSkillFile(libraryDir, 'pushable', 'new-file.md')).toBe(updatedFiles['new-file.md'])
 
       const libraryLock = readLockFile(libraryDir)
-      expect(libraryLock.skills.pushable).toEqual({ version: 2, hash: updatedHash })
+      expectLockEntryWithUpdatedAt(libraryLock.skills.pushable, { version: 2, hash: updatedHash })
 
       const projectLock = readLockFile(projectRoot())
-      expect(projectLock.skills.pushable).toEqual({ version: 2, hash: updatedHash })
+      expect(projectLock.skills.pushable).toEqual(libraryLock.skills.pushable)
     })
 
     test('pull updates project with multi-file library changes', () => {

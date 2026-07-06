@@ -11,6 +11,15 @@ type LockFile = {
   skills: Record<string, { version: number; hash: string; updatedAt?: string }>
 }
 
+const expectLockEntryWithUpdatedAt = (
+  entry: { version: number; hash: string; updatedAt?: string },
+  expected: { version: number; hash: string },
+) => {
+  expect(entry).toMatchObject(expected)
+  expect(typeof entry.updatedAt).toBe('string')
+  expect(Number.isNaN(Date.parse(entry.updatedAt!))).toBe(false)
+}
+
 describe('lock-aware add command (CLI)', () => {
   let tempDir: string
   let libraryDir: string
@@ -60,7 +69,7 @@ describe('lock-aware add command (CLI)', () => {
     expect(result.exitCode).toBe(0)
     expect(existsSync(join(libraryDir, 'skillbook.lock.json'))).toBe(true)
     const lock = readLockFile()
-    expect(lock.skills['new-skill']).toEqual({ version: 1, hash: hashSkill(content) })
+    expectLockEntryWithUpdatedAt(lock.skills['new-skill'], { version: 1, hash: hashSkill(content) })
   })
 
   test('add bumps version when overwriting with new content', () => {
@@ -72,7 +81,7 @@ describe('lock-aware add command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const lock = readLockFile()
-    expect(lock.skills.alpha).toEqual({ version: 2, hash: hashSkill('# Alpha v2\n') })
+    expectLockEntryWithUpdatedAt(lock.skills.alpha, { version: 2, hash: hashSkill('# Alpha v2\n') })
   })
 
   test('add keeps version when content is identical', () => {
@@ -84,7 +93,7 @@ describe('lock-aware add command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const lock = readLockFile()
-    expect(lock.skills.same).toEqual({ version: 1, hash: hashSkill(content) })
+    expectLockEntryWithUpdatedAt(lock.skills.same, { version: 1, hash: hashSkill(content) })
   })
 })
 
@@ -166,7 +175,7 @@ describe('multi-file add command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const lock = readLockFile()
-    expect(lock.skills['hash-test']).toEqual({ version: 1, hash: expectedHash })
+    expectLockEntryWithUpdatedAt(lock.skills['hash-test'], { version: 1, hash: expectedHash })
   })
 
   test('add directory rejects directory without SKILL.md', () => {
@@ -327,10 +336,7 @@ describe('multi-file add cold-start (no existing library)', () => {
     // 3. Lock entry was written with version 1 and correct hash
     expect(existsSync(join(libraryDir, 'skillbook.lock.json'))).toBe(true)
     const lock = readLockFile()
-    expect(lock.skills['cold-start']).toEqual({
-      version: 1,
-      hash: hashDir(files),
-    })
+    expectLockEntryWithUpdatedAt(lock.skills['cold-start'], { version: 1, hash: hashDir(files) })
 
     // 4. Git repo was initialized and skill was committed
     expect(existsSync(join(libraryDir, '.git'))).toBe(true)

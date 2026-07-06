@@ -96,4 +96,18 @@ describe('show command (CLI)', () => {
     expect(data.hash).toBe(hash)
     expect(data.entry).toEqual({ version: 2, hash })
   })
+
+  test('shows updatedAt in human output when present', () => {
+    const content = '# Alpha\n'
+    const hash = hashSkill(content)
+    const updatedAt = '2026-07-06T12:00:00.000Z'
+
+    writeSkill(libraryDir, 'alpha', content)
+    writeLockEntry(libraryDir, 'alpha', { version: 2, hash, updatedAt })
+
+    const result = runCli(['show', 'alpha', '--library'], env())
+
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain(`Version: 2 updated ${updatedAt}`)
+  })
 })

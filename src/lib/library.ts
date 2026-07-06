@@ -439,7 +439,11 @@ const commitSkillToLibrary = async (options: CommitSkillOptions): Promise<AddSki
 
     const hash = await computeSkillHash(skillDir)
     const nextVersion = existingEntry ? existingEntry.version + 1 : 1
-    const updatedLock = setLockEntry(lock, skillName, { version: nextVersion, hash })
+    const updatedLock = setLockEntry(lock, skillName, {
+      version: nextVersion,
+      hash,
+      updatedAt: new Date().toISOString(),
+    })
     writeLockFile(lockFilePath, updatedLock)
 
     const addResult = await gitAdd(libraryPath, gitAddPath)
@@ -494,7 +498,11 @@ export const addSkillToLibrary = async (
       if (existingContent !== null && existingContent === content) {
         if (!existingEntry) {
           const hash = await computeSkillHash(dir)
-          const updated = setLockEntry(lock, skillName, { version: 1, hash })
+          const updated = setLockEntry(lock, skillName, {
+            version: 1,
+            hash,
+            updatedAt: new Date().toISOString(),
+          })
           writeLockFile(lockFilePath, updated)
         }
         return { skip: true, result: { success: true, action: 'skipped', path: skillFilePath } }
