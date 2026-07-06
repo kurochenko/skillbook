@@ -96,6 +96,15 @@ describe('lock-based sync commands (CLI)', () => {
     runCli(['init', '--project', '--path', projectDir], env())
   }
 
+  test('install with no skills exits with existing non-TTY error', () => {
+    runInit()
+
+    const result = runCli(['install', '--project', projectDir], env())
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('No skills specified')
+  })
+
   test('install copies library skill and writes lock entry', () => {
     runInit()
     const files = {
