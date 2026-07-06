@@ -94,6 +94,21 @@ describe('skill lint', () => {
     })
   })
 
+  test('trailing newline does not count as an extra line', () => {
+    writeSkill('boundary-skill', [
+      '---',
+      'name: boundary-skill',
+      'description: Exactly at the limit.',
+      '---',
+      ...Array.from({ length: 496 }, (_, index) => `Line ${index + 1}`),
+    ].join('\n') + '\n')
+
+    const result = lintSkills(skillsPath)
+
+    expect(result.ok).toBe(true)
+    expect(result.findings).toEqual([])
+  })
+
   test('reports name, description, and unknown frontmatter issues', () => {
     writeSkill('legacy_name', [
       '---',
