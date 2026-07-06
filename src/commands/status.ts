@@ -81,8 +81,8 @@ export default defineCommand({
     const projectContext = getProjectLockContext(projectPath)
     const libraryContext = getLibraryLockContext()
 
-    const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
-    const projectLock = readLockFileOrFail(projectContext.lockFilePath)
+    const libraryLock = readLockFileOrFail(libraryContext.lockFilePath, { json: args.json })
+    const projectLock = readLockFileOrFail(projectContext.lockFilePath, { json: args.json })
 
     const skillNames = listSkillIds(projectContext.skillsPath)
     const skills: StatusSkill[] = []
@@ -127,7 +127,9 @@ export default defineCommand({
     }
 
     if (args.json) {
-      process.stdout.write(JSON.stringify(output))
+      const ok = summary.diverged === 0
+      process.stdout.write(JSON.stringify({ ok, ...output }))
+      if (!ok) process.exit(2)
       return
     }
 
@@ -163,6 +165,10 @@ export default defineCommand({
     for (const skill of skills) {
       const colorize = statusColor(skill.status)
       console.log(`${pad(skill.id, skillWidth)}  ${colorize(`[${skill.status}]`)}`)
+    }
+
+    if (summary.diverged > 0) {
+      process.exit(2)
     }
   },
 })

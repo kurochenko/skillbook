@@ -46,15 +46,15 @@ export default defineCommand({
     const skillFile = getSkillFilePath(context.skillsPath, skill)
 
     if (!existsSync(skillFile)) {
-      fail(`Skill not found in ${scope}: ${skill}`)
+      fail(`Skill not found in ${scope}: ${skill}`, 1, { json, payload: { scope, id: skill } })
     }
 
-    const lock = readLockFileOrFail(context.lockFilePath)
+    const lock = readLockFileOrFail(context.lockFilePath, { json, payload: { scope, id: skill } })
     const entry = lock.skills[skill] ?? null
     const hash = await computeSkillHash(skillDir)
 
     if (json) {
-      process.stdout.write(JSON.stringify({ scope, id: skill, hash, entry }))
+      process.stdout.write(JSON.stringify({ ok: true, scope, id: skill, hash, entry }))
       return
     }
 

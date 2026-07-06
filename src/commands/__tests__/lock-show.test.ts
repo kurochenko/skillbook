@@ -14,6 +14,7 @@ type LockEntry = {
 }
 
 type ShowOutput = {
+  ok: boolean
   scope: 'project' | 'library'
   id: string
   hash: string
@@ -74,6 +75,7 @@ describe('show command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const data = parseJson(result.stdout)
+    expect(data.ok).toBe(true)
     expect(data.scope).toBe('project')
     expect(data.id).toBe('alpha')
     expect(data.hash).toBe(hash)

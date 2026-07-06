@@ -442,7 +442,7 @@ describe('lock-based harness sync (CLI)', () => {
       ['harness', 'sync', '--project', projectDir, '--id', 'cursor', '--mode', 'symlink'],
       env(),
     )
-    expect(result.exitCode).toBe(0)
+    expect(result.exitCode).toBe(2)
     expect(result.stdout).toContain('1 conflicting path skipped')
     expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
     expect(readFileSync(cursorFile, 'utf-8')).toBe('# Existing cursor skill\n')
@@ -500,9 +500,11 @@ describe('lock-based harness sync (CLI)', () => {
     expect(status.exitCode).toBe(0)
 
     const parsed = JSON.parse(status.stdout) as {
+      ok: boolean
       drifted: number
       skills: Array<{ id: string; status: string }>
     }
+    expect(parsed.ok).toBe(true)
     expect(parsed.drifted).toBe(1)
     expect(parsed.skills).toContainEqual({ id: 'alpha', status: 'harness-drifted' })
   })

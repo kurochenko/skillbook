@@ -66,6 +66,7 @@ describe('lock-based workflow (CLI)', () => {
   const projectRoot = () => getProjectLockRoot(projectDir)
 
   const parseStatus = (output: string) => JSON.parse(output) as {
+    ok: boolean
     skills: Array<{
       id: string
       status: string
@@ -113,6 +114,7 @@ describe('lock-based workflow (CLI)', () => {
       const result = runStatus()
       expect(result.exitCode).toBe(0)
       const data = parseStatus(result.stdout)
+      expect(data.ok).toBe(true)
       expect(data.skills).toHaveLength(1)
       expect(data.skills[0]).toMatchObject({ id: 'alpha', status: 'synced' })
       expect(data.skills[0]?.project).toMatchObject({ version: 1, hash })
@@ -167,8 +169,9 @@ describe('lock-based workflow (CLI)', () => {
       writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
 
       const result = runStatus()
-      expect(result.exitCode).toBe(0)
+      expect(result.exitCode).toBe(2)
       const data = parseStatus(result.stdout)
+      expect(data.ok).toBe(false)
       expect(data.skills[0]).toMatchObject({ id: 'alpha', status: 'diverged' })
     })
 
@@ -197,7 +200,7 @@ describe('lock-based workflow (CLI)', () => {
       expect(data.skills).toHaveLength(0)
     })
 
-    test('corrupt project lockfile exits cleanly without stack trace', () => {
+    test('corrupt project lockfile exits cleanly as JSON without stack trace', () => {
       writeLockFile(libraryDir, {})
       mkdirSync(projectRoot(), { recursive: true })
       const lockPath = getLockFilePath(projectRoot())
@@ -206,9 +209,11 @@ describe('lock-based workflow (CLI)', () => {
       const result = runStatus()
 
       expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
-      expect(result.stderr).toContain(`Invalid lock file at ${lockPath}:`)
-      expect(result.stderr).toContain("Fix or delete the file and re-run 'skillbook migrate'.")
+      expect(result.stderr).toBe('')
+      const data = JSON.parse(result.stdout) as { ok: boolean; error: string }
+      expect(data.ok).toBe(false)
+      expect(data.error).toContain(`Invalid lock file at ${lockPath}:`)
+      expect(data.error).toContain("Fix or delete the file and re-run 'skillbook migrate'.")
       expect(result.stderr).not.toContain('LockFileError')
       expect(result.stderr).not.toContain('SyntaxError')
       expect(result.stderr).not.toContain('src/lib/lockfile')
