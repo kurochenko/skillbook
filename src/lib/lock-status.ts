@@ -30,11 +30,13 @@ export const resolveLockStatus = (input: LockStatusInput): LockStatus => {
   }
 
   const projectChanged = projectHash !== projectEntry.hash
-  const libraryAdvanced =
-    libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
+  const libraryVersionAhead = libraryEntry.version > projectEntry.version
+  const unrelatedLibraryHash =
+    libraryEntry.version <= projectEntry.version && libraryEntry.hash !== projectEntry.hash
 
-  if (projectChanged && libraryAdvanced) return 'diverged'
+  if (unrelatedLibraryHash) return 'diverged'
+  if (projectChanged && libraryVersionAhead) return 'diverged'
   if (projectChanged) return 'ahead'
-  if (libraryAdvanced) return 'behind'
+  if (libraryVersionAhead) return 'behind'
   return 'synced'
 }

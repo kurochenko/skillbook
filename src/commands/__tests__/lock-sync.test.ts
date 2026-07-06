@@ -157,6 +157,28 @@ describe('lock-based sync commands (CLI)', () => {
     expect(projectLock.skills.alpha).toEqual({ version: 2, hash: updatedHash })
   })
 
+  test('pull refuses same-version library hash mismatch without overwriting clean project', () => {
+    runInit()
+    const projectFiles = { [SKILL_FILE]: '# Alpha project\n' }
+    const libraryFiles = { [SKILL_FILE]: '# Alpha library\n' }
+    const projectHash = hashSkill(projectFiles)
+    const libraryHash = hashSkill(libraryFiles)
+
+    writeSkillFiles(libraryDir, 'alpha', libraryFiles)
+    writeLockFile(libraryDir, { alpha: { version: 1, hash: libraryHash } })
+
+    writeSkillFiles(projectRoot(), 'alpha', projectFiles)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash: projectHash } })
+
+    const result = runCli(['pull', 'alpha', '--project', projectDir], env())
+    expect(result.exitCode).toBe(2)
+    expect(result.stdout).toContain("Skill 'alpha' has diverged")
+
+    expect(readSkillFile(projectRoot(), 'alpha', SKILL_FILE)).toBe(projectFiles[SKILL_FILE])
+    const projectLock = readLockFile(projectRoot())
+    expect(projectLock.skills.alpha).toEqual({ version: 1, hash: projectHash })
+  })
+
   test('pull refreshes copied harness outputs in copy mode', () => {
     runInit()
     const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }
@@ -237,6 +259,28 @@ describe('lock-based sync commands (CLI)', () => {
     expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(remoteFiles[SKILL_FILE])
     const libraryLock = readLockFile(libraryDir)
     expect(libraryLock.skills.alpha).toEqual({ version: 2, hash: remoteHash })
+  })
+
+  test('push refuses same-version library hash mismatch without overwriting library', () => {
+    runInit()
+    const projectFiles = { [SKILL_FILE]: '# Alpha project\n' }
+    const libraryFiles = { [SKILL_FILE]: '# Alpha library\n' }
+    const projectHash = hashSkill(projectFiles)
+    const libraryHash = hashSkill(libraryFiles)
+
+    writeSkillFiles(libraryDir, 'alpha', libraryFiles)
+    writeLockFile(libraryDir, { alpha: { version: 1, hash: libraryHash } })
+
+    writeSkillFiles(projectRoot(), 'alpha', projectFiles)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash: projectHash } })
+
+    const result = runCli(['push', 'alpha', '--project', projectDir], env())
+    expect(result.exitCode).toBe(2)
+    expect(result.stdout).toContain("Skill 'alpha' has diverged")
+
+    expect(readSkillFile(libraryDir, 'alpha', SKILL_FILE)).toBe(libraryFiles[SKILL_FILE])
+    const libraryLock = readLockFile(libraryDir)
+    expect(libraryLock.skills.alpha).toEqual({ version: 1, hash: libraryHash })
   })
 
   test('push creates library entry for local-only skill', () => {
