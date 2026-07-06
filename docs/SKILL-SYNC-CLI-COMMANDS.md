@@ -57,7 +57,7 @@ Project vs harness:
   - Pull library changes into project when behind.
 - `skillbook push <skill> [--skills id1,id2,...]`
   - Push project changes into library when ahead, bump version.
-- `skillbook resolve <skill> --strategy library|project|merge`
+- `skillbook resolve <skill> --strategy library|project`
   - Resolve diverged state with a chosen strategy.
 - `skillbook uninstall <skill> [--skills id1,id2,...]`
   - Remove skill from project (library untouched).

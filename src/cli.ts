@@ -122,10 +122,6 @@ ${pc.cyan('  skillbook scan [path]')}${pc.dim('              Scan and import ski
 ${pc.cyan('  skillbook list')}${pc.dim('                     List skills in your library')}
 ${pc.cyan('  skillbook add <source>')}${pc.dim('             Add skill from URL or path')}
 
-${pc.bold('PLANNED (NOT IMPLEMENTED YET)')}
-
-${pc.dim('  merge strategy for resolve')}
-
 ${pc.bold('OPTIONS')}
 
 ${pc.cyan('  --log')}${pc.dim('             Write logs to ~/.skillbook/logs/skillbook.log')}
