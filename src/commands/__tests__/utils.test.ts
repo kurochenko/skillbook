@@ -76,6 +76,59 @@ describe('resolveSkills', () => {
     expect(result).toEqual(['alpha'])
   })
 
+  test('Rejects traversal skill ids', () => {
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+    process.exit = ((code?: number | string) => {
+      throw new Error(`exit:${code}`)
+    }) as (code?: number | string) => never
+
+    expect(() => resolveSkills('../../x', undefined)).toThrow('exit:1')
+    expect(stderrOutput.join()).toContain('Invalid skill name "../../x"')
+    expect(stderrOutput.join()).toContain(
+      'Skill name can only contain lowercase letters, numbers, hyphens, and underscores',
+    )
+  })
+
+  test('Rejects blank positional skill ids', () => {
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+    process.exit = ((code?: number | string) => {
+      throw new Error(`exit:${code}`)
+    }) as (code?: number | string) => never
+
+    expect(() => resolveSkills(' ', undefined)).toThrow('exit:1')
+    expect(stderrOutput.join()).toContain('No skills specified')
+  })
+
+  test('Rejects uppercase skill ids', () => {
+    const stderrOutput: string[] = []
+    process.stderr.write = (chunk: string) => {
+      stderrOutput.push(chunk)
+      return true
+    }
+    process.exit = ((code?: number | string) => {
+      throw new Error(`exit:${code}`)
+    }) as (code?: number | string) => never
+
+    expect(() => resolveSkills(undefined, 'alpha,Beta')).toThrow('exit:1')
+    expect(stderrOutput.join()).toContain('Invalid skill name "Beta"')
+    expect(stderrOutput.join()).toContain(
+      'Skill name can only contain lowercase letters, numbers, hyphens, and underscores',
+    )
+  })
+
+  test('Valid skill ids pass validation', () => {
+    const result = resolveSkills('alpha-1', 'beta_2,gamma')
+    expect(result).toEqual(['alpha-1', 'beta_2', 'gamma'])
+  })
+
   test('Exits with error when no skills specified', () => {
     let exitCode: number | undefined
     process.exit = ((code: number | string) => {
