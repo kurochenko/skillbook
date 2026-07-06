@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'fs'
 import { createHash } from 'crypto'
-import { basename, dirname, extname, join, relative } from 'path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'path'
 
 import { SKILL_FILE, TOOLS, type ToolId } from '@/constants'
 import { copySkillDir } from '@/lib/lock-copy'
@@ -37,6 +37,8 @@ export type HarnessContentStatus =
   | 'harness-drifted'
   | 'missing'
   | 'conflict'
+  | 'stale'
+  | 'untracked'
 
 export type HarnessSyncSkillResult = {
   synced: boolean
@@ -62,6 +64,7 @@ export type HarnessSyncResult = {
   linked: number
   conflicts: number
   drifted: number
+  removedStale: number
   fallbackToCopy: boolean
   mode: HarnessMode
 }
@@ -89,6 +92,8 @@ export type HarnessStatusResult = {
   drifted: number
   missing: number
   conflicts: number
+  stale: number
+  untracked: number
   skills: HarnessStatusRow[]
 }
 
@@ -122,6 +127,13 @@ const readSymlinkTarget = (path: string): string | null => {
   } catch {
     return null
   }
+}
+
+const isPathInside = (parentPath: string, candidatePath: string): boolean => {
+  const parent = resolve(parentPath)
+  const candidate = resolve(candidatePath)
+  const pathFromParent = relative(parent, candidate)
+  return pathFromParent === '' || (!pathFromParent.startsWith('..') && !isAbsolute(pathFromParent))
 }
 
 const removePath = (path: string): void => {
@@ -260,6 +272,28 @@ const inspectCopyTarget = (
 
   if (pathType !== 'file') return 'conflict'
   return filesEqual(targetPath, entryPath) ? 'harness-synced' : 'harness-drifted'
+}
+
+const symlinkTargetPointsIntoProjectSkills = (
+  entryPath: string,
+  projectSkillsPath: string,
+): boolean => {
+  const rawTarget = readSymlinkTarget(entryPath)
+  if (!rawTarget) return false
+
+  const resolvedTarget = resolve(dirname(entryPath), rawTarget)
+  return isPathInside(projectSkillsPath, resolvedTarget)
+}
+
+const inspectOrphanHarnessEntry = (
+  entryPath: string,
+  projectSkillsPath: string,
+): HarnessContentStatus => {
+  if (getPathType(entryPath) === 'symlink' && symlinkTargetPointsIntoProjectSkills(entryPath, projectSkillsPath)) {
+    return 'stale'
+  }
+
+  return 'untracked'
 }
 
 const ensureSymlink = (
@@ -463,14 +497,38 @@ const listHarnessSkills = (projectPath: string, harnessId: ToolId): string[] => 
   if (!existsSync(baseDir)) return []
 
   if (TOOLS[harnessId].needsDirectory) {
-    return listSkillIds(baseDir)
+    return readdirSync(baseDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+      .map((entry) => entry.name)
+      .sort()
   }
 
   return readdirSync(baseDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
+    .filter((entry) => entry.isFile() || entry.isSymbolicLink())
     .filter((entry) => extname(entry.name) === '.md')
     .map((entry) => basename(entry.name, '.md'))
     .sort()
+}
+
+const removeStaleHarnessEntries = (
+  projectPath: string,
+  harnessId: ToolId,
+  projectSkillIds: Set<string>,
+): number => {
+  const projectSkillsPath = getLockSkillsPath(getProjectLockRoot(projectPath))
+  let removed = 0
+
+  for (const skillId of listHarnessSkills(projectPath, harnessId)) {
+    if (projectSkillIds.has(skillId)) continue
+
+    const entryPath = getHarnessEntryPath(projectPath, harnessId, skillId)
+    if (inspectOrphanHarnessEntry(entryPath, projectSkillsPath) !== 'stale') continue
+
+    removePath(entryPath)
+    removed += 1
+  }
+
+  return removed
 }
 
 export const linkSkillToHarness = (
@@ -522,15 +580,18 @@ export const syncHarnessSkills = (
 ): HarnessSyncResult => {
   const projectSkillsPath = getLockSkillsPath(getProjectLockRoot(projectPath))
   const skillIds = listSkillIds(projectSkillsPath)
+  const skillIdSet = new Set(skillIds)
 
   const initialMode = options.mode ?? 'symlink'
   if (skillIds.length === 0) {
+    const removedStale = removeStaleHarnessEntries(projectPath, harnessId, skillIdSet)
     return {
       total: 0,
       synced: 0,
       linked: 0,
       conflicts: 0,
       drifted: 0,
+      removedStale,
       fallbackToCopy: false,
       mode: initialMode,
     }
@@ -558,12 +619,15 @@ export const syncHarnessSkills = (
     }
   }
 
+  const removedStale = removeStaleHarnessEntries(projectPath, harnessId, skillIdSet)
+
   return {
     total: skillIds.length,
     synced,
     linked: synced,
     conflicts,
     drifted,
+    removedStale,
     fallbackToCopy,
     mode,
   }
@@ -621,6 +685,7 @@ export const importHarnessSkills = (
     if (entryType !== 'symlink') {
       if (tool.needsDirectory) {
         const sourceDir = join(baseDir, skillId)
+        if (!existsSync(join(sourceDir, SKILL_FILE))) continue
         const targetDir = getSkillDir(projectSkillsPath, skillId)
         copySkillDir(sourceDir, targetDir)
       } else {
@@ -679,6 +744,8 @@ export const getHarnessStatus = (
   let drifted = 0
   let missing = 0
   let conflicts = 0
+  let stale = 0
+  let untracked = 0
 
   for (const skillId of skillIds) {
     const status = inspectHarnessSkill(projectPath, harnessId, skillId, mode)
@@ -690,14 +757,28 @@ export const getHarnessStatus = (
     if (status === 'conflict') conflicts += 1
   }
 
+  const projectSkillIds = new Set(skillIds)
+  for (const skillId of listHarnessSkills(projectPath, harnessId)) {
+    if (projectSkillIds.has(skillId)) continue
+
+    const entryPath = getHarnessEntryPath(projectPath, harnessId, skillId)
+    const status = inspectOrphanHarnessEntry(entryPath, projectSkillsPath)
+    skills.push({ id: skillId, status })
+
+    if (status === 'stale') stale += 1
+    if (status === 'untracked') untracked += 1
+  }
+
   return {
     harness: harnessId,
     mode,
-    total: skillIds.length,
+    total: skills.length,
     synced,
     drifted,
     missing,
     conflicts,
+    stale,
+    untracked,
     skills,
   }
 }
