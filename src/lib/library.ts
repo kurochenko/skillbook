@@ -84,6 +84,8 @@ const SKILL_PATH_MARKERS = [
     needsDirectory: tool.needsDirectory,
   })),
   { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  // Legacy Cursor harness path used before Cursor adopted Agent Skills directories.
+  { marker: '/.cursor/rules/', suffix: '.md', needsDirectory: false },
 ]
 
 const readFileSafe = (path: string): string | null => {

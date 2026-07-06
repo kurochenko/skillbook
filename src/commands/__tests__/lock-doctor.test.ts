@@ -86,7 +86,7 @@ describe('doctor command (CLI)', () => {
       'copy',
     ], env())
 
-    writeFileSync(join(projectDir, '.cursor', 'rules', 'alpha.md'), '# Drifted\n', 'utf-8')
+    writeFileSync(join(projectDir, '.cursor', 'skills', 'alpha', 'SKILL.md'), '# Drifted\n', 'utf-8')
 
     const result = runCli(['doctor', '--project', projectDir], env())
 

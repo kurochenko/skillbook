@@ -278,6 +278,9 @@ export default defineCommand({
               if (result.removedStale > 0) {
                 p.log.info(pc.dim(`removed ${result.removedStale} stale entr${result.removedStale === 1 ? 'y' : 'ies'}`))
               }
+              if (result.removedLegacy > 0) {
+                p.log.info(pc.dim(`removed ${result.removedLegacy} legacy entr${result.removedLegacy === 1 ? 'y' : 'ies'}`))
+              }
               continue
             }
 
@@ -285,6 +288,10 @@ export default defineCommand({
 
             if (result.removedStale > 0) {
               p.log.info(pc.dim(`removed ${result.removedStale} stale entr${result.removedStale === 1 ? 'y' : 'ies'}`))
+            }
+
+            if (result.removedLegacy > 0) {
+              p.log.info(pc.dim(`removed ${result.removedLegacy} legacy entr${result.removedLegacy === 1 ? 'y' : 'ies'}`))
             }
 
             if (result.fallbackToCopy) {
@@ -452,6 +459,10 @@ export default defineCommand({
                 pc.yellow(`${result.conflicts} conflicting path${result.conflicts === 1 ? '' : 's'} skipped.`),
               )
             }
+          }
+
+          if (result.removedLegacy > 0) {
+            p.log.info(pc.dim(`removed ${result.removedLegacy} legacy entr${result.removedLegacy === 1 ? 'y' : 'ies'}`))
           }
 
           p.log.info(pc.dim(`Enabled: ${nextHarnesses.join(', ') || 'none'}`))

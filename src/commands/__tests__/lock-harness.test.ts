@@ -112,7 +112,7 @@ describe('lock-based harness sync (CLI)', () => {
     expectSymlink(harnessDir, targetDir)
   })
 
-  test('harness sync links cursor file to SKILL.md', () => {
+  test('harness sync links cursor skill directory', () => {
     runInit()
     const files = {
       [SKILL_FILE]: '# Alpha v1\n',
@@ -129,9 +129,9 @@ describe('lock-based harness sync (CLI)', () => {
     )
     expect(result.exitCode).toBe(0)
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
-    const targetFile = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
-    expectSymlink(cursorFile, targetFile)
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
+    const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expectSymlink(cursorDir, targetDir)
   })
 
   test('harness sync links project skills into opencode harness', () => {
@@ -202,7 +202,7 @@ describe('lock-based harness sync (CLI)', () => {
     expectSymlink(harnessPath, targetDir)
   })
 
-  test('harness import copies cursor file into project SKILL.md and links harness', () => {
+  test('harness import copies cursor skill directory into project and links harness', () => {
     runInit()
     const baseFiles = { [SKILL_FILE]: '# Alpha v1\n' }
     const baseHash = hashSkill(baseFiles)
@@ -210,9 +210,9 @@ describe('lock-based harness sync (CLI)', () => {
     writeSkillFiles(projectRoot(), 'alpha', baseFiles)
     writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
 
-    const cursorDir = join(projectDir, '.cursor', 'rules')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
     mkdirSync(cursorDir, { recursive: true })
-    writeFileSync(join(cursorDir, 'alpha.md'), '# Alpha v2 from cursor\n', 'utf-8')
+    writeFileSync(join(cursorDir, SKILL_FILE), '# Alpha v2 from cursor\n', 'utf-8')
 
     const result = runCli(
       ['harness', 'import', '--project', projectDir, '--id', 'cursor'],
@@ -222,9 +222,8 @@ describe('lock-based harness sync (CLI)', () => {
 
     const projectSkill = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
     expect(readFileSync(projectSkill, 'utf-8')).toBe('# Alpha v2 from cursor\n')
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
-    const targetFile = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
-    expectSymlink(cursorFile, targetFile)
+    const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
+    expectSymlink(cursorDir, targetDir)
   })
 
   test('harness import copies opencode skill into project and links harness', () => {
@@ -385,9 +384,9 @@ describe('lock-based harness sync (CLI)', () => {
     )
 
     const claudeHarnessDir = join(projectDir, '.claude', 'skills', 'alpha')
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
     expect(lstatSync(claudeHarnessDir).isSymbolicLink()).toBe(false)
-    expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
+    expect(lstatSync(cursorDir).isSymbolicLink()).toBe(false)
 
     const claudeResult = runCli(
       [
@@ -421,7 +420,7 @@ describe('lock-based harness sync (CLI)', () => {
     expect(cursorResult.exitCode).toBe(0)
 
     expectSymlink(claudeHarnessDir, join(getLockSkillsPath(projectRoot()), 'alpha'))
-    expectSymlink(cursorFile, join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE))
+    expectSymlink(cursorDir, join(getLockSkillsPath(projectRoot()), 'alpha'))
   })
 
   test('harness sync without --force reports real file conflict and preserves it', () => {
@@ -434,10 +433,10 @@ describe('lock-based harness sync (CLI)', () => {
     writeSkillFiles(projectRoot(), 'alpha', files)
     writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
 
-    const cursorDir = join(projectDir, '.cursor', 'rules')
-    const cursorFile = join(cursorDir, 'alpha.md')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
+    const cursorFile = join(cursorDir, SKILL_FILE)
     mkdirSync(cursorDir, { recursive: true })
-    writeFileSync(cursorFile, '# Existing cursor rule\n', 'utf-8')
+    writeFileSync(cursorFile, '# Existing cursor skill\n', 'utf-8')
 
     const result = runCli(
       ['harness', 'sync', '--project', projectDir, '--id', 'cursor', '--mode', 'symlink'],
@@ -446,7 +445,7 @@ describe('lock-based harness sync (CLI)', () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('1 conflicting path skipped')
     expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
-    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Existing cursor rule\n')
+    expect(readFileSync(cursorFile, 'utf-8')).toBe('# Existing cursor skill\n')
   })
 
   test('harness sync heals dangling symlink entries', () => {
@@ -601,15 +600,16 @@ describe('lock-based harness sync (CLI)', () => {
     expect(readFileSync(join(harnessEntry, SKILL_FILE), 'utf-8')).toBe('# My own skill\n')
   })
 
-  test('cursor orphaned real files are untracked while orphaned symlinks are stale and removed', () => {
+  test('cursor orphaned real directories are untracked while orphaned symlinks are stale and removed', () => {
     runInit()
     writeLockFile(projectRoot(), {})
 
-    const cursorDir = join(projectDir, '.cursor', 'rules')
-    const untrackedFile = join(cursorDir, 'my-own.md')
-    const staleFile = join(cursorDir, 'gone.md')
-    const staleTarget = join(getLockSkillsPath(projectRoot()), 'gone', SKILL_FILE)
+    const cursorDir = join(projectDir, '.cursor', 'skills')
+    const untrackedFile = join(cursorDir, 'my-own', SKILL_FILE)
+    const staleFile = join(cursorDir, 'gone')
+    const staleTarget = join(getLockSkillsPath(projectRoot()), 'gone')
     mkdirSync(cursorDir, { recursive: true })
+    mkdirSync(dirname(untrackedFile), { recursive: true })
     writeFileSync(untrackedFile, '# My own cursor rule\n', 'utf-8')
     symlinkSync(relative(dirname(staleFile), staleTarget), staleFile)
 
@@ -636,6 +636,74 @@ describe('lock-based harness sync (CLI)', () => {
     expect(sync.stdout).toContain('removed 1 stale entry')
     expect(existsSync(staleFile)).toBe(false)
     expect(readFileSync(untrackedFile, 'utf-8')).toBe('# My own cursor rule\n')
+  })
+
+  test('cursor sync removes legacy symlink rule for project skill', () => {
+    runInit()
+    const files = { [SKILL_FILE]: '# Alpha v1\n' }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const legacyFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const legacyTarget = join(getLockSkillsPath(projectRoot()), 'alpha', SKILL_FILE)
+    mkdirSync(dirname(legacyFile), { recursive: true })
+    symlinkSync(relative(dirname(legacyFile), legacyTarget), legacyFile)
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor'],
+      env(),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('removed 1 legacy entry')
+    expect(existsSync(legacyFile)).toBe(false)
+    expectSymlink(join(projectDir, '.cursor', 'skills', 'alpha'), join(getLockSkillsPath(projectRoot()), 'alpha'))
+  })
+
+  test('cursor sync removes legacy identical real rule for project skill', () => {
+    runInit()
+    const files = { [SKILL_FILE]: '# Alpha v1\n' }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const legacyFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    mkdirSync(dirname(legacyFile), { recursive: true })
+    writeFileSync(legacyFile, files[SKILL_FILE], 'utf-8')
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor'],
+      env(),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('removed 1 legacy entry')
+    expect(existsSync(legacyFile)).toBe(false)
+  })
+
+  test('cursor sync leaves divergent legacy real rule with warning', () => {
+    runInit()
+    const files = { [SKILL_FILE]: '# Alpha v1\n' }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const legacyFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    mkdirSync(dirname(legacyFile), { recursive: true })
+    writeFileSync(legacyFile, '# Divergent legacy rule\n', 'utf-8')
+
+    const result = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor'],
+      env(),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stderr).toContain("legacy cursor rule 'alpha.md' left in place")
+    expect(readFileSync(legacyFile, 'utf-8')).toBe('# Divergent legacy rule\n')
   })
 
   test('harness sync without --id syncs all harnesses in lock.harnesses', () => {

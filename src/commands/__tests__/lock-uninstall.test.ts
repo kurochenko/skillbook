@@ -69,9 +69,9 @@ describe('uninstall command (CLI)', () => {
 
     runCli(['harness', 'enable', '--id', 'opencode', '--project', projectDir])
 
-    const cursorDir = join(projectDir, '.cursor', 'rules')
+    const cursorDir = join(projectDir, '.cursor', 'skills', 'alpha')
     mkdirSync(cursorDir, { recursive: true })
-    writeFileSync(join(cursorDir, 'alpha.md'), '# Alpha\n', 'utf-8')
+    writeFileSync(join(cursorDir, SKILL_FILE), '# Alpha\n', 'utf-8')
 
     const symlinkPath = join(projectDir, '.opencode', 'skill', 'alpha')
     const targetDir = join(getLockSkillsPath(projectRoot()), 'alpha')
@@ -82,7 +82,7 @@ describe('uninstall command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     expect(existsSync(symlinkPath)).toBe(false)
-    expect(existsSync(join(cursorDir, 'alpha.md'))).toBe(true)
+    expect(existsSync(join(cursorDir, SKILL_FILE))).toBe(true)
   })
 
   test('uninstall removes copied harness entries in copy mode', () => {
@@ -101,7 +101,7 @@ describe('uninstall command (CLI)', () => {
       'copy',
     ])
 
-    const cursorFile = join(projectDir, '.cursor', 'rules', 'alpha.md')
+    const cursorFile = join(projectDir, '.cursor', 'skills', 'alpha')
     expect(existsSync(cursorFile)).toBe(true)
     expect(lstatSync(cursorFile).isSymbolicLink()).toBe(false)
 
