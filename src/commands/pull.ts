@@ -15,6 +15,7 @@ import {
 } from '@/lib/lockfile'
 import { computeSkillHash } from '@/lib/skill-hash'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
+import { resolveLockStatus } from '@/lib/lock-status'
 import { getSkillDir } from '@/lib/skill-fs'
 import { resolveSkills } from '@/commands/utils'
 
@@ -105,11 +106,9 @@ const pullSkill = async (
   }
 
   const projectHash = await computeSkillHash(projectSkillDir)
-  const projectChanged = projectHash !== projectEntry.hash
-  const libraryAdvanced =
-    libraryEntry.version !== projectEntry.version || libraryEntry.hash !== projectEntry.hash
+  const status = resolveLockStatus({ projectHash, projectEntry, libraryEntry })
 
-  if (projectChanged && libraryAdvanced) {
+  if (status === 'diverged') {
     return {
       success: false,
       error: `Skill '${skill}' has diverged. Resolve conflicts before pulling.`,
@@ -117,11 +116,11 @@ const pullSkill = async (
     }
   }
 
-  if (projectChanged && !libraryAdvanced) {
+  if (status === 'ahead') {
     return { success: false, error: `Skill '${skill}' has local changes. Push before pulling.`, exitCode: 2 }
   }
 
-  if (!projectChanged && !libraryAdvanced) {
+  if (status === 'synced') {
     return { success: true, alreadyUpToDate: true }
   }
 
