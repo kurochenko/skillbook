@@ -166,12 +166,12 @@ export default defineCommand({
           p.log.info(`${pc.bold(harnessId)} ${pc.dim(`(mode: ${mode})`)}`)
           p.log.info(
             pc.dim(
-              `skills ${result.total}, synced ${result.synced}, drifted ${result.drifted}, missing ${result.missing}, conflicts ${result.conflicts}`,
+              `skills ${result.total}, synced ${result.synced}, drifted ${result.drifted}, missing ${result.missing}, conflicts ${result.conflicts}, stale ${result.stale}, untracked ${result.untracked}`,
             ),
           )
 
           if (result.total === 0) {
-            p.log.info(pc.dim('No project skills found'))
+            p.log.info(pc.dim('No project or harness skills found'))
             return
           }
 
@@ -182,9 +182,21 @@ export default defineCommand({
                 ? pc.yellow('[harness-drifted]')
                 : row.status === 'conflict'
                   ? pc.red('[conflict]')
-                  : pc.dim('[missing]')
+                  : row.status === 'stale'
+                    ? pc.magenta('[stale]')
+                    : row.status === 'untracked'
+                      ? pc.cyan('[untracked]')
+                      : pc.dim('[missing]')
 
             console.log(`${row.id} ${label}`)
+          }
+
+          if (result.stale > 0) {
+            p.log.info(pc.dim('Stale entries point at removed skillbook skills; run harness sync to clean up.'))
+          }
+
+          if (result.untracked > 0) {
+            p.log.info(pc.dim('Untracked entries are not managed by skillbook.'))
           }
         },
       }),
@@ -269,10 +281,17 @@ export default defineCommand({
 
             if (result.total === 0) {
               p.log.info(pc.dim(`No project skills to sync for ${harnessId}`))
+              if (result.removedStale > 0) {
+                p.log.info(pc.dim(`removed ${result.removedStale} stale entr${result.removedStale === 1 ? 'y' : 'ies'}`))
+              }
               continue
             }
 
             p.log.success(`Synced ${result.synced} skill${result.synced === 1 ? '' : 's'} to ${harnessId} (${result.mode})`)
+
+            if (result.removedStale > 0) {
+              p.log.info(pc.dim(`removed ${result.removedStale} stale entr${result.removedStale === 1 ? 'y' : 'ies'}`))
+            }
 
             if (result.fallbackToCopy) {
               p.log.warn(pc.yellow(`Symlinks are not supported for ${harnessId}; switched to copy mode.`))

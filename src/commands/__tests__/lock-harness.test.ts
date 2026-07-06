@@ -508,6 +508,136 @@ describe('lock-based harness sync (CLI)', () => {
     expect(parsed.skills).toContainEqual({ id: 'alpha', status: 'harness-drifted' })
   })
 
+  test('removed project skill is reported stale and sync removes dangling symlink', () => {
+    runInit()
+    const files = {
+      [SKILL_FILE]: '# Alpha v1\n',
+    }
+    const hash = hashSkill(files)
+
+    writeSkillFiles(projectRoot(), 'alpha', files)
+    writeLockFile(projectRoot(), { alpha: { version: 1, hash } })
+
+    const sync = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'claude-code'],
+      env(),
+    )
+    expect(sync.exitCode).toBe(0)
+
+    const harnessEntry = join(projectDir, '.claude', 'skills', 'alpha')
+    rmSync(join(getLockSkillsPath(projectRoot()), 'alpha'), { recursive: true, force: true })
+    writeLockFile(projectRoot(), {})
+
+    const staleStatus = runCli(
+      ['harness', 'status', '--project', projectDir, '--id', 'claude-code', '--json'],
+      env(),
+    )
+    expect(staleStatus.exitCode).toBe(0)
+    const staleParsed = JSON.parse(staleStatus.stdout) as {
+      stale: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(staleParsed.stale).toBe(1)
+    expect(staleParsed.skills).toContainEqual({ id: 'alpha', status: 'stale' })
+    expect(lstatSync(harnessEntry).isSymbolicLink()).toBe(true)
+
+    const cleanup = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'claude-code'],
+      env(),
+    )
+    expect(cleanup.exitCode).toBe(0)
+    expect(cleanup.stdout).toContain('removed 1 stale entry')
+    expect(existsSync(harnessEntry)).toBe(false)
+
+    const cleanStatus = runCli(
+      ['harness', 'status', '--project', projectDir, '--id', 'claude-code', '--json'],
+      env(),
+    )
+    expect(cleanStatus.exitCode).toBe(0)
+    const cleanParsed = JSON.parse(cleanStatus.stdout) as {
+      total: number
+      stale: number
+      untracked: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(cleanParsed.total).toBe(0)
+    expect(cleanParsed.stale).toBe(0)
+    expect(cleanParsed.untracked).toBe(0)
+    expect(cleanParsed.skills).toEqual([])
+  })
+
+  test('hand-created directory harness skill is untracked and sync leaves it untouched', () => {
+    runInit()
+    writeLockFile(projectRoot(), {})
+
+    const harnessEntry = join(projectDir, '.claude', 'skills', 'my-own')
+    mkdirSync(harnessEntry, { recursive: true })
+    writeFileSync(join(harnessEntry, SKILL_FILE), '# My own skill\n', 'utf-8')
+
+    const status = runCli(
+      ['harness', 'status', '--project', projectDir, '--id', 'claude-code', '--json'],
+      env(),
+    )
+    expect(status.exitCode).toBe(0)
+    const parsed = JSON.parse(status.stdout) as {
+      untracked: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(parsed.untracked).toBe(1)
+    expect(parsed.skills).toContainEqual({ id: 'my-own', status: 'untracked' })
+
+    const sync = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'claude-code'],
+      env(),
+    )
+    expect(sync.exitCode).toBe(0)
+    expect(readFileSync(join(harnessEntry, SKILL_FILE), 'utf-8')).toBe('# My own skill\n')
+
+    const forceSync = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'claude-code', '--force'],
+      env(),
+    )
+    expect(forceSync.exitCode).toBe(0)
+    expect(readFileSync(join(harnessEntry, SKILL_FILE), 'utf-8')).toBe('# My own skill\n')
+  })
+
+  test('cursor orphaned real files are untracked while orphaned symlinks are stale and removed', () => {
+    runInit()
+    writeLockFile(projectRoot(), {})
+
+    const cursorDir = join(projectDir, '.cursor', 'rules')
+    const untrackedFile = join(cursorDir, 'my-own.md')
+    const staleFile = join(cursorDir, 'gone.md')
+    const staleTarget = join(getLockSkillsPath(projectRoot()), 'gone', SKILL_FILE)
+    mkdirSync(cursorDir, { recursive: true })
+    writeFileSync(untrackedFile, '# My own cursor rule\n', 'utf-8')
+    symlinkSync(relative(dirname(staleFile), staleTarget), staleFile)
+
+    const status = runCli(
+      ['harness', 'status', '--project', projectDir, '--id', 'cursor', '--json'],
+      env(),
+    )
+    expect(status.exitCode).toBe(0)
+    const parsed = JSON.parse(status.stdout) as {
+      stale: number
+      untracked: number
+      skills: Array<{ id: string; status: string }>
+    }
+    expect(parsed.stale).toBe(1)
+    expect(parsed.untracked).toBe(1)
+    expect(parsed.skills).toContainEqual({ id: 'gone', status: 'stale' })
+    expect(parsed.skills).toContainEqual({ id: 'my-own', status: 'untracked' })
+
+    const sync = runCli(
+      ['harness', 'sync', '--project', projectDir, '--id', 'cursor'],
+      env(),
+    )
+    expect(sync.exitCode).toBe(0)
+    expect(sync.stdout).toContain('removed 1 stale entry')
+    expect(existsSync(staleFile)).toBe(false)
+    expect(readFileSync(untrackedFile, 'utf-8')).toBe('# My own cursor rule\n')
+  })
+
   test('harness sync without --id syncs all harnesses in lock.harnesses', () => {
     runInit()
     const files = {
