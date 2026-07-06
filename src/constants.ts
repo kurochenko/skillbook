@@ -34,3 +34,8 @@ export const DEFAULT_LIBRARY_PATH = '~/.skillbook'
 export const SKILLBOOK_DIR = '.skillbook'
 export const SKILLS_DIR = 'skills'
 export const SKILL_FILE = 'SKILL.md'
+
+export const LOCK_BASE_DIR = '.skillbook'
+export const LOCK_SKILLS_DIR = 'skills'
+export const LOCK_FILE = 'skillbook.lock.json'
+export const LOCK_LIBRARY_ENV = 'SKILLBOOK_LOCK_LIBRARY'

@@ -29,7 +29,6 @@ describe('lock-aware add command (CLI)', () => {
 
   const env = () => ({
     SKILLBOOK_LIBRARY: libraryDir,
-    SKILLBOOK_LOCK_LIBRARY: libraryDir,
   })
 
   const createSkillFile = (path: string, content: string) => {
@@ -107,7 +106,6 @@ describe('multi-file add command (CLI)', () => {
 
   const env = () => ({
     SKILLBOOK_LIBRARY: libraryDir,
-    SKILLBOOK_LOCK_LIBRARY: libraryDir,
   })
 
   const createSkillDir = (name: string, files: Record<string, string>) => {
@@ -271,7 +269,6 @@ describe('multi-file add cold-start (no existing library)', () => {
 
   const env = () => ({
     SKILLBOOK_LIBRARY: libraryDir,
-    SKILLBOOK_LOCK_LIBRARY: libraryDir,
   })
 
   const createSkillDir = (name: string, files: Record<string, string>) => {
@@ -359,7 +356,6 @@ describe('stale file cleanup on directory skill update', () => {
 
   const env = () => ({
     SKILLBOOK_LIBRARY: libraryDir,
-    SKILLBOOK_LOCK_LIBRARY: libraryDir,
   })
 
   const createSkillDir = (name: string, files: Record<string, string>) => {

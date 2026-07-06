@@ -13,7 +13,7 @@ import {
   removeHarnessSkills,
   syncHarnessSkills,
 } from '@/lib/lock-harness'
-import { getLockFilePath, getProjectLockRoot } from '@/lib/lock-paths'
+import { getLockFilePath, getProjectLockRoot } from '@/lib/paths'
 import { createEmptyLockFile, type HarnessMode, type LockFile, getHarnessMode, setHarnessMode, writeLockFile } from '@/lib/lockfile'
 
 const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => {

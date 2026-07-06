@@ -87,7 +87,7 @@ Create skills once, reuse them across all your projects.
 
 ${pc.bold('LOCK-BASED WORKFLOW (IMPLEMENTED)')}
 
-${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.skillbook (or SKILLBOOK_LOCK_LIBRARY)')}
+${pc.cyan('  skillbook init --library')}${pc.dim('                 Init library at ~/.skillbook (or SKILLBOOK_LIBRARY)')}
 ${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init project .skillbook folder')}
 ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
@@ -127,8 +127,8 @@ ${pc.cyan('  --log-stderr')}${pc.dim('      Write logs to stderr')}
 
 ${pc.bold('ENV')}
 
-${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Override lock-based library path (default: ~/.skillbook)')}
 ${pc.cyan('  SKILLBOOK_LIBRARY')}${pc.dim('        Override library path (default: ~/.skillbook)')}
+${pc.cyan('  SKILLBOOK_LOCK_LIBRARY')}${pc.dim('   Deprecated fallback honored when SKILLBOOK_LIBRARY is unset')}
 
 ${pc.dim('Project-scoped commands default to the current directory when --project is omitted.')}
 ${pc.dim('Harness mode defaults to symlink and falls back to copy when symlinks are unsupported.')}

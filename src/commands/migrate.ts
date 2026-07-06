@@ -7,10 +7,10 @@ import { computeSkillHash } from '@/lib/skill-hash'
 import { setLockEntry, writeLockFile } from '@/lib/lockfile'
 import {
   getLockFilePath,
-  getLockLibraryPath,
+  getLibraryPath,
   getLockSkillsPath,
   getProjectLockRoot,
-} from '@/lib/lock-paths'
+} from '@/lib/paths'
 import { getSkillDir, listSkillIds } from '@/lib/skill-fs'
 import { fail, readLockFileOrFail } from '@/commands/utils'
 
@@ -36,7 +36,7 @@ export default defineCommand({
     }
 
     const targetRoot = args.library
-      ? getLockLibraryPath()
+      ? getLibraryPath()
       : getProjectLockRoot(args.project ?? process.cwd())
     const skillsPath = getLockSkillsPath(targetRoot)
     const lockPath = getLockFilePath(targetRoot)

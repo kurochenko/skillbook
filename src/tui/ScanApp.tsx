@@ -9,7 +9,7 @@ import {
   type ScannedSkill,
   type ScanSkillStatus,
 } from '@/lib/library'
-import { getProjectLockRoot } from '@/lib/lock-paths'
+import { getProjectLockRoot } from '@/lib/paths'
 import { useListNavigation } from '@/tui/hooks/useListNavigation'
 import { UI, SECTION_LABELS } from '@/tui/constants'
 import { getStickyWindowStart } from '@/tui/window'
