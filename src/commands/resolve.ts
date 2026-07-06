@@ -5,9 +5,8 @@ import pc from 'picocolors'
 
 import { copySkillDir } from '@/lib/lock-copy'
 import { computeSkillHash } from '@/lib/skill-hash'
-import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
-import { linkSkillToHarness } from '@/lib/lock-harness'
-import { getHarnessMode, setHarnessMode, setLockEntry, writeLockFile } from '@/lib/lockfile'
+import { syncSkillToHarnesses } from '@/lib/lock-operations'
+import { setLockEntry, writeLockFile } from '@/lib/lockfile'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
 import { fail, readLockFileOrFail } from '@/commands/utils'
@@ -73,46 +72,26 @@ export default defineCommand({
         updatedAt: libraryEntry.updatedAt,
       })
 
-      const harnesses = (updatedProjectLock.harnesses ?? [])
-        .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
-
-      let conflicts = 0
-      let drifted = 0
-      const fallbackHarnesses: ToolId[] = []
-
-      for (const harnessId of harnesses) {
-        const result = linkSkillToHarness(projectPath, harnessId, skill, {
-          mode: getHarnessMode(updatedProjectLock, harnessId),
-          force: true,
-          allowModeFallback: true,
-        })
-
-        if (result.conflict) conflicts += 1
-        if (result.drifted) drifted += 1
-
-        if (result.fallbackToCopy && getHarnessMode(updatedProjectLock, harnessId) !== result.mode) {
-          updatedProjectLock = setHarnessMode(updatedProjectLock, harnessId, result.mode)
-          fallbackHarnesses.push(harnessId)
-        }
-      }
+      const harnessSync = syncSkillToHarnesses(projectPath, skill, updatedProjectLock)
+      updatedProjectLock = harnessSync.lock
 
       writeLockFile(projectContext.lockFilePath, updatedProjectLock)
       p.log.success(`Resolved '${skill}' using library version`)
 
-      if (conflicts > 0) {
-        p.log.warn(pc.yellow(`${conflicts} harness path${conflicts === 1 ? '' : 's'} skipped (conflict).`))
+      if (harnessSync.conflicts > 0) {
+        p.log.warn(pc.yellow(`${harnessSync.conflicts} harness path${harnessSync.conflicts === 1 ? '' : 's'} skipped (conflict).`))
       }
 
-      if (drifted > 0) {
+      if (harnessSync.drifted > 0) {
         p.log.warn(
           pc.yellow(
-            `${drifted} drifted harness copy${drifted === 1 ? '' : 'ies'} skipped (use 'skillbook harness sync --force').`,
+            `${harnessSync.drifted} drifted harness copy${harnessSync.drifted === 1 ? '' : 'ies'} skipped (use 'skillbook harness sync --force').`,
           ),
         )
       }
 
-      if (fallbackHarnesses.length > 0) {
-        p.log.warn(pc.yellow(`Symlink fallback: switched to copy mode for ${fallbackHarnesses.join(', ')}.`))
+      if (harnessSync.fallbackHarnesses.length > 0) {
+        p.log.warn(pc.yellow(`Symlink fallback: switched to copy mode for ${harnessSync.fallbackHarnesses.join(', ')}.`))
       }
 
       return

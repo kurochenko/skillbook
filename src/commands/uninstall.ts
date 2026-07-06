@@ -2,9 +2,8 @@ import { existsSync, rmSync } from 'fs'
 import { defineCommand } from 'citty'
 import pc from 'picocolors'
 
-import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
-import { removeSkillFromHarness } from '@/lib/lock-harness'
-import { getHarnessMode, writeLockFile } from '@/lib/lockfile'
+import { removeSkillFromHarnesses } from '@/lib/lock-operations'
+import { writeLockFile } from '@/lib/lockfile'
 import { getProjectLockContext } from '@/lib/lock-context'
 import { getSkillDir } from '@/lib/skill-fs'
 import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
@@ -35,11 +34,7 @@ const uninstallSkill = (
     writeLockFile(lockPath, { ...lock, skills: rest })
   }
 
-  const harnesses = (lock.harnesses ?? []).filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
-
-  for (const harnessId of harnesses) {
-    removeSkillFromHarness(projectPath, harnessId, skill, getHarnessMode(lock, harnessId))
-  }
+  removeSkillFromHarnesses(projectPath, skill, lock)
 
   return { success: true }
 }
