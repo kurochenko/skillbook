@@ -112,7 +112,17 @@ skillbook pull my-skill
 skillbook pull --skills alpha,beta
 ```
 
-### 6) Resolve conflicts
+### 6) Daily project sync
+
+Pull any behind project skills, leave ahead/diverged/local-only skills untouched, and refresh all enabled harnesses:
+
+```bash
+skillbook sync
+skillbook sync --dry-run
+skillbook sync --force   # overwrite drifted copied harness files
+```
+
+### 7) Resolve conflicts
 
 If `status` shows `diverged`, pick a winner:
 
@@ -122,7 +132,7 @@ skillbook resolve my-skill --strategy library
 skillbook resolve my-skill --strategy project
 ```
 
-### 7) Re-sync harness outputs
+### 8) Re-sync harness outputs
 
 If harness files were changed, removed, or drifted:
 
@@ -133,7 +143,7 @@ skillbook harness sync --id opencode
 skillbook harness sync --id opencode --force
 ```
 
-### 8) Use copy mode on filesystems without symlink support
+### 9) Use copy mode on filesystems without symlink support
 
 If symlinks are unsupported in your environment, use copy mode explicitly:
 
@@ -143,7 +153,7 @@ skillbook harness enable --id opencode --mode copy
 
 When symlink mode is enabled but unsupported by the filesystem, skillbook automatically falls back to copy mode and persists it in `skillbook.lock.json`.
 
-### 9) Switch an existing harness from symlink mode to copy mode
+### 10) Switch an existing harness from symlink mode to copy mode
 
 Use `--force` when migrating so existing harness entries are replaced with real files/directories:
 
@@ -154,7 +164,7 @@ skillbook harness status --id cursor --project "/absolute/path/to/project"
 
 Repeat for each harness you use: `claude-code`, `codex`, `cursor`, `opencode`, `pi`.
 
-### 10) Operate on multiple skills in one command
+### 11) Operate on multiple skills in one command
 
 The lock workflow commands support `--skills` (comma-separated):
 
@@ -175,6 +185,7 @@ skillbook install alpha --skills beta,gamma --project /path/to/project
 
 ```bash
 skillbook status                          # project vs library
+skillbook sync                            # pull behind skills + sync enabled harnesses
 skillbook add <path> [--name id]          # add from .md file or skill directory
 skillbook scan <path>                      # discover skills in existing projects
 skillbook diff <id> [--files]              # compare library/project skill content

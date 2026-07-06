@@ -91,7 +91,7 @@ const updateLockHarnesses = (
   return { lockPath, lock: nextLock, nextHarnesses }
 }
 
-const ensureHarnessModeAfterSync = (
+export const ensureHarnessModeAfterSync = (
   lockPath: string,
   lock: LockFile,
   harnessId: ToolId,
