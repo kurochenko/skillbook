@@ -119,9 +119,7 @@ describe('resolveSkills', () => {
 
     expect(() => resolveSkills(undefined, 'alpha,Beta')).toThrow('exit:1')
     expect(stderrOutput.join()).toContain('Invalid skill name "Beta"')
-    expect(stderrOutput.join()).toContain(
-      'Skill name can only contain lowercase letters, numbers, hyphens, and underscores',
-    )
+    expect(stderrOutput.join()).toContain('Skill name cannot contain uppercase letters')
   })
 
   test('Valid skill ids pass validation', () => {

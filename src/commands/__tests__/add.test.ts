@@ -180,8 +180,8 @@ describe('add command', () => {
   describe('path patterns', () => {
     const patterns = [
       { path: '.claude/skills/my-skill/SKILL.md', expected: 'my-skill' },
-      { path: '.claude/skills/my_skill/SKILL.md', expected: 'my_skill' },
-      { path: '.claude/skills/_private/SKILL.md', expected: '_private' },
+      { path: '.claude/skills/my-skill-two/SKILL.md', expected: 'my-skill-two' },
+      { path: '.claude/skills/private-skill/SKILL.md', expected: 'private-skill' },
       { path: '.cursor/skills/my-skill/SKILL.md', expected: 'my-skill' },
       { path: '.cursor/rules/my-skill.md', expected: 'my-skill' },
       { path: '.opencode/skill/my-skill/SKILL.md', expected: 'my-skill' },
@@ -220,8 +220,8 @@ describe('add command', () => {
       expect(getLibrarySkill('empty')).toBe('')
     })
 
-    test('handles skill name at max length (50 chars)', () => {
-      const longName = 'a'.repeat(50)
+    test('handles skill name at max length (64 chars)', () => {
+      const longName = 'a'.repeat(64)
       const skillPath = createSkillFile('random/file.md', '# Long name skill')
 
       const result = runCli(['add', skillPath, '--name', longName], env())

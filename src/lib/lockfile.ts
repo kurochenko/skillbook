@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
-import { validateSkillName } from '@/lib/skills'
+import { validateExistingSkillName } from '@/lib/skills'
 
 export type LockEntry = {
   version: number
@@ -76,7 +76,7 @@ export const validateLockFile = (parsed: unknown, path: string): Partial<LockFil
   }
 
   for (const [skillId, entry] of Object.entries(skills ?? {})) {
-    const validation = validateSkillName(skillId)
+    const validation = validateExistingSkillName(skillId)
     if (!validation.valid) {
       failValidation(path, `invalid skill id "${skillId}": ${validation.error}`)
     }
