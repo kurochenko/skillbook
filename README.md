@@ -186,6 +186,7 @@ skillbook install alpha --skills beta,gamma --project /path/to/project
 ```bash
 skillbook status                          # project vs library
 skillbook sync                            # pull behind skills + sync enabled harnesses
+skillbook verify [--json]                 # read-only project integrity check
 skillbook add <path> [--name id]          # add from .md file or skill directory
 skillbook scan <path>                      # discover skills in existing projects
 skillbook diff <id> [--files]              # compare library/project skill content
