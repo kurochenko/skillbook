@@ -8,7 +8,7 @@ import { computeSkillHash } from '@/lib/skill-hash'
 import { copySkillDir } from '@/lib/lock-copy'
 import { gitInit, gitAdd, gitCommit, ensureGitConfig, isGitRepo, gitPush } from '@/lib/git'
 import { resolveOriginPlan } from '@/lib/library-sync'
-import { SKILL_FILE, SKILLS_DIR } from '@/constants'
+import { SKILL_FILE, SKILLS_DIR, TOOLS } from '@/constants'
 import { extractSkillName, validateSkillName } from '@/lib/skills'
 import { DEFAULT_SKILLS } from '@/lib/default-skills'
 import { isIgnoredFsError, logError } from '@/lib/logger'
@@ -78,12 +78,12 @@ const IGNORED_DIRS_SET = new Set([
 ])
 
 const SKILL_PATH_MARKERS = [
-  { marker: '/.claude/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
-  { marker: '/.agents/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
-  { marker: '/.cursor/rules/', suffix: '.md', needsDirectory: false },
-  { marker: '/.opencode/skill/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
+  ...Object.values(TOOLS).map((tool) => ({
+    marker: `/${tool.baseDir.join('/')}/`,
+    suffix: tool.needsDirectory ? `/${SKILL_FILE}` : (tool.fileSuffix ?? ''),
+    needsDirectory: tool.needsDirectory,
+  })),
   { marker: '/.skillbook/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
-  { marker: '/.pi/skills/', suffix: `/${SKILL_FILE}`, needsDirectory: true },
 ]
 
 const readFileSafe = (path: string): string | null => {

@@ -1,12 +1,18 @@
 import { basename, dirname } from 'path'
+import { SKILL_FILE, TOOLS } from '@/constants'
 
 const SKILL_NAME_PATTERN = /^[a-z0-9_][a-z0-9_-]{0,49}$/
 
-const HARNESS_PATTERNS = [
-  /\.claude\/skills\/([^/]+)\/SKILL\.md$/i,
-  /\.cursor\/rules\/([^/]+)\.md$/i,
-  /\.opencode\/skill\/([^/]+)\/SKILL\.md$/i,
-]
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const HARNESS_PATTERNS = Object.values(TOOLS).map((tool) => {
+  const baseDirPattern = escapeRegExp(tool.baseDir.join('/'))
+  if (tool.needsDirectory) {
+    return new RegExp(`${baseDirPattern}/([^/]+)/${escapeRegExp(SKILL_FILE)}$`, 'i')
+  }
+
+  return new RegExp(`${baseDirPattern}/([^/]+)${escapeRegExp(tool.fileSuffix ?? '')}$`, 'i')
+})
 
 export type SkillNameValidation =
   | { valid: true; name: string }

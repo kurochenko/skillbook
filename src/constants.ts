@@ -1,35 +1,3 @@
-export const TOOLS = {
-  'claude-code': {
-    name: 'Claude Code',
-    skillPath: (name: string) => `.claude/skills/${name}/SKILL.md`,
-    needsDirectory: true,
-  },
-  codex: {
-    name: 'Codex',
-    skillPath: (name: string) => `.agents/skills/${name}/SKILL.md`,
-    needsDirectory: true,
-  },
-  cursor: {
-    name: 'Cursor',
-    skillPath: (name: string) => `.cursor/rules/${name}.md`,
-    needsDirectory: false,
-  },
-  opencode: {
-    name: 'OpenCode',
-    skillPath: (name: string) => `.opencode/skill/${name}/SKILL.md`,
-    needsDirectory: true,
-  },
-  pi: {
-    name: 'Pi',
-    skillPath: (name: string) => `.pi/skills/${name}/SKILL.md`,
-    needsDirectory: true,
-  },
-} as const
-
-export type ToolId = keyof typeof TOOLS
-
-export const SUPPORTED_TOOLS = Object.keys(TOOLS) as ToolId[]
-
 export const DEFAULT_LIBRARY_PATH = '~/.skillbook'
 export const SKILLBOOK_DIR = '.skillbook'
 export const SKILLS_DIR = 'skills'
@@ -39,3 +7,54 @@ export const LOCK_BASE_DIR = '.skillbook'
 export const LOCK_SKILLS_DIR = 'skills'
 export const LOCK_FILE = 'skillbook.lock.json'
 export const LOCK_LIBRARY_ENV = 'SKILLBOOK_LOCK_LIBRARY'
+
+type ToolPathConfig = {
+  name: string
+  baseDir: readonly string[]
+  needsDirectory: boolean
+  fileSuffix?: string
+}
+
+const getSkillPathFromToolConfig = (tool: ToolPathConfig, name: string): string => {
+  const basePath = tool.baseDir.join('/')
+  if (tool.needsDirectory) return `${basePath}/${name}/${SKILL_FILE}`
+  return `${basePath}/${name}${tool.fileSuffix ?? ''}`
+}
+
+const defineTool = <const T extends ToolPathConfig>(tool: T): T & { skillPath: (name: string) => string } => ({
+  ...tool,
+  skillPath: (name: string) => getSkillPathFromToolConfig(tool, name),
+})
+
+export const TOOLS = {
+  'claude-code': defineTool({
+    name: 'Claude Code',
+    baseDir: ['.claude', 'skills'],
+    needsDirectory: true,
+  }),
+  codex: defineTool({
+    name: 'Codex',
+    baseDir: ['.agents', 'skills'],
+    needsDirectory: true,
+  }),
+  cursor: defineTool({
+    name: 'Cursor',
+    baseDir: ['.cursor', 'rules'],
+    needsDirectory: false,
+    fileSuffix: '.md',
+  }),
+  opencode: defineTool({
+    name: 'OpenCode',
+    baseDir: ['.opencode', 'skill'],
+    needsDirectory: true,
+  }),
+  pi: defineTool({
+    name: 'Pi',
+    baseDir: ['.pi', 'skills'],
+    needsDirectory: true,
+  }),
+} as const
+
+export type ToolId = keyof typeof TOOLS
+
+export const SUPPORTED_TOOLS = Object.keys(TOOLS) as ToolId[]

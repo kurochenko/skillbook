@@ -1,17 +1,9 @@
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { type ToolId } from '@/constants'
-
-const HARNESS_BASE_DIRS: Record<ToolId, string[]> = {
-  'claude-code': ['.claude', 'skills'],
-  codex: ['.agents', 'skills'],
-  opencode: ['.opencode', 'skill'],
-  cursor: ['.cursor', 'rules'],
-  pi: ['.pi', 'skills'],
-}
+import { TOOLS, type ToolId } from '@/constants'
 
 export const getHarnessBaseDir = (projectPath: string, harnessId: ToolId): string =>
-  join(projectPath, ...HARNESS_BASE_DIRS[harnessId])
+  join(projectPath, ...TOOLS[harnessId].baseDir)
 
 export const harnessExists = (projectPath: string, harnessId: ToolId): boolean =>
   existsSync(getHarnessBaseDir(projectPath, harnessId))

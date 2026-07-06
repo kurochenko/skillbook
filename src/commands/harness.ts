@@ -16,6 +16,8 @@ import {
 import { getLockFilePath, getProjectLockRoot } from '@/lib/paths'
 import { createEmptyLockFile, type HarnessMode, type LockFile, getHarnessMode, setHarnessMode, writeLockFile } from '@/lib/lockfile'
 
+const HARNESS_ID_DESCRIPTION = `Harness id (${SUPPORTED_TOOLS.join(', ')})`
+
 const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => {
   if (allowAll && value === 'all') return SUPPORTED_TOOLS
 
@@ -131,7 +133,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, codex, cursor, opencode)',
+            description: HARNESS_ID_DESCRIPTION,
           },
           harness: {
             type: 'string',
@@ -205,7 +207,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, codex, cursor, opencode)',
+            description: HARNESS_ID_DESCRIPTION,
           },
           harness: {
             type: 'string',
@@ -324,7 +326,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, codex, cursor, opencode)',
+            description: HARNESS_ID_DESCRIPTION,
           },
           harness: {
             type: 'string',
@@ -388,7 +390,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, codex, cursor, opencode)',
+            description: HARNESS_ID_DESCRIPTION,
           },
           harness: {
             type: 'string',
@@ -469,7 +471,7 @@ export default defineCommand({
           },
           id: {
             type: 'string',
-            description: 'Harness id (claude-code, codex, cursor, opencode)',
+            description: HARNESS_ID_DESCRIPTION,
           },
           harness: {
             type: 'string',
