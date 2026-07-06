@@ -21,6 +21,7 @@ type FileDiffEntry = {
 }
 
 type DiffJsonOutput = {
+  ok: boolean
   id: string
   from: DiffScope
   to: DiffScope
@@ -126,9 +127,10 @@ export default defineCommand({
     const from = args.from as DiffScope
     const to = args.to as DiffScope
     const showFiles = args.files
+    const json = args.json
 
     if (!['library', 'project'].includes(from) || !['library', 'project'].includes(to)) {
-      fail('Invalid --from/--to. Use library or project.')
+      fail('Invalid --from/--to. Use library or project.', 1, { json, payload: { id: skill, from, to } })
     }
 
     const fromContext = resolveScopeContext(from, projectPath)
@@ -139,10 +141,10 @@ export default defineCommand({
     const toFile = getSkillFilePath(toContext.skillsPath, skill)
 
     if (!existsSync(fromFile)) {
-      fail(`Skill not found in ${from}: ${skill}`)
+      fail(`Skill not found in ${from}: ${skill}`, 1, { json, payload: { id: skill, from, to } })
     }
     if (!existsSync(toFile)) {
-      fail(`Skill not found in ${to}: ${skill}`)
+      fail(`Skill not found in ${to}: ${skill}`, 1, { json, payload: { id: skill, from, to } })
     }
 
     const fromHash = await computeSkillHash(fromDir)
@@ -156,8 +158,9 @@ export default defineCommand({
       ? computeFileDiffs(fromDir, toDir)
       : []
 
-    if (args.json) {
+    if (json) {
       const output: DiffJsonOutput = {
+        ok: true,
         id: skill,
         from,
         to,

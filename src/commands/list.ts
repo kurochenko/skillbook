@@ -35,11 +35,11 @@ export default defineCommand({
       const projectContext = getProjectLockContext(projectPath)
       const skillsPath = projectContext.skillsPath
       const skills = listSkillIds(skillsPath)
-      const lock = skills.length > 0 ? readLockFileOrFail(projectContext.lockFilePath) : null
+      const lock = skills.length > 0 ? readLockFileOrFail(projectContext.lockFilePath, { json: isJson }) : null
       const entries = Object.fromEntries(skills.map((skill) => [skill, lock?.skills[skill] ?? null]))
 
       if (isJson) {
-        process.stdout.write(JSON.stringify({ scope: 'project', path: projectPath, skills, entries }))
+        process.stdout.write(JSON.stringify({ ok: true, scope: 'project', path: projectPath, skills, entries }))
         return
       }
 
@@ -61,11 +61,11 @@ export default defineCommand({
     const skillsPath = getSkillsPath()
 
     const skills = existsSync(skillsPath) ? listSkills() : []
-    const lock = skills.length > 0 ? readLockFileOrFail(getLockFilePath(libraryPath)) : null
+    const lock = skills.length > 0 ? readLockFileOrFail(getLockFilePath(libraryPath), { json: isJson }) : null
     const entries = Object.fromEntries(skills.map((skill) => [skill, lock?.skills[skill] ?? null]))
 
     if (isJson) {
-      process.stdout.write(JSON.stringify({ scope: 'library', path: libraryPath, skills, entries }))
+      process.stdout.write(JSON.stringify({ ok: true, scope: 'library', path: libraryPath, skills, entries }))
       return
     }
 

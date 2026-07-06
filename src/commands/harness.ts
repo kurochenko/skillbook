@@ -18,32 +18,32 @@ import { createEmptyLockFile, type HarnessMode, type LockFile, getHarnessMode, s
 
 const HARNESS_ID_DESCRIPTION = `Harness id (${SUPPORTED_TOOLS.join(', ')})`
 
-const parseHarness = (value: string | undefined, allowAll = false): ToolId[] => {
+const parseHarness = (value: string | undefined, allowAll = false, json = false): ToolId[] => {
   if (allowAll && value === 'all') return SUPPORTED_TOOLS
 
   if (!value) {
-    fail(`Missing --id. Available harness ids: ${SUPPORTED_TOOLS.join(', ')}`)
+    fail(`Missing --id. Available harness ids: ${SUPPORTED_TOOLS.join(', ')}`, 1, { json })
   }
 
   if (!SUPPORTED_TOOLS.includes(value as ToolId)) {
-    fail(`Unknown harness '${value}'. Available: ${SUPPORTED_TOOLS.join(', ')}`)
+    fail(`Unknown harness '${value}'. Available: ${SUPPORTED_TOOLS.join(', ')}`, 1, { json })
   }
 
   return [value as ToolId]
 }
 
-const parseMode = (value: string | undefined): HarnessMode | undefined => {
+const parseMode = (value: string | undefined, json = false): HarnessMode | undefined => {
   if (!value) return undefined
   if (value === 'symlink' || value === 'copy') return value
-  fail(`Unknown harness mode '${value}'. Use symlink or copy.`)
+  fail(`Unknown harness mode '${value}'. Use symlink or copy.`, 1, { json })
 }
 
 const resolveHarnessArg = (args: { id?: string; harness?: string }) =>
   args.id ?? args.harness
 
-const getProjectLock = (projectPath: string): { lockPath: string; lock: LockFile } => {
+const getProjectLock = (projectPath: string, options: { json?: boolean } = {}): { lockPath: string; lock: LockFile } => {
   const lockPath = getLockFilePath(getProjectLockRoot(projectPath))
-  const lock = existsSync(lockPath) ? readLockFileOrFail(lockPath) : createEmptyLockFile()
+  const lock = existsSync(lockPath) ? readLockFileOrFail(lockPath, options) : createEmptyLockFile()
   return { lockPath, lock }
 }
 
@@ -147,13 +147,15 @@ export default defineCommand({
         },
         run: ({ args }) => {
           const projectPath = args.project ?? process.cwd()
-          const harnessId = parseHarness(resolveHarnessArg(args))[0]
-          const { lock } = getProjectLock(projectPath)
+          const harnessId = parseHarness(resolveHarnessArg(args), false, args.json)[0]
+          const { lock } = getProjectLock(projectPath, { json: args.json })
           const mode = getHarnessMode(lock, harnessId)
           const result = getHarnessStatus(projectPath, harnessId, mode)
 
           if (args.json) {
-            process.stdout.write(JSON.stringify(result))
+            const ok = result.conflicts === 0
+            process.stdout.write(JSON.stringify({ ok, ...result }))
+            if (!ok) process.exit(2)
             return
           }
 
@@ -191,6 +193,10 @@ export default defineCommand({
 
           if (result.untracked > 0) {
             p.log.info(pc.dim('Untracked entries are not managed by skillbook.'))
+          }
+
+          if (result.conflicts > 0) {
+            process.exit(2)
           }
         },
       }),
@@ -234,12 +240,16 @@ export default defineCommand({
           let harnesses: ToolId[]
 
           if (harnessArg) {
-            harnesses = parseHarness(harnessArg, true)
+            harnesses = parseHarness(harnessArg, true, args.json)
           } else {
-            const { lock } = getProjectLock(projectPath)
+            const { lock } = getProjectLock(projectPath, { json: args.json })
             const configuredHarnesses = lock.harnesses ?? []
 
             if (configuredHarnesses.length === 0) {
+              if (args.json) {
+                process.stdout.write(JSON.stringify({ ok: true, harnesses: [] }))
+                return
+              }
               p.log.info(pc.dim(`No harnesses enabled for this project. To enable all harnesses, run:`))
               p.log.info(pc.dim(`  skillbook harness sync --id all`))
               p.log.info(pc.dim(`Or enable specific harnesses with:`))
@@ -250,10 +260,12 @@ export default defineCommand({
             harnesses = configuredHarnesses as ToolId[]
           }
 
-          const modeOverride = parseMode(args.mode)
+          const modeOverride = parseMode(args.mode, args.json)
+          const jsonResults: Array<{ harnessId: ToolId } & ReturnType<typeof syncHarnessSkills>> = []
+          let totalConflicts = 0
 
           for (const harnessId of harnesses) {
-            const { lockPath, lock } = getProjectLock(projectPath)
+            const { lockPath, lock } = getProjectLock(projectPath, { json: args.json })
             const configuredMode = getHarnessMode(lock, harnessId)
             const mode = modeOverride ?? configuredMode
 
@@ -262,6 +274,7 @@ export default defineCommand({
               force: args.force,
               allowModeFallback: true,
             })
+            totalConflicts += result.conflicts
 
             let nextLock = lock
             if (result.mode !== configuredMode) {
@@ -269,7 +282,7 @@ export default defineCommand({
             }
 
             if (args.json) {
-              process.stdout.write(JSON.stringify({ harnessId, ...result }))
+              jsonResults.push({ harnessId, ...result })
               continue
             }
 
@@ -317,6 +330,20 @@ export default defineCommand({
             if (!nextLock.harnesses?.includes(harnessId)) {
               p.log.info(pc.dim(`Hint: run 'skillbook harness enable --id ${harnessId} --mode ${result.mode}' to persist this mode`))
             }
+          }
+
+          if (args.json) {
+            const ok = jsonResults.every((result) => result.conflicts === 0)
+            const output = jsonResults.length === 1
+              ? { ok, ...jsonResults[0] }
+              : { ok, harnesses: jsonResults }
+            process.stdout.write(JSON.stringify(output))
+            if (!ok) process.exit(2)
+            return
+          }
+
+          if (totalConflicts > 0) {
+            process.exit(2)
           }
         },
       }),

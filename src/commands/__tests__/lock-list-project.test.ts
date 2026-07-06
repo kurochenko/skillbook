@@ -7,6 +7,7 @@ import { SKILL_FILE } from '@/constants'
 import { getLockFilePath, getLockSkillsPath, getProjectLockRoot } from '@/lib/paths'
 
 type ListOutput = {
+  ok: boolean
   scope: 'project' | 'library'
   path: string
   skills: string[]
@@ -51,6 +52,7 @@ describe('list --project (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const data = parseJson(result.stdout)
+    expect(data.ok).toBe(true)
     expect(data.scope).toBe('project')
     expect(data.path).toBe(projectDir)
     expect(data.skills).toEqual(['alpha', 'beta'])

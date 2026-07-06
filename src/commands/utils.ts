@@ -2,17 +2,27 @@ import pc from 'picocolors'
 import { LockFileError, readLockFile, type LockFile } from '@/lib/lockfile'
 import { validateSkillName } from '@/lib/skills'
 
-export const fail = (message: string, exitCode = 1): never => {
+type FailOptions = {
+  json?: boolean
+  payload?: Record<string, unknown>
+}
+
+export const fail = (message: string, exitCode = 1, options: FailOptions = {}): never => {
+  if (options.json) {
+    process.stdout.write(JSON.stringify({ ...options.payload, ok: false, error: message }))
+    process.exit(exitCode)
+  }
+
   process.stderr.write(`${pc.red(message)}\n`)
   process.exit(exitCode)
 }
 
-export const readLockFileOrFail = (path: string): LockFile => {
+export const readLockFileOrFail = (path: string, options: FailOptions = {}): LockFile => {
   try {
     return readLockFile(path)
   } catch (error) {
     if (error instanceof LockFileError) {
-      fail(error.message)
+      fail(error.message, 1, options)
     }
     throw error
   }

@@ -14,6 +14,7 @@ type FileDiffEntry = {
 }
 
 type DiffOutput = {
+  ok: boolean
   id: string
   from: 'library' | 'project'
   to: 'library' | 'project'
@@ -71,6 +72,7 @@ describe('diff command (CLI)', () => {
 
     expect(result.exitCode).toBe(0)
     const data = parseJson(result.stdout)
+    expect(data.ok).toBe(true)
     expect(data.id).toBe('alpha')
     expect(data.from).toBe('library')
     expect(data.to).toBe('project')

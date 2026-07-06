@@ -199,6 +199,27 @@ skillbook harness status --id <harness>
 skillbook harness enable --id <harness> --mode symlink|copy
 ```
 
+## Automation
+
+Commands that accept `--json` emit one JSON object on stdout with a top-level
+`ok` boolean. Existing command payload fields remain at the top level. JSON
+errors use `{ "ok": false, "error": "..." }` plus any partial payload fields and
+the same exit code as the human-readable path.
+
+```bash
+skillbook status --json | jq
+```
+
+Exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success |
+| 1 | Usage, input, or environment error, including bad args, missing skills, corrupt lockfiles, and verify findings |
+| 2 | Sync-state conflict, including diverged skills, push/pull refusals, and harness conflicts |
+
+The update banner is suppressed when `--json` is used or stdout is not a TTY.
+
 ## Supported harnesses
 
 | Tool | Path | Format |
