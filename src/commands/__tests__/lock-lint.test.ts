@@ -108,4 +108,30 @@ describe('lint command', () => {
     expect(result.exitCode).toBe(0)
     expect(json).toEqual({ ok: true, skills: 1, findings: [] })
   })
+
+  test('unknown requested skill id reports an error and exits 1', () => {
+    writeProjectSkill('clean-skill', [
+      '---',
+      'name: clean-skill',
+      'description: Clean project skill.',
+      '---',
+      '# Clean Skill',
+    ].join('\n'))
+
+    const result = runCli(['lint', 'does-not-exist', '--project', projectDir, '--json'])
+    const json = JSON.parse(result.stdout) as {
+      ok: boolean
+      skills: number
+      findings: Array<{ skill: string; level: string; rule: string }>
+    }
+
+    expect(result.exitCode).toBe(1)
+    expect(json.ok).toBe(false)
+    expect(json.findings).toHaveLength(1)
+    expect(json.findings[0]).toMatchObject({
+      skill: 'does-not-exist',
+      level: 'error',
+      rule: 'unknown-skill',
+    })
+  })
 })
