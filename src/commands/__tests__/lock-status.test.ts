@@ -175,6 +175,24 @@ describe('lock-based workflow (CLI)', () => {
       expect(data.skills[0]).toMatchObject({ id: 'alpha', status: 'diverged' })
     })
 
+    test('human output also exits 2 when a skill is diverged', () => {
+      const base = '# Skill v1'
+      const local = '# Skill v2 local'
+      const remote = '# Skill v2 remote'
+      const baseHash = hashFromContent(base)
+      const remoteHash = hashFromContent(remote)
+
+      writeSkill(libraryDir, 'alpha', remote)
+      writeLockFile(libraryDir, { alpha: { version: 2, hash: remoteHash } })
+
+      writeSkill(projectRoot(), 'alpha', local)
+      writeLockFile(projectRoot(), { alpha: { version: 1, hash: baseHash } })
+
+      const result = runCli(['status', '--project', projectDir], env())
+      expect(result.exitCode).toBe(2)
+      expect(result.stdout).toContain('diverged')
+    })
+
     test('reports local-only when project has skill and library does not', () => {
       const content = '# Local skill'
       writeSkill(projectRoot(), 'alpha', content)
