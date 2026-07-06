@@ -1,90 +1,9 @@
-import { existsSync } from 'fs'
 import { defineCommand } from 'citty'
 import pc from 'picocolors'
 
-import { copySkillDir } from '@/lib/lock-copy'
-import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
-import { linkSkillToHarness } from '@/lib/lock-harness'
-import { getHarnessMode, setHarnessMode, setLockEntry, writeLockFile } from '@/lib/lockfile'
-import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
-import { getSkillDir } from '@/lib/skill-fs'
-import { resolveSkills, readLockFileOrFail } from '@/commands/utils'
-
-const installSkill = (
-  skill: string,
-  projectPath: string,
-  force = false,
-): {
-  success: boolean
-  error?: string
-  conflicts?: number
-  drifted?: number
-  fallbackHarnesses?: ToolId[]
-} => {
-  const projectContext = getProjectLockContext(projectPath)
-  const libraryContext = getLibraryLockContext()
-  const projectSkillDir = getSkillDir(projectContext.skillsPath, skill)
-  const librarySkillDir = getSkillDir(libraryContext.skillsPath, skill)
-
-  if (!existsSync(librarySkillDir)) {
-    return { success: false, error: `Skill not found in library: ${skill}` }
-  }
-
-  if (existsSync(projectSkillDir)) {
-    if (force) {
-      // Continue with overwriting
-    } else {
-      return { success: false, error: `Skill already exists in project: ${skill}. Use --force to overwrite.` }
-    }
-  }
-
-  const libraryLock = readLockFileOrFail(libraryContext.lockFilePath)
-  const entry = libraryLock.skills[skill]
-
-  if (!entry) {
-    return { success: false, error: `No lock entry found for skill in library: ${skill}` }
-  }
-
-  copySkillDir(librarySkillDir, projectSkillDir)
-
-  const projectLock = readLockFileOrFail(projectContext.lockFilePath)
-  const updated = setLockEntry(projectLock, skill, {
-    version: entry.version,
-    hash: entry.hash,
-    updatedAt: entry.updatedAt,
-  })
-  writeLockFile(projectContext.lockFilePath, updated)
-
-  const harnesses = (updated.harnesses ?? [])
-    .filter((h): h is ToolId => SUPPORTED_TOOLS.includes(h as ToolId))
-
-  let conflicts = 0
-  let drifted = 0
-  const fallbackHarnesses: ToolId[] = []
-  let nextProjectLock = updated
-
-  for (const harnessId of harnesses) {
-    const result = linkSkillToHarness(projectPath, harnessId, skill, {
-      mode: getHarnessMode(nextProjectLock, harnessId),
-      force: true,
-      allowModeFallback: true,
-    })
-
-    if (result.conflict) conflicts += 1
-    if (result.drifted) drifted += 1
-
-    if (result.fallbackToCopy && getHarnessMode(nextProjectLock, harnessId) !== result.mode) {
-      nextProjectLock = setHarnessMode(nextProjectLock, harnessId, result.mode)
-      fallbackHarnesses.push(harnessId)
-    }
-  }
-
-  if (fallbackHarnesses.length > 0) {
-    writeLockFile(projectContext.lockFilePath, nextProjectLock)
-  }
-
-  return { success: true, conflicts, drifted, fallbackHarnesses }
-}
+import { type ToolId } from '@/constants'
+import { installSkill } from '@/lib/lock-operations'
+import { resolveSkills } from '@/commands/utils'
 
 export default defineCommand({
   meta: {
