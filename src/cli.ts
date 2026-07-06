@@ -23,6 +23,7 @@ const SUBCOMMANDS = [
   'sync',
   'uninstall',
   'upgrade',
+  'verify',
 ]
 
 const out = (s: string) => process.stdout.write(`${s}\n`)
@@ -93,6 +94,7 @@ ${pc.cyan('  skillbook init --project --path <path>')}${pc.dim('        Init pro
 ${pc.cyan('  skillbook status [--project <path>]')}${pc.dim('        Show lock-based status for project skills')}
 ${pc.cyan('  skillbook status [--project <path>] --json')}${pc.dim('  JSON output for automation')}
 ${pc.cyan('  skillbook sync [--project <path>] [--force]')}${pc.dim(' Pull behind skills and sync enabled harnesses')}
+${pc.cyan('  skillbook verify [--project <path>] [--json]')}${pc.dim(' Verify project skill integrity without changes')}
 ${pc.cyan('  skillbook list --project <path> --json')}${pc.dim('        List project skills')}
 ${pc.cyan('  skillbook show <id> --project <path> --json')}${pc.dim('   Show project skill details')}
 ${pc.cyan('  skillbook diff <id> --project <path> --json')}${pc.dim('   Diff project vs library')}
@@ -169,6 +171,7 @@ const runSubcommand = async () => {
       sync: () => import('@/commands/sync').then((m) => m.default),
       uninstall: () => import('@/commands/uninstall').then((m) => m.default),
       upgrade: () => import('@/commands/upgrade').then((m) => m.default),
+      verify: () => import('@/commands/verify').then((m) => m.default),
     },
   })
   await runMain(main)
