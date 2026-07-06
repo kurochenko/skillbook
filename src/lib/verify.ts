@@ -1,6 +1,7 @@
 import { existsSync, statSync } from 'fs'
 
-import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
+import { type ToolId } from '@/constants'
+import { enabledHarnesses } from '@/lib/harness'
 import { getHarnessStatus } from '@/lib/lock-harness'
 import { getLibraryLockContext, getProjectLockContext, type LockContext } from '@/lib/lock-context'
 import { getHarnessMode, LockFileError, readLockFile, type LockFile } from '@/lib/lockfile'
@@ -39,9 +40,6 @@ export type VerifyResult = {
 export type VerifyProjectOptions = {
   library?: boolean
 }
-
-const enabledHarnesses = (harnesses: string[] | undefined): ToolId[] =>
-  (harnesses ?? []).filter((id): id is ToolId => SUPPORTED_TOOLS.includes(id as ToolId))
 
 const isDirectory = (path: string): boolean => {
   try {

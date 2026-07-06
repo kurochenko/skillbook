@@ -15,7 +15,9 @@ import {
   readSymlinkTarget,
   type HarnessContentStatus,
 } from '@/lib/harness-inspect'
-import { copySkillDir } from '@/lib/lock-copy'
+import { copySkillDir, ensureDir } from '@/lib/lock-copy'
+
+export { ensureDir }
 import { type HarnessMode } from '@/lib/lockfile'
 import { getProjectLockRoot, getLockSkillsPath } from '@/lib/paths'
 import { getSkillDir, getSkillFilePath } from '@/lib/skill-fs'
@@ -50,12 +52,6 @@ type SyncOptions = {
   mode?: HarnessMode
   force?: boolean
   allowModeFallback?: boolean
-}
-
-export const ensureDir = (path: string): void => {
-  if (!existsSync(path)) {
-    mkdirSync(path, { recursive: true })
-  }
 }
 
 export const removePath = (path: string): void => {

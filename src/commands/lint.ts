@@ -2,15 +2,12 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { fail } from '@/commands/utils'
+import { fail, plural } from '@/commands/utils'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { lintSkills, type LintFinding } from '@/lib/lint'
 import { validateExistingSkillName } from '@/lib/skills'
 
 type RawArgs = Record<string, unknown>
-
-const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
-  `${count} ${count === 1 ? singular : pluralForm}`
 
 const collectIds = (args: RawArgs): string[] => {
   const ids: string[] = []

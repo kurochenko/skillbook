@@ -1,6 +1,7 @@
 import pc from 'picocolors'
-import { LockFileError, readLockFile, type LockFile } from '@/lib/lockfile'
 import { validateExistingSkillName } from '@/lib/skills'
+
+export { readLockFileOrFail } from '@/lib/lock-read'
 
 type FailOptions = {
   json?: boolean
@@ -17,16 +18,8 @@ export const fail = (message: string, exitCode = 1, options: FailOptions = {}): 
   process.exit(exitCode)
 }
 
-export const readLockFileOrFail = (path: string, options: FailOptions = {}): LockFile => {
-  try {
-    return readLockFile(path)
-  } catch (error) {
-    if (error instanceof LockFileError) {
-      fail(error.message, 1, options)
-    }
-    throw error
-  }
-}
+export const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
+  `${count} ${count === 1 ? singular : pluralForm}`
 
 export const resolveSkills = (skill?: string, skills?: string): string[] => {
   const skillList: string[] = []

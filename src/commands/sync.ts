@@ -2,11 +2,12 @@ import { defineCommand } from 'citty'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
-import { readLockFileOrFail } from '@/commands/utils'
+import { plural, readLockFileOrFail } from '@/commands/utils'
 import { ensureHarnessModeAfterSync } from '@/commands/harness'
 import { SUPPORTED_TOOLS, type ToolId } from '@/constants'
 import { getLibraryLockContext, getProjectLockContext } from '@/lib/lock-context'
 import { getHarnessStatus, syncHarnessSkills } from '@/lib/lock-harness'
+import { enabledHarnesses } from '@/lib/harness'
 import { resolveLockStatus, type LockStatus } from '@/lib/lock-status'
 import { getHarnessMode, type HarnessMode } from '@/lib/lockfile'
 import { pullSkill } from '@/lib/lock-operations'
@@ -43,12 +44,6 @@ type SyncOutput = {
   skills: SyncSkill[]
   harnesses: SyncHarness[]
 }
-
-const enabledHarnesses = (harnesses: string[] | undefined): ToolId[] =>
-  (harnesses ?? []).filter((id): id is ToolId => SUPPORTED_TOOLS.includes(id as ToolId))
-
-const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
-  `${count} ${count === 1 ? singular : pluralForm}`
 
 const printSkillLine = (skill: SyncSkill) => {
   if (skill.action === 'pulled') {

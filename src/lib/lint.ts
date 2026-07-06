@@ -50,7 +50,10 @@ const KNOWN_FRONTMATTER_KEYS = new Set([
 
 const lineCount = (content: string): number => {
   if (content.length === 0) return 0
-  return content.split(/\r\n|\r|\n/).length
+  const lines = content.split(/\r\n|\r|\n/)
+  // a trailing newline produces a phantom empty last element, not a real line
+  if (lines[lines.length - 1] === '') lines.pop()
+  return lines.length
 }
 
 export const parseSkillFrontmatter = (content: string): ParsedFrontmatter => {

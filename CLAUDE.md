@@ -28,13 +28,13 @@ bun run build                # Compile to dist/skillbook
 
 ### Core layers
 
-- **`src/lib/lockfile.ts`** — Read/write `skillbook.lock.json`. Schema: `{ schema: 1, skills: Record<id, { version, hash }>, harnesses: string[] }`.
+- **`src/lib/lockfile.ts`** — Read/write `skillbook.lock.json` (validated, atomic writes). Schema: `{ schema: 1, skills: Record<id, { version, hash, updatedAt? }>, harnesses?: string[], harnessModes?: Record<id, 'symlink' | 'copy'> }`.
 - **`src/lib/paths.ts`** / **`lock-context.ts`** — Resolve paths for library (`~/.skillbook` or `SKILLBOOK_LIBRARY`) and project (`.skillbook/` within project root).
 - **`src/lib/lock-status.ts`** — Compare project vs library lock entries to determine sync status: `synced | ahead | behind | diverged | local-only | library-only`.
 - **`src/lib/library.ts`** — Library operations: `ensureLibrary()` (init git repo), `addSkillToLibrary()`, `scanProjectSkills()` (crawl filesystem via `fdir`), `listSkills()`.
-- **`src/lib/lock-harness.ts`** — Symlink management: create/remove symlinks from harness dirs to `.skillbook/skills/`.
+- **`src/lib/lock-harness.ts`** — Re-export barrel over `harness-inspect.ts` (path/status inspection), `harness-link.ts` (symlink/copy primitives), and `harness-batch.ts` (bulk sync/import/status, stale-entry cleanup).
 - **`src/lib/skill-hash.ts`** — Content hashing for change detection.
-- **`src/lib/skills.ts`** — Skill name validation (`/^[a-z0-9_][a-z0-9_-]{0,49}$/`) and extraction from file paths.
+- **`src/lib/skills.ts`** — Skill name validation (`validateSkillName` enforces the Agent Skills spec for new names; `validateExistingSkillName` also tolerates legacy underscores) and extraction from file paths.
 
 ### Path system
 
@@ -50,7 +50,7 @@ Tests use `bun:test` with temp directories and env overrides. The helper `withLi
 - Project dir: `.skillbook/skills/<id>/SKILL.md`
 - Library dir: `~/.skillbook/skills/<id>/SKILL.md`
 - Lock file: `skillbook.lock.json`
-- Supported harness IDs: `claude-code`, `codex`, `cursor`, `opencode`
+- Supported harness IDs: `claude-code`, `codex`, `cursor`, `opencode`, `pi`
 
 ## TypeScript strictness
 
